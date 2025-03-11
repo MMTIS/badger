@@ -25,6 +25,8 @@ sh scripts/generate-schema.sh
 ```
 *For Microsoft Windows users, see the commands in the [shell file](scripts/generate-schema.sh).*
 
+For Microsoft Windows users a [screen recording](https://www.youtube.com/watch?v=Kz2p4yQn5rw) was made.
+
 ## Architecture
 
 Badger takes concepts of various timetable formats and converts them in NeTEx objects.
