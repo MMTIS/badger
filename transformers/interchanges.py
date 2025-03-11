@@ -158,7 +158,7 @@ def interchange_rules_to_service_journey_interchanges(db: Database) -> Generator
                             interchange_rule.distributor_filter.scheduled_stop_point_ref = ssp_ref
                             break
                 else:
-                    log_once(logging.WARN,"sj-2""We cannot find {sj_ref.ref} for {interchange_rule}.")
+                    log_once(logging.WARN,"sj-2","We cannot find {sj_ref.ref} for {interchange_rule}.")
 
         else:
             log_once(logging.WARN, "sj-3","TODO: implement non-servicejourneyref interchange")
