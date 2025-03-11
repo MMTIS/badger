@@ -59,11 +59,26 @@ In the case a different format is required, our intermediate NeTEx presentation 
 
 #### NeTEx EPIP example
 ```sh
-uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.lmdb
 uv run python -m conv.netex_db_to_generalframe path_to_input_netex path_to_intermediate_presentation.xml.gz
 uv run python -m conv.epip_db_to_db path_to_input_netex.lmdb path_to_output_epip.lmdb
 uv run python -m conv.epip_db_to_xml path_to_output_epip.lmdb path_to_output_epip.xml.gz
 ```
+
+#### GTFS to NeTEx EPIP example
+```sh
+uv run python -m conv.gtfs_import_to_db path_to_gtfs.zip path_to_gtfs.duckdb
+uv run python -m conv.gtfs_convert_to_db path_to_gtfs.duckdb path_to_intermediate.lmdb
+uv run python -m conv.epip_db_to_db path_to_intermediate.lmdb path_to_output_epip.lmdb
+uv run python -m conv.epip_db_to_xml path_to_output_epip.lmdb path_to_output_epip.xml.gz
+```
+
+#### NeTEx EPIP to GTFS example
+```sh
+uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.lmdb
+uv run python -m conv.gtfs_db_to_db path_to_input_netex.lmdb path_to_output_gtfs.lmdb
+uv run python -m conv.gtfs_db_to_gtfs path_to_output_gtfs.lmdb path_to_output_gtfs.zip
+```
+
 
 ### Performance
 The software has carefully been designed with streaming and performance in mind, while meeting the reproducibility requirements.

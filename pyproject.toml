@@ -4,12 +4,15 @@ version = "0.1.0"
 description = "A fast Python based timetable converter"
 authors = ["Stefan de Konink <stefan@konink.de>"]
 dependencies = [
+    "chardet",
     "cloudpickle",
     "dateutils",
+    "duckdb",
     "isal",
     "lmdb",
     "lz4",
     "numpy",
+    "pandas",
     "pyproj",
     "xsdata[cli,soap,lxml]>=24.12",
 ]

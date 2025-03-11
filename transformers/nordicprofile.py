@@ -17,7 +17,7 @@ from netex import Codespace, DataSource, Version, VehicleJourney, TimetableFrame
     GroupOfLines, OperatingPeriod, OperatingPeriodVersionStructure, UicOperatingPeriod, UicOperatingPeriodRef, \
     OperatingPeriodRef, RouteLinksInFrameRelStructure, RouteView, ParticipantRef
 from utils.refs import getRef, getIndex, getId
-from timetabledpassingtimesprofile import TimetablePassingTimesProfile
+from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
 import lxml
 
 
