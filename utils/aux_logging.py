@@ -3,7 +3,6 @@
 # --log=INFO
 # --logfile=filename
 import logging
-from typing import Any
 
 from configuration import NOSOFTLOGGING, processing_data, log_dict
 import os
@@ -37,7 +36,7 @@ def prepare_logger(log_level: int, log_file_name: str) -> logging.Logger:
         return mylogger
     if mylogger:
         mylogger.setLevel(log_level)
-        log_dict: dict[str, list[Any]] = {}  # type: ignore
+        log_dict = {}
         # create console handler and set level to debug
         ch = logging.StreamHandler(sys.stdout)
         ch.setLevel(logging.DEBUG)
