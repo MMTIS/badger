@@ -48,8 +48,8 @@ The interaction with source data follows the paradigm of common ETL.
 A source is extracted, optionally transformed in NeTEx, and loaded into a key-value database.
 This database should be observed as a _NeTEx GeneralFrame_.
 All first class objects are represented as-is.
-Considering the use of public use of NeTEx, we have experienced that the use is different from what was academically intended.
-For this reason we denormalise the FrameDefaults, inherit versions, and make sure that geographic projections as explicitly set.
+Considering the public use of NeTEx, we have experienced that the implementations are different from what was academically intended.
+For this reason we denormalise the FrameDefaults, inherit versions, and make sure that geographic projections are explicitly set.
 The goal is that the processing later can trust fields are set with sane defaults.
 
 Now a NeTEx database is available, this database is read by an implementation of a NeTEx target profile.
