@@ -17,13 +17,13 @@ uv venv
 uv sync
 sh scripts/setup.sh
 ```
-*For Microsoft Windows users, see the commands in the shell file.*
+*For Microsoft Windows users, see the commands in the [shell file](scripts/setup.sh).*
 
 ### Update schemas
 ```sh
 sh scripts/generate-schema.sh
 ```
-*For Microsoft Windows users, see the commands in the shell file.*
+*For Microsoft Windows users, see the commands in the [shell file](scripts/generate-schema.sh).*
 
 ## Architecture
 
