@@ -3,6 +3,8 @@ set -e  # Stops the script upon errors
 
 echo "🚀 Initialising the project..."
 
+uv venv
+
 source .venv/bin/activate
 
 echo "📦 Initialising the git submodules..."
