@@ -1,8 +1,9 @@
 # CONFIGURATION:
 import logging
+from typing import Any
 
 # Logging
-log_dict: dict[str, tuple[int, str]] = (
+log_dict: dict[str, list[Any]] = (
     {}
 )  # relevant values key - type of problem, then  [count, message]
 NOSOFTLOGGING = False  # if set to True the log_print function will output nothing
