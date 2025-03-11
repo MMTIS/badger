@@ -1,0 +1,9 @@
+netex/**
+**/.idea
+**/__pycache__/
+**/.venv
+**/*.lmdb/
+*.pyc
+*.txt
+*.duckdb
+uv.lock

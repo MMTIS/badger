@@ -1,0 +1,4 @@
+[submodule "schema/netex"]
+	path = schema/netex
+	url = https://github.com/NeTEx-CEN/NeTEx.git
+	branch = next

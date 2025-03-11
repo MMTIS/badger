@@ -1,3 +1,20 @@
+[project]
+name = "badger"
+version = "0.1.0"
+description = "A fast Python based timetable converter"
+authors = ["Stefan de Konink <stefan@konink.de>"]
+dependencies = [
+    "xsdata[cli,soap,lxml]>=24.12",
+]
+requires-python = ">=3.12"
+
+[tool.black]
+extend-exclude = "netex"
+
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
+exclude = ["netex"]
+
+[tool.ruff]
+exclude = ["netex"]
