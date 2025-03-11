@@ -59,7 +59,8 @@ In the case a different format is required, our intermediate NeTEx presentation 
 
 #### NeTEx EPIP example
 ```sh
-uv run python -m conv.netex_db_to_generalframe path_to_input_netex path_to_intermediate_presentation.xml.gz
+uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.lmdb
+uv run python -m conv.netex_db_to_generalframe path_to_input_netex.lmdb path_to_intermediate_presentation.xml.gz
 uv run python -m conv.epip_db_to_db path_to_input_netex.lmdb path_to_output_epip.lmdb
 uv run python -m conv.epip_db_to_xml path_to_output_epip.lmdb path_to_output_epip.xml.gz
 ```
