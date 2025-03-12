@@ -3,6 +3,7 @@ import logging
 from utils.aux_logging import (
     prepare_logger,
     log_all,
+    log_once,
     log_flush,
     log_write_counts,
     log_print,
