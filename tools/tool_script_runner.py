@@ -69,8 +69,8 @@ def check_string(input_string: str) -> bool:
 def load_and_run(file_name: str, args_string: str) -> Any:
 
     module_name = file_name.rstrip(".py")
-    mod =importlib.import_module(module_name)
-    main_function=getattr(mod,"main")
+    mod = importlib.import_module(module_name)
+    main_function = getattr(mod, "main")
 
     if not callable(main_function):
         raise TypeError(f"{module_name} is not callable!")
@@ -79,7 +79,7 @@ def load_and_run(file_name: str, args_string: str) -> Any:
     args1: list[Any] = []
     for arg in args:
         result: Any
-        result=arg
+        result = arg
         if check_string(arg):
             print(".")
             result = arg

@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, IO, Any
 import inspect
 
 if TYPE_CHECKING:
@@ -965,7 +965,7 @@ def recursive_attributes(obj, depth: List[int]) -> Tuple[object, List[int]]:
                     mydepth.pop()
 
 
-def open_netex_file(filename):
+def open_netex_file(filename : str) -> Iterable[IO[Any]]:
     if filename.endswith(".xml.gz"):
         yield igzip_threaded.open(filename, "rb", compresslevel=3, threads=3)
     elif filename.endswith(".xml"):
