@@ -1,53 +1,74 @@
 from operator import attrgetter
 from itertools import groupby
-from typing import Optional, List, TypeVar
+from typing import Optional, List, TypeVar, Any
 
-from netex import *
+from netex import (
+    MultilingualString,
+    EntityInVersionStructure,
+    EntityStructure,
+    VersionOfObjectRefStructure,
+    Codespace,
+    Version,
+)
+
+# TODO: This is required for globals to work, lets fix that later.
+from netex import *  # noqa: F403
+
 from utils.utils import get_object_name
 
 import datetime
 import re
 
 T = TypeVar("T")
+Tid = TypeVar("Tid", bound=EntityStructure)
+Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
+Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-def getRef(obj: object, klass=None):
+def getRef(obj: Tidversion, klass: type[Tref] | None = None) -> Tref | None:
     if obj is None:
         return None
 
-    if klass == None:
-        asobj = type(obj).__name__ + 'Ref'  # Was: RefStructure
+    if klass is None:
+        asobj = type(obj).__name__ + "Ref"  # Was: RefStructure
         klass = globals()[asobj]
 
-    if hasattr(obj, 'id'):
-        instance = klass(ref=obj.id)
-    elif hasattr(obj, 'ref'):
-        instance = klass(ref=obj.ref)
+    assert klass is not None
 
-    if hasattr(instance, 'order'):
+    if hasattr(obj, "id"):
+        assert obj.id is not None
+        instance = klass(ref=obj.id)
+    elif hasattr(obj, "ref"):
+        assert obj.ref is not None
+        instance = klass(ref=obj.ref)
+    else:
+        return None
+
+    if hasattr(instance, "order") and hasattr(obj, "order"):
         instance.order = obj.order
 
     name = type(obj).__name__
-    if hasattr(obj, 'Meta') and hasattr(obj.Meta, 'name'):
+    if hasattr(obj, "Meta") and hasattr(obj.Meta, "name"):
         name = obj.Meta.name
-    elif name.endswith('RefStructure'):
-        name = name.replace('RefStructure', 'Ref')
+    elif name.endswith("RefStructure"):
+        name = name.replace("RefStructure", "Ref")
 
-    if hasattr(obj, 'version'):
+    if hasattr(obj, "version"):
         instance.version = obj.version
 
     kname = klass.__name__
     meta_kname = klass.__name__
-    if hasattr(klass, 'Meta') and hasattr(klass.Meta, 'name'):
-        meta_kname = klass.Meta.name
+    meta = getattr(klass, "Meta", None)
+    if meta and hasattr(meta, "name"):
+        meta_kname = meta.name
 
     if not (kname.startswith(name) or meta_kname.startswith(name)):
         instance.name_of_ref_class = name
     return instance
 
 
-def getFakeRefByClass(id: str, klass: T, version: str = None) -> T:
-    asobj = klass.__name__ + 'Ref'  # Was: RefStructure
+def getFakeRefByClass(id: str, klass: type[Tref], version: str | None = None) -> Tref:
+    asobj = type(klass).__name__ + "Ref"  # Was: RefStructure
     klass = globals()[asobj]
     instance = klass(ref=id)
     if version is not None:
@@ -55,80 +76,90 @@ def getFakeRefByClass(id: str, klass: T, version: str = None) -> T:
     return instance
 
 
-def getClassFromRefClass(ref):
+def getClassFromRefClass(ref: Tref) -> Any:
     if ref.name_of_ref_class is not None:
         klass = ref.name_of_ref_class
     else:
-        klass = re.sub(r'LineRef(Structure)?', 'Line', ref.__name__)
+        klass = re.sub(
+            r"LineRef(Structure)?", "Line", type(ref).__name__
+        )  # TODO: review
 
     return globals()[klass]
 
 
-def getFakeRef(id: str, klass: T, version: str, version_ref: str = None) -> T:
-    if id is None:
-        return None
+def getFakeRef(
+    id: str, klass: type[Tref], version: str, version_ref: str | None = None
+) -> Tref | None:
+    return (
+        klass(
+            ref=id,
+            version=version if version_ref is None else None,
+            version_ref=version_ref,
+        )
+        if id is None
+        else None
+    )
 
-    instance = klass(ref=id, version=version if version_ref is None else None, version_ref=version_ref)
-    return instance
+
+def getIdByRef(obj: object, codespace: Codespace, ref: str) -> str:
+    name = getattr(getattr(type(obj), "Meta", None), "name", type(obj).__name__)
+    return "{}:{}:{}".format(codespace.xmlns, name, str(ref).replace(":", "-"))
 
 
-def getIdByRef(obj: object, codespace: Codespace, ref: str):
-    name = type(obj).__name__
-    if hasattr(obj.Meta, 'name'):
-        name = obj.Meta.name
-    return "{}:{}:{}".format(codespace.xmlns, name, str(ref).replace(':', '-'))
-
-
-def getIndex(l: List[T], attr=None) -> dict[object, T]:
+def getIndex(objects: List[Tid], attr: str | None = None) -> dict[object, Tid]:
     if not attr:
-        return {x.id: x for x in l}
+        return {x.id: x for x in objects}
 
     f = attrgetter(attr)  # TODO: change with our own attrgetter that understands lists
-    return {f(x): x for x in l}
+    return {f(x): x for x in objects}
 
 
-def getIndexByGroup(l: List[T], attr: str) -> dict[object, T]:
+def getIndexByGroup(objects: List[T], attr: str) -> dict[object, list[T]]:
     f = attrgetter(attr)  # TODO: change with our own attrgetter that understands lists
-    return {i: list(j) for i, j in groupby(l, lambda x: f(x))}
+    return {i: list(j) for i, j in groupby(objects, lambda x: f(x))}
 
 
-def setIdVersion(obj: object, codespace: Codespace, id: str, version: Optional[Version]):
-    name = type(obj).__name__
-    if hasattr(obj.Meta, 'name'):
-        name = obj.Meta.name
-    obj.id = "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(':', '-'))
+def setIdVersion(
+    obj: Tidversion, codespace: Codespace, id: str, version: Optional[Version]
+) -> None:
+    name = getattr(getattr(type(obj), "Meta", None), "name", type(obj).__name__)
+    obj.id = "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(":", "-"))
     if version:
         obj.version = version.version
     else:
         obj.version = "any"
 
 
-def getId(clazz: T, codespace: Codespace, id: str):
+def getId(clazz: Tid, codespace: Codespace, id: str) -> str:
     name = get_object_name(clazz)
-    return "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(':', '-'))
+    return "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(":", "-"))
 
 
-def getVersionOfObjectRef(obj: object):
+def getVersionOfObjectRef(obj: Tid) -> VersionOfObjectRefStructure:
+    assert obj.id is not None
     return VersionOfObjectRefStructure(name_of_ref_class=type(obj).__name__, ref=obj.id)
 
 
-def getBitString2(available: list, f_orig=None, t_orig=None):
-    l = sorted(available)
+def getBitString2(
+    available: list[datetime.datetime],
+    f_orig: datetime.datetime | None = None,
+    t_orig: datetime.datetime | None = None,
+) -> str:
+    dates_sorted: list[datetime.datetime] = sorted(available)
     if f_orig is None:
-        f_orig = l[0]
+        f_orig = dates_sorted[0]
     if t_orig is None:
-        t_orig = l[-1]
+        t_orig = dates_sorted[-1]
 
     f = f_orig
 
-    out = ''
+    out = ""
     while f <= t_orig:
-        out += str(int(f in l))
+        out += str(int(f in dates_sorted))
         f += datetime.timedelta(days=1)
 
     return out
 
 
-def getOptionalString(name: str):
-    if name:
-        return MultilingualString(value=name)
+def getOptionalString(name: str) -> MultilingualString | None:
+    return MultilingualString(value=name) if name else None

@@ -1,8 +1,9 @@
 import inspect
+
 import netex
 import warnings
 import re
-from typing import Generator, TypeVar
+from typing import TypeVar, Iterable, Any, Type
 from xsdata.models.datatype import XmlDuration
 from netex import VersionFrameDefaultsStructure
 
@@ -10,42 +11,69 @@ T = TypeVar("T")
 
 
 def get_object_name(clazz: T) -> str:
-    return getattr(clazz.Meta, 'name', clazz.__name__) if hasattr(clazz, 'Meta') else clazz.__name__
+    return (
+        getattr(clazz.Meta, "name", str(clazz.__name__))
+        if hasattr(clazz, "Meta")
+        else str(clazz.__name__)
+    )
 
 
-def get_element_name_with_ns(clazz):
+def get_element_name_with_ns(clazz: T) -> str:
     name = get_object_name(clazz)
-    return "{" + clazz.Meta.namespace + "}" + name
+    meta = getattr(type(clazz), "Meta", None)
+
+    return "{" + meta.namespace if meta is not None else "" + "}" + name
 
 
-def project(obj, clazz: T, **kwargs) -> T:
+Tdc = TypeVar("Tdc", bound=type)
+
+
+def project(obj: Tdc, clazz: Type[Tdc], **kwargs: Any) -> Tdc:
     # if issubclass(obj.__class__, clazz_intermediate):
-    attributes = {x: getattr(obj, x, None) for x in clazz.__dataclass_fields__.keys() if
-                  (hasattr(clazz.__dataclass_fields__[x], 'init') and clazz.__dataclass_fields__[x].init != False)}
-    if 'id' in attributes:
-        attributes['id'] = attributes['id'].replace(f":{get_object_name(obj.__class__)}:",
-                                                    f":{get_object_name(clazz)}:")
+    attributes: dict[str, Any] = {
+        x: getattr(obj, x, None)
+        for x in clazz.__dataclass_fields__.keys()
+        if (
+            hasattr(clazz.__dataclass_fields__[x], "init")
+            and clazz.__dataclass_fields__[x].init is not False
+        )
+    }
+    if "id" in attributes:
+        attributes["id"] = attributes["id"].replace(
+            f":{get_object_name(obj.__class__)}:", f":{get_object_name(clazz)}:"
+        )
 
     return clazz(**{**attributes, **kwargs})
 
 
 def projectRef(obj, clazz: T) -> T:
-    attributes = {x: getattr(obj, x, None) for x in clazz.__dataclass_fields__.keys() if
-                  (hasattr(clazz.__dataclass_fields__[x], 'init') and clazz.__dataclass_fields__[x].init != False)}
-    if 'name_of_ref_class' not in attributes or attributes['name_of_ref_class'] is None:
-        attributes['name_of_ref_class'] = re.sub(r'Ref(Structure)?', '', obj.__class__.__name__)
+    attributes = {
+        x: getattr(obj, x, None)
+        for x in clazz.__dataclass_fields__.keys()
+        if (
+            hasattr(clazz.__dataclass_fields__[x], "init")
+            and clazz.__dataclass_fields__[x].init is not False
+        )
+    }
+    if "name_of_ref_class" not in attributes or attributes["name_of_ref_class"] is None:
+        attributes["name_of_ref_class"] = re.sub(
+            r"Ref(Structure)?", "", obj.__class__.__name__
+        )
 
     return clazz(**attributes)
 
 
-def to_seconds(xml_duration: XmlDuration):
+def to_seconds(xml_duration: XmlDuration) -> int:
     if xml_duration.months is not None and xml_duration.months > 0:
         warnings.warn("Duration is bigger than a month!")
-    return (((xml_duration.days or 0) * 24 + (xml_duration.hours or 0)) * 3600) + ((xml_duration.minutes or 0) * 60) + (
-                xml_duration.seconds or 0)
+    return (
+        (((xml_duration.days or 0) * 24 + (xml_duration.hours or 0)) * 3600)
+        + ((xml_duration.minutes or 0) * 60)
+        + (xml_duration.seconds or 0)
+    )
 
 
-def dontsetifnone(clazz, attr, value):
+def dontsetifnone(clazz: T, attr, value) -> T:
     if value is None:
         return None
 
@@ -57,16 +85,16 @@ def dontsetifnone(clazz, attr, value):
         return clazz(**{attr: chain([first], value)})
 
 
-def chain(*iterables) -> Generator:
+def chain(*iterables: Any) -> Iterable[Any]:
     for it in iterables:
         for element in it:
             yield element
 
 
 class GeneratorTester:
-    def __init__(self, value):
-        self._has_value = None
-        self.value = value
+    def __init__(self, value: Any):
+        self._has_value: bool | None = None
+        self.value: Any = value
 
     def has_value(self) -> bool:
         if self._has_value is not None:
@@ -81,14 +109,12 @@ class GeneratorTester:
 
         return self._has_value
 
-    def generator(self) -> Generator | None:
+    def generator(self) -> Iterable[Any]:
         if self._has_value is None:
-            return self.value
+            yield self.value
 
         elif self._has_value:
-            return chain([self.first], self.value)
-
-        return None
+            yield from chain([self.first], self.value)
 
 
 def get_boring_classes() -> list[T]:
@@ -96,8 +122,11 @@ def get_boring_classes() -> list[T]:
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 
     # The interesting class members certainly will have a "Meta class" with a namespace
-    interesting_members = [x[1] for x in clsmembers if hasattr(x[1], 'Meta') and hasattr(x[1].Meta, 'namespace')] + [
-        VersionFrameDefaultsStructure]
+    interesting_members = [
+        x[1]
+        for x in clsmembers
+        if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace")
+    ] + [VersionFrameDefaultsStructure]
 
     return interesting_members
 
@@ -107,12 +136,19 @@ def get_interesting_classes(my_filter=None) -> tuple[list[str], list[str], list[
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 
     # The interesting class members certainly will have a "Meta class" with a namespace
-    interesting_members = [x for x in clsmembers if hasattr(x[1], 'Meta') and hasattr(x[1].Meta, 'namespace')]
+    interesting_members = [
+        x
+        for x in clsmembers
+        if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace")
+    ]
 
     # Specifically we are interested in classes that are derived from "EntityInVersion", to find them, we exclude embedded child objects called "VersionedChild"
-    entitiesinversion = [x for x in interesting_members if
-                         netex.VersionedChildStructure not in x[1].__mro__ and netex.EntityInVersionStructure in x[
-                             1].__mro__]
+    entitiesinversion = [
+        x
+        for x in interesting_members
+        if netex.VersionedChildStructure not in x[1].__mro__
+        and netex.EntityInVersionStructure in x[1].__mro__
+    ]
 
     # Obviously we want to have the VersionedChild too
     # versionedchild = [x for x in interesting_members if netex.VersionedChildStructure in x[1].__mro__]
@@ -127,11 +163,23 @@ def get_interesting_classes(my_filter=None) -> tuple[list[str], list[str], list[
 
     if my_filter is not None:
         clean_element_names = [x[0] for x in entitiesinversion if x[0] in my_filter]
-        interesting_element_names = [get_element_name_with_ns(x[1]) for x in entitiesinversion if x[0] in my_filter]
+        interesting_element_names = [
+            get_element_name_with_ns(x[1])
+            for x in entitiesinversion
+            if x[0] in my_filter
+        ]
         interesting_clazzes = [x[1] for x in entitiesinversion if x[0] in my_filter]
     else:
-        clean_element_names = [x[0] for x in entitiesinversion if not x[0].endswith('Frame')]
-        interesting_element_names = [get_element_name_with_ns(x[1]) for x in entitiesinversion if not x[0].endswith('Frame')]
-        interesting_clazzes = [x[1] for x in entitiesinversion if not x[0].endswith('Frame')]
+        clean_element_names = [
+            x[0] for x in entitiesinversion if not x[0].endswith("Frame")
+        ]
+        interesting_element_names = [
+            get_element_name_with_ns(x[1])
+            for x in entitiesinversion
+            if not x[0].endswith("Frame")
+        ]
+        interesting_clazzes = [
+            x[1] for x in entitiesinversion if not x[0].endswith("Frame")
+        ]
 
     return clean_element_names, interesting_element_names, interesting_clazzes
