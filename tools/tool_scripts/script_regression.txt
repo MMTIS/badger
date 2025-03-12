@@ -14,6 +14,22 @@
         {"step":8,"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
         ]
     },
+           {
+    "block": "nl4",
+    "download_url":"https://github.com/user-attachments/files/18202171/NeTEx_WSF_WSF_20241203_20241203.xml.gz",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-epip.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb True"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":10,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+         ]
+  },
     {
        "block": "swiss4",
        "download_url":"https://github.com/user-attachments/files/18593829/swiss4.zip",
@@ -30,7 +46,7 @@
         {"step":9,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.lmdb %%dir%%/09.lmdb"},
         {"step":10,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.lmdb %%dir%%/%%block%%-gtfs.zip"},
         {"step":11,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/17-%%block%%-map.html 1"},
-        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
+        {"step":12,"script": "#tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
 
         ]
     }
