@@ -70,6 +70,8 @@ def main(source_database_file: str, target_database_file: str):
             source_db.clean_cache()
             # TODO: epip_noticeassignment(source_db, target_db, generator_defaults)
 
+            target_db.block_until_done()
+
             log_all(logging.INFO, "Reprojection Update ")
             reprojection_update(target_db, 'urn:ogc:def:crs:EPSG::4326')
 
