@@ -12,6 +12,7 @@ import math
 import random
 import time
 import zipfile
+from typing import Any, List, Dict
 
 import folium
 import pandas as pd
@@ -20,14 +21,14 @@ import traceback
 
 
 # Generate a random dark color
-def generate_random_dark_color():
+def generate_random_dark_color() -> str:
     r = random.randint(0, 200)  # Random red component (0-128)
     g = random.randint(0, 200)  # Random green component (0-128)
     b = random.randint(0, 200)  # Random blue component (0-128)
     return '#%02x%02x%02x' % (r, g, b)
 
 
-def main(gtfs_zip_file, map_file, limitation):
+def main(gtfs_zip_file :str, map_file :str, limitation : int) -> None:
     limitation=int(limitation)
     # Read GTFS files using pandas
     # Read the GTFS files directly from the ZIP archive using pandas
@@ -121,16 +122,16 @@ def main(gtfs_zip_file, map_file, limitation):
         'stop_id'].to_dict()
 
     # Add trips to map
-    stop_coords_list = []
-    stop_coords_list_str = []
-    route_names = []
+    stop_coords_list : List[List[float]] = []
+    stop_coords_list_str : List[str] = []
+    route_names : List[str] = []
 
     r = 0
     timer = 0
     for route_id in route_dict.keys():
         if r % 1000 == 0 and not limitation:
             print(str(r) + " of " + str(len(route_dict)))
-            timer = time.time()
+            timer = int(time.time())
 
         route_name_dict = route_dict[route_id]
 
@@ -172,20 +173,20 @@ def main(gtfs_zip_file, map_file, limitation):
     print("map created in: " + str(round(time.time() - end_time, 2)))
 
 
-def handle_trips_for_route(trips_dict, trips_names_dict, route_id, stop_times_dict, stops_dict, stop_coords_list,
-                           stop_coords_list_str, route_names, route_name_dict):
+def handle_trips_for_route(trips_dict: Dict[str,List[str]], trips_names_dict: Dict[str,List[str]], route_id:str, stop_times_dict: Dict[str,List[str]], stops_dict :Dict[str,List[float]], stop_coords_list : List[List[float]],
+                           stop_coords_list_str: List[str], route_names:List[str], route_name_dict: Dict[str,str]) -> None:
     if trips_dict.get(route_id)==None:
         log_once(logging.ERROR,'mapping',f'No trips for route {route_id}')
         return
     for trip_id in trips_dict.get(route_id):
-        stop_coords = []
+        stop_coords : List[float]= []
         trip_name = trips_names_dict[route_id][trips_dict[route_id].index(trip_id)]
 
         for stop_id in stop_times_dict[trip_id]:
             if stops_dict.get(stop_id)==None:
                 log_once(logging.ERROR,'no coordinates',f'no coordinates available: {trip_id} - {stop_id}')
             else:
-                stop_coord = stops_dict[stop_id]
+                stop_coord :List[float]= stops_dict[stop_id]
 
                 if stop_coord:
                     stop_coords.append(stop_coord)
@@ -201,7 +202,6 @@ def handle_trips_for_route(trips_dict, trips_names_dict, route_id, stop_times_di
             if (stop_coords_str in stop_coords_list_i_str) or (stop_coords_list_i_str in stop_coords_str):
                 no_sub = True
                 break
-
         if not no_sub:
             stop_coords_list.append(stop_coords)
             stop_coords_list_str.append(array_of_array_to_string(stop_coords))
@@ -211,7 +211,7 @@ def handle_trips_for_route(trips_dict, trips_names_dict, route_id, stop_times_di
                 route_names.append(str(route_name_dict['route_short_name']) + " to " + str(trip_name))
 
 
-def array_of_array_to_string(array_of_arrays):
+def array_of_array_to_string(array_of_arrays : list[Any]) ->str:
     return ''.join(f'[{x[0]}, {x[1]}]' for x in array_of_arrays)
 
 
@@ -231,9 +231,9 @@ if __name__ == "__main__":
         if args.limitation:
             main(args.gtfs_zip_file, args.map_file, args.limitation)
         else:
-            main(args.gtfs_zip_file, args.map_file, None)
+            main(args.gtfs_zip_file, args.map_file, 1)
     except Exception as e:
-        log_all(logging.ERROR, f'{e}', traceback.format_exc())
+        log_all(logging.ERROR, f'{e}'+ traceback.format_exc())
         raise e
 
 

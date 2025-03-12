@@ -11,9 +11,10 @@ from utils.aux_logging import (
 import traceback
 from lxml import etree
 from netexio.dbaccess import open_netex_file
+from typing import Any, Optional
 
 
-def check_xsd_validity(xsd_file):
+def check_xsd_validity(xsd_file : str)  -> bool:
     try:
         etree.parse(xsd_file)
         log_all(logging.INFO,f"{xsd_file} is a valid XSD file")
@@ -23,7 +24,7 @@ def check_xsd_validity(xsd_file):
         log_all(logging.ERROR,f"An error occurred while checking {xsd_file}: {str(e)}")
     return True
 
-def validate_xml(xml_file, xmlschema):
+def validate_xml(xml_file:str , xmlschema : etree.XMLSchema) -> bool:
     try:
 
         # Validate the XML file against the schema
@@ -39,7 +40,7 @@ def validate_xml(xml_file, xmlschema):
 
     return True
 
-def main(folder, xsd_schema):
+def main(folder:str, xsd_schema:str) -> None:
     xmlschema = etree.XMLSchema(etree.parse(xsd_schema))
     for root, dirs, files in os.walk(folder):
         for filename in files:
