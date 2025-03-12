@@ -3,6 +3,7 @@ import os
 import time
 import json
 import shutil
+import importlib
 from typing import Any, Optional
 
 from utils.aux_logging import (
@@ -68,14 +69,13 @@ def check_string(input_string: str) -> bool:
 def load_and_run(file_name: str, args_string: str) -> Any:
 
     module_name = file_name.rstrip(".py")
-    mod = __import__(module_name,fromlist=[None])
+    mod =importlib.import_module(module_name)
     main_function=getattr(mod,"main")
 
     if not callable(main_function):
         raise TypeError(f"{module_name} is not callable!")
 
     args = parse_command_line_arguments(args_string)
-    # args = args_string.split()  # Split the string into a list of arguments
     args1: list[Any] = []
     for arg in args:
         result: Any
