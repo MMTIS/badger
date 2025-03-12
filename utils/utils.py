@@ -91,7 +91,7 @@ class GeneratorTester:
         return None
 
 
-def get_boring_classes():
+def get_boring_classes() -> list[T]:
     # Get all classes from the generated NeTEx Python Dataclasses
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 
@@ -102,7 +102,7 @@ def get_boring_classes():
     return interesting_members
 
 
-def get_interesting_classes(my_filter=None):
+def get_interesting_classes(my_filter=None) -> tuple[list[str], list[str], list[T]]:
     # Get all classes from the generated NeTEx Python Dataclasses
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 
