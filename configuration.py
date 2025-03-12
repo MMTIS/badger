@@ -27,11 +27,12 @@ defaults["authority_reference"] = True
 defaults["codespace"] = "OPENOV"
 defaults["version"] = 1
 
-input_dir = "d:/input"
-processing_data = "d:/aux_testing_processing"
-list_scripts = "./scripts/list_scripts.txt"
-gtfs_validator = "gtfs-validator-6.0.0-cli.jar"
+input_dir = "d:/input"  # the standard directory for files to load (depreciated)
+processing_data = "d:/aux_testing_processing"   #the root folder for processing
+list_scripts = "./scripts/list_scripts.txt"  # place where the list processing scripts are stored
+gtfs_validator = "./gtfs-validator-7.0.0-cli.jar"  # location of the gtfs validator.jar.
 
+# ftp connection information for the ftp upload tool
 ftpconns = {
     "sbb_ftp": {
         "server": "ftp.example.com",

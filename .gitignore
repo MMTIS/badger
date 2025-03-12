@@ -6,5 +6,6 @@ netex/**
 *.pyc
 *.txt
 *.duckdb
+*.jar
 uv.lock
 local_configuration.py

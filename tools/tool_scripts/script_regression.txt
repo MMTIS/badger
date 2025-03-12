@@ -29,7 +29,9 @@
         {"step":8,"script": "conv.netex_to_db", "args": "[%%dir%%/%%block%%-netex.xml.gz]  %%dir%%/08.lmdb"},
         {"step":9,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.lmdb %%dir%%/09.lmdb"},
         {"step":10,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.lmdb %%dir%%/%%block%%-gtfs.zip"},
-        {"step":11,"script": "tools.gtfs_map_visualisation.py", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/17-%%block%%-map.html 1"}
+        {"step":11,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/17-%%block%%-map.html 1"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
+
         ]
     }
 ]
