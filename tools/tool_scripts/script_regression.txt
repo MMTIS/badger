@@ -10,6 +10,8 @@
         {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
         {"step":4,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/04-netex-import.lmdb"},
         {"step":5,"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.lmdb %%dir%%/05-netex-database.lmdb"},
-        {"step":6,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.lmdb %%dir%%/epip_output.xml"}
-        ]
+        {"step":6,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.lmdb %%dir%%/epip_output.xml"},
+        {"step":7,"script": "tools.xml_validator", "args": "%%dir%%/epip_output.xml ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":8,"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
+       ]
   }]
