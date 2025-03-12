@@ -49,5 +49,36 @@
         {"step":12,"script": "#tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
 
         ]
-    }
+    },
+    {
+        "block":"nl3",
+        "description":"nl 3 test with list",
+        "download_urls":[
+            "https://github.com/user-attachments/files/18202170/NeTEx_WSF_WSF_20241112_20241112.xml.gz"
+            ],
+        "scripts": [
+            {"step":"1", "script": "process_url_list", "args": "netex2epip"}
+            ]
+       },
+    {
+        "block":"nl2",
+        "description":"nl2 test with list",
+        "download_urls":[
+            "https://github.com/user-attachments/files/18202160/NeTEx_WPD_WPD_20241112_20241112.xml.gz"
+            ],
+        "scripts": [
+            {"step":"1", "script": "process_url_list", "args": "netex2epipgtfs"}
+            ]
+       },
+
+    {
+        "block":"swissmikrolist",
+        "description":"swissmikro with list",
+        "download_urls":[
+            "https://github.com/user-attachments/files/18201746/swiss_mikro.zip"
+            ],
+        "scripts": [
+            {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+            ]
+       }
 ]
