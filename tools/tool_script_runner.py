@@ -66,14 +66,20 @@ def check_string(input_string: str) -> bool:
 
 
 def load_and_run(file_name: str, args_string: str) -> Any:
-    module_name = file_name[:-3]  # Remove the '.py' extension
-    module_name = module_name + ".main"
-    components = module_name.split(".")
-    mod: Any = __import__(components[0])
-    for comp in components[1:]:
-        mod = getattr(mod, comp)
 
-    if not callable(mod):
+    module_name = file_name.rstrip(".py")
+    components = module_name.split(".")
+    #mod=None
+    #for comp in components:
+    #    if mod==None:
+    #        mod =__import__(comp)
+    #    else:
+    #        mod= getattr(mod,comp)
+    # main_function= getattr(mod,"main")
+    mod = __import__(module_name,fromlist=[None])
+    main_function=getattr(mod,"main")
+
+    if not callable(main_function):
         raise TypeError(f"{module_name} is not callable!")
 
     args = parse_command_line_arguments(args_string)
@@ -81,16 +87,17 @@ def load_and_run(file_name: str, args_string: str) -> Any:
     args1: list[Any] = []
     for arg in args:
         result: Any
+        result=arg
         if check_string(arg):
             print(".")
-            # arg= create_list_from_string(arg)
+            #arg= create_list_from_string(arg)
             result = arg
         elif arg == "True":
             result = True
         elif arg == "False":
             result = False
         args1.append(result)
-    result = mod(*args1)
+    result = main_function(*args1)
     return result
 
 
