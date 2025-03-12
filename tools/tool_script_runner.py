@@ -68,14 +68,6 @@ def check_string(input_string: str) -> bool:
 def load_and_run(file_name: str, args_string: str) -> Any:
 
     module_name = file_name.rstrip(".py")
-    components = module_name.split(".")
-    #mod=None
-    #for comp in components:
-    #    if mod==None:
-    #        mod =__import__(comp)
-    #    else:
-    #        mod= getattr(mod,comp)
-    # main_function= getattr(mod,"main")
     mod = __import__(module_name,fromlist=[None])
     main_function=getattr(mod,"main")
 
@@ -90,7 +82,6 @@ def load_and_run(file_name: str, args_string: str) -> Any:
         result=arg
         if check_string(arg):
             print(".")
-            #arg= create_list_from_string(arg)
             result = arg
         elif arg == "True":
             result = True
