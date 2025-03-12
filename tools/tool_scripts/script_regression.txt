@@ -1,7 +1,6 @@
 [
 
-
-{
+    {
     "block": "swissmikro",
     "download_url":"https://github.com/user-attachments/files/18201746/swiss_mikro.zip",
     "scripts": [
@@ -13,5 +12,24 @@
         {"step":6,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.lmdb %%dir%%/epip_output.xml"},
         {"step":7,"script": "tools.xml_validator", "args": "%%dir%%/epip_output.xml ../schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":8,"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
-       ]
-  }]
+        ]
+    },
+    {
+       "block": "swiss4",
+       "download_url":"https://github.com/user-attachments/files/18593829/swiss4.zip",
+        "description":"Reduced Swiss data set for tests, still a bit large",
+        "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "set_defaults", "args": "authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":3,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":4,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/%%block%%-netex.xml.gz"},
+        {"step":7,"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":8,"script": "conv.netex_to_db", "args": "[%%dir%%/%%block%%-netex.xml.gz]  %%dir%%/08.lmdb"},
+        {"step":9,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.lmdb %%dir%%/09.lmdb"},
+        {"step":10,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.lmdb %%dir%%/%%block%%-gtfs.zip"},
+        {"step":11,"script": "tools.gtfs_map_visualisation.py", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/17-%%block%%-map.html 1"}
+        ]
+    }
+]
