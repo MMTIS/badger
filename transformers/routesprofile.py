@@ -20,7 +20,7 @@ class RoutesProfile:
                 if isinstance(projection, PointProjection):
                     if projection.project_to_point_ref:
                         if projection.project_to_point_ref.name_of_ref_class == 'RoutePoint':
-                            yield utils.project(projection.project_to_point_ref, RoutePointRefStructure)
+                            yield utils.utils.project(projection.project_to_point_ref, RoutePointRefStructure)
 
     @staticmethod
     def projectRouteToServiceLinks(db: Database, sjp: ServiceJourneyPattern, route: Route, route_point_projection: Dict[str, RoutePointRefStructure], generator_defaults: dict) -> Generator[ServiceLink, None, ServiceJourneyPattern]:
