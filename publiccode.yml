@@ -1,0 +1,56 @@
+publiccodeYmlVersion: "0.4"
+name: badger
+applicationSuite: timetable conversion tools
+url: https://github.com/MMTIS/badger/
+landingURL: https://github.com/MMTIS/badger/
+softwareVersion: "0.9"
+releaseDate: 2025-03-12
+platforms:
+  - windows
+  - linux
+categories:
+  - data-collection
+  - data-analytics
+developmentStatus: beta
+softwareType: standalone/backend
+description:
+  en:
+    localisedName: badger
+    shortDescription: An extremely fast, state of the art, and consistent approach
+      for timetable conversions.
+    longDescription: >+
+      An extremely fast, state of the art, and consistent approach for timetable
+      conversions.
+
+
+      An extremely fast, state of the art, and consistent approach for timetable
+      conversions.
+
+
+      An extremely fast, state of the art, and consistent approach for timetable
+      conversions.
+
+    documentation: https://github.com/MMTIS/badger/README.md
+    apiDocumentation: https://github.com/MMTIS/badger/README.md
+    features:
+      - Conversion GTFS to NeTEx
+      - Conversion NeTEx to GTFS
+      - Conversion NeTEx to EPIP (European Passenger Information Profile)
+      - Validation of GTFS and NeTEx
+legal:
+  license: AGPL-1.0-or-later
+maintenance:
+  type: community
+  contacts:
+    - name: Stefan de Konink
+      email: stefan@opengeo.nl
+      phone: ""
+      affiliation: ""
+    - name: SBB
+      email: opendata@sbb.ch
+      phone: ""
+      affiliation: ""
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
