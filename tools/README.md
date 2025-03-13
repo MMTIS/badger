@@ -50,7 +50,8 @@ uv run python -m tools.gtfs_map_visualisation path_to_gtfs_file.zip  path_to_fol
 stops is shown. This is nonsensical for processing, but it shows the geographical extension. Set to 1 one has
 a reasonable view on the "lines" within the GTFS file.
 
-On startup in the report only the stops are shown. To see the trips check the box in the top right corner.
+On startup in the report only the stops are shown.
+To see the trips check the box in the top right corner.
 
 ## The script runner
 In the `tools` folder there is the a tool for running scripts to process everything.
