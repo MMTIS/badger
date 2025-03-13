@@ -28,7 +28,8 @@ uv run python -m tools.xml.validator path_to_xml_file.xml.zip  path_to_main_xsd_
 In the `tools` folder there is the a tool for validating GTFS files.
 It uses the Mobility Data validator: https://github.com/MobilityData/gtfs-validator/#readme
 You need to install this locally, with an accepted Java runtime environment.
-The current project expects it in the tools-folder. You can change the name and place in the configuration: 
+The current project expects it in the tools-folder.
+You can change the name and place in the configuration: 
 
 ```
 gtfs_validator = "./gtfs-validator-7.0.0-cli.jar"  # location of the gtfs validator.jar.
