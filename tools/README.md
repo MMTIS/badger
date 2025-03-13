@@ -37,7 +37,8 @@ You can run it as
 ```
 uv run python -m tools.gtfs_validator path_to_gtfs_file.zip  path_to_report_file
 ```
-The script calls the jar file to do it works. The result contains two json-files and an html report.
+The script calls the jar file to do it works.
+The result contains two json-files and an html report.
 If there is no error found, then the excecution is considered successful.
 
 ## The GTFS Visualisation
