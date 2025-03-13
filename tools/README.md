@@ -62,8 +62,8 @@ There are predefined script files already in the `tools/tools_script` folder
 `name_of_block` the identier of the block. `all` means all blocks (are processed sequentially.)
 
 ### Basic idea
-the script runner allows to run scripts.
-In the script file there are blocks that can be accessed
+The script runner allows to run scripts.
+In the script file there are blocks that can be executed.
 
 ### The structure of the script file
 
