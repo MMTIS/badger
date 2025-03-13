@@ -62,7 +62,7 @@ def get_day_type_from_availability_condition(db_read: Database, availability_con
         for operating_day in availability_condition.operating_days.operating_day_ref_or_operating_day:
             if isinstance(operating_day, OperatingDayRef):
                 operating_day_ref = operating_day
-                operating_day = load_local(db_read, OperatingDay, limit=1, filter=operating_day.ref, cursor=True)[0]
+                operating_day = load_local(db_read, OperatingDay, limit=1, filter_id=operating_day.ref, cursor=True)[0]
             else:
                 operating_day_ref = getRef(operating_day)
 

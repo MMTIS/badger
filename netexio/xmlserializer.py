@@ -1,6 +1,7 @@
+from netex import EntityStructure
 from netexio.serializer import Serializer
 
-from typing import TypeVar, Any, Type
+from typing import TypeVar, Any, cast
 
 from xsdata.formats.dataclass.context import XmlContext
 from xsdata.formats.dataclass.parsers import XmlParser
@@ -12,6 +13,7 @@ from xsdata.formats.dataclass.serializers.config import SerializerConfig
 from lxml import etree
 
 T = TypeVar("T")
+Tid = TypeVar("Tid", bound=EntityStructure)
 
 
 class MyXmlSerializer(Serializer):
@@ -38,15 +40,21 @@ class MyXmlSerializer(Serializer):
         serializer_config.ignore_default_attributes = True
         self.serializer = XmlSerializer(config=serializer_config)
 
-    def marshall(self, obj: Any, clazz: T) -> str:
+    @staticmethod
+    def encode_key(
+        id: str | None, version: str | None, clazz: type[Tid], include_clazz: bool = False
+    ) -> bytes:
+        return ((id or '') + "-" + (version or 'any')).encode("utf-8")
+
+    def marshall(self, obj: Any, clazz: type[Tid]) -> str:
         if isinstance(obj, str):
             return obj
         elif isinstance(obj, etree._Element):
-            return str(etree.tostring(obj, encoding="unicode"))
+            return cast(str, etree.tostring(obj, encoding="unicode"))
         else:
             return self.serializer.render(obj, self.ns_map).replace("\n", "")
 
-    def unmarshall(self, obj: Any, clazz: Type[T]) -> T:
+    def unmarshall(self, obj: Any, clazz: type[Tid]) -> Tid:
         if isinstance(obj, etree._Element):
             return self.parser.parse(obj, clazz)
 

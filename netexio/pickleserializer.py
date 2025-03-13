@@ -1,13 +1,16 @@
 import string
+
+from netex import EntityStructure
 from netexio.serializer import Serializer
 import lz4.frame
 import cloudpickle
 import re
 from netexio.xmlserializer import MyXmlSerializer
 from utils.utils import get_object_name
-from typing import TypeVar, Any, Never
+from typing import TypeVar, Any, cast
 
 T = TypeVar("T")
+Tid = TypeVar("Tid", bound=EntityStructure)
 
 
 class MyPickleSerializer(Serializer):
@@ -19,7 +22,7 @@ class MyPickleSerializer(Serializer):
 
     @staticmethod
     def encode_key(
-        id: str, version: str, clazz: T, include_clazz: bool = False
+        id: str | None, version: str | None, clazz: type[Tid], include_clazz: bool = False
     ) -> bytes:
         SEPARATOR = ord("-")
         SPECIAL_CHAR = ord("*")
@@ -56,19 +59,19 @@ class MyPickleSerializer(Serializer):
 
         return bytes(encoded_bytes)
 
-    def marshall(self, obj: Any, clazz: type[Never]) -> Any:
+    def marshall(self, obj: Any, clazz: type[Tid]) -> bytes:
         if not getattr(obj, "__module__").startswith(
             "netex."
         ):  # TODO: can we just get the parent?
             obj = self.xmlserializer.unmarshall(obj, clazz)
 
         if self.compression:
-            return lz4.frame.compress(cloudpickle.dumps(obj))
+            return cast(bytes, lz4.frame.compress(cloudpickle.dumps(obj)))
         else:
-            return cloudpickle.dumps(obj)
+            return cast(bytes, cloudpickle.dumps(obj))
 
-    def unmarshall(self, obj: bytes, clazz: type[Never]) -> Any:
+    def unmarshall(self, obj: bytes, clazz: type[Tid]) -> Tid:
         if self.compression:
-            return cloudpickle.loads(lz4.frame.decompress(obj))
+            return cast(Tid, cloudpickle.loads(lz4.frame.decompress(obj)))
         else:
-            return cloudpickle.loads(obj)
+            return cast(Tid, cloudpickle.loads(obj))

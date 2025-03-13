@@ -32,7 +32,7 @@ class RoutesProfile:
         if route.points_in_sequence:
             links_in_sequence = [por.onward_route_link_ref for por in route.points_in_sequence.point_on_route if por.onward_route_link_ref]
             # TODO: #142
-            route_links_in_sequence: List[RouteLink] = [load_local(db, RouteLink, filter=lis.ref, cursor=True, limit=1, cache=False)[0] for lis in links_in_sequence]
+            route_links_in_sequence: List[RouteLink] = [load_local(db, RouteLink, filter_id=lis.ref, cursor=True, limit=1, cache=False)[0] for lis in links_in_sequence]
             route_i = 0
 
             if sjp.points_in_sequence:
