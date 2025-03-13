@@ -53,7 +53,7 @@ a reasonable view on the "lines" within the GTFS file.
 On startup in the report only the stops are shown. To see the trips check the box in the top right corner.
 
 ## The script runner
-in the `tools` folder there is the a tool for running scripts to process everything
+In the `tools` folder there is the a tool for running scripts to process everything.
 ```
 uv run python -m tools.script_runner path_to_script_file.txt  name_of_logfile.log name_of_block (--begin_step=no_of_step) (--this_step=no_of_step) (--end_step=no_of_step)
 ```
