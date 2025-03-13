@@ -3,7 +3,7 @@
 from typing import Any
 
 
-def resolve_attr(obj: Any, attr: str) -> Any:
+def resolve_attr(obj: Any, attr: list[str | int]) -> Any:
     for name in attr:
         if isinstance(name, int):
             obj = obj[name]
@@ -12,7 +12,7 @@ def resolve_attr(obj: Any, attr: str) -> Any:
     return obj
 
 
-def update_attr(obj: Any, attr: str, value: Any) -> Any:
+def update_attr(obj: Any, attr: list[str | int], value: Any) -> Any:
     for name in attr[0:-1]:
         if isinstance(name, int):
             obj = obj[name]
