@@ -46,9 +46,10 @@ transport networks. For this reasons "some" stops and "some" routes are shown on
 ```
 uv run python -m tools.gtfs_map_visualisation path_to_gtfs_file.zip  path_to_folium_map.html one_of_n_routes
 ```
-`one_of_n_routes` is a number. If set to 1 every route is shown, if set to 10, then only one in 10 routes and one in ten
-stops is shown. This is nonsensical for processing, but it shows the geographical extension. Set to 1 one has
-a reasonable view on the "lines" within the GTFS file.
+`one_of_n_routes` is a number.
+If set to 1 every route is shown, if set to 10, then only one in 10 routes and one in ten stops is shown.
+This is nonsensical for processing, but it shows the geographical extension.
+Set to 1 one has a reasonable view on the "lines" within the GTFS file.
 
 On startup in the report only the stops are shown.
 To see the trips check the box in the top right corner.
