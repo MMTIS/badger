@@ -62,9 +62,10 @@ In the `tools` folder there is the a tool for running scripts to process everyth
 ```
 uv run python -m tools.script_runner path_to_script_file.txt  name_of_logfile.log name_of_block (--begin_step=no_of_step) (--this_step=no_of_step) (--end_step=no_of_step)
 ```
-There are predefined script files already in the `tools/tools_script` folder
-`no_of_step` is the sequence number of the step (!are counted in the script and not using the "step-no)
-`name_of_block` the identier of the block. `all` means all blocks (are processed sequentially.)
+Note:
+* We provide some script files in the `tools/tools_script` folder-
+* `no_of_step` is the sequence number in the block to start. Be aware that it is the n-th script in the block and not the number/id in `step` in the script.
+* `name_of_block` the identier of the block. `all` means all blocks (are processed sequentially.)
 
 ### Basic idea
 The script runner allows to run scripts.
