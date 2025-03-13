@@ -3,32 +3,33 @@ import inspect
 import netex
 import warnings
 import re
-from typing import TypeVar, Iterable, Any, Type
+from typing import TypeVar, Iterable, Any
 from xsdata.models.datatype import XmlDuration
-from netex import VersionFrameDefaultsStructure
+from netex import (
+    VersionFrameDefaultsStructure,
+    EntityStructure,
+    VersionOfObjectRefStructure,
+)
 
 T = TypeVar("T")
+Tid = TypeVar("Tid", bound=EntityStructure)
+Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-def get_object_name(clazz: T) -> str:
-    return (
-        getattr(clazz.Meta, "name", str(clazz.__name__))
-        if hasattr(clazz, "Meta")
-        else str(clazz.__name__)
-    )
+def get_object_name(clazz: type[Tid]) -> str:
+    return getattr(getattr(clazz, "Meta", None), "name", str(clazz.__name__))
 
 
-def get_element_name_with_ns(clazz: T) -> str:
+def get_element_name_with_ns(clazz: type[Tid]) -> str:
     name = get_object_name(clazz)
     meta = getattr(type(clazz), "Meta", None)
 
     return "{" + meta.namespace if meta is not None else "" + "}" + name
 
 
-Tdc = TypeVar("Tdc", bound=type)
+def project(obj: Tid, clazz: type[Tid], **kwargs: Any) -> Tid:
+    assert clazz.__dataclass_fields__ is not None
 
-
-def project(obj: Tdc, clazz: Type[Tdc], **kwargs: Any) -> Tdc:
     # if issubclass(obj.__class__, clazz_intermediate):
     attributes: dict[str, Any] = {
         x: getattr(obj, x, None)
@@ -46,34 +47,35 @@ def project(obj: Tdc, clazz: Type[Tdc], **kwargs: Any) -> Tdc:
     return clazz(**{**attributes, **kwargs})
 
 
-def projectRef(obj, clazz: T) -> T:
+def projectRef(obj: T, clazz: type[Tref]) -> Tref:
+    assert clazz.__dataclass_fields__ is not None
+
     attributes = {
         x: getattr(obj, x, None)
-        for x in clazz.__dataclass_fields__.keys()
-        if (
-            hasattr(clazz.__dataclass_fields__[x], "init")
-            and clazz.__dataclass_fields__[x].init is not False
-        )
+        for x, field in clazz.__dataclass_fields__.items()
+        if getattr(field, "init", False)  # Ensure field is included in __init__
     }
+
     if "name_of_ref_class" not in attributes or attributes["name_of_ref_class"] is None:
         attributes["name_of_ref_class"] = re.sub(
             r"Ref(Structure)?", "", obj.__class__.__name__
         )
 
-    return clazz(**attributes)
+    # Ensure types match expected argument types of clazz
+    return clazz(**{k: v for k, v in attributes.items() if v is not None})
 
 
 def to_seconds(xml_duration: XmlDuration) -> int:
     if xml_duration.months is not None and xml_duration.months > 0:
         warnings.warn("Duration is bigger than a month!")
-    return (
+    return int(
         (((xml_duration.days or 0) * 24 + (xml_duration.hours or 0)) * 3600)
         + ((xml_duration.minutes or 0) * 60)
         + (xml_duration.seconds or 0)
     )
 
 
-def dontsetifnone(clazz: T, attr, value) -> T:
+def dontsetifnone(clazz: type[T], attr: str, value: Any) -> T | None:
     if value is None:
         return None
 
@@ -117,7 +119,7 @@ class GeneratorTester:
             yield from chain([self.first], self.value)
 
 
-def get_boring_classes() -> list[T]:
+def get_boring_classes() -> list[Any]:
     # Get all classes from the generated NeTEx Python Dataclasses
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 
@@ -131,7 +133,9 @@ def get_boring_classes() -> list[T]:
     return interesting_members
 
 
-def get_interesting_classes(my_filter=None) -> tuple[list[str], list[str], list[T]]:
+def get_interesting_classes(
+    my_filter: set[str] | None = None,
+) -> tuple[list[str], list[str], list[Any]]:
     # Get all classes from the generated NeTEx Python Dataclasses
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 

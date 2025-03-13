@@ -130,7 +130,7 @@ def setIdVersion(
         obj.version = "any"
 
 
-def getId(clazz: Tid, codespace: Codespace, id: str) -> str:
+def getId(clazz: type[Tid], codespace: Codespace, id: str) -> str:
     name = get_object_name(clazz)
     return "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(":", "-"))
 
