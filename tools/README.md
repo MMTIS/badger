@@ -41,8 +41,9 @@ The script calls the jar file to do it works. The result contains two json-files
 If there is no error found, then the excecution is considered successful.
 
 ## The GTFS Visualisation
-In the `tools` folder there is the a tool for GTFS visualisation. The idea is to see the geographical extension of 
-transport networks. For this reasons "some" stops and "some" routes are shown on a map
+In the `tools` folder there is the a tool for GTFS visualisation.
+The idea is to see the geographical extension of transport networks.
+For this reasons "some" stops and "some" routes are shown on a map.
 ```
 uv run python -m tools.gtfs_map_visualisation path_to_gtfs_file.zip  path_to_folium_map.html one_of_n_routes
 ```
