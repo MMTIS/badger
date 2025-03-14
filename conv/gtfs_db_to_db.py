@@ -1,14 +1,12 @@
 import logging
 
 from utils.aux_logging import prepare_logger, log_all
-from netex import DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, AvailabilityCondition, \
-    DayType, DayTypeAssignment, UicOperatingPeriod, Version, StopArea, InterchangeRule
+from netex import DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, Version, StopArea, InterchangeRule
 from netexio.database import Database
-from netexio.dbaccess import setup_database, write_objects, load_local, copy_table
+from netexio.dbaccess import setup_database, load_local, copy_table
 from netexio.pickleserializer import MyPickleSerializer
 from utils.utils import get_interesting_classes
-from transformers.gtfs import GTFS_CLASSES, gtfs_operator_line_memory, gtfs_calls_generator, \
-    apply_availability_conditions_via_day_type_ref, gtfs_sj_processing, gtfs_generate_deprecated_version
+from transformers.gtfs import GTFS_CLASSES, gtfs_operator_line_memory, gtfs_sj_processing, gtfs_generate_deprecated_version
 from transformers.projection import reprojection_update
 
 

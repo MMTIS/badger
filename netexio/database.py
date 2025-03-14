@@ -9,18 +9,24 @@ import threading
 import queue
 import os
 import cloudpickle
-from typing import TypeVar, Iterable, Any, Optional, Type, cast
+from typing import TypeVar, Iterable, Any, Optional, Type
 from enum import IntEnum
 
-from netex import EntityStructure, MultilingualString, ScheduledStopPoint
+from netex import (
+    EntityStructure,
+    EntityInVersionStructure,
+    VersionOfObjectRefStructure,
+)
 from netexio.activelrucache import ActiveLRUCache
 from netexio.dbaccess import update_embedded_referencing
-from netexio.pickleserializer import MyPickleSerializer
 from netexio.serializer import Serializer
 from utils.utils import get_object_name
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
+Tver = TypeVar("Tver", bound=EntityInVersionStructure)
+Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
+
 
 class LmdbActions(IntEnum):
     STOP = 0
@@ -50,9 +56,12 @@ class Referencing:
 
 
 class Database:
-    task_queue: queue.Queue[
-        tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]
-    ] | None
+    task_queue: (
+        queue.Queue[
+            tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]
+        ]
+        | None
+    )
     writer_thread: threading.Thread | None
 
     def __init__(
@@ -125,7 +134,7 @@ class Database:
         self,
         exception_type: Optional[Type[BaseException]],
         exception_value: Optional[BaseException],
-        exception_traceback: Optional[TracebackType]
+        exception_traceback: Optional[TracebackType],
     ) -> Optional[bool]:
         self.block_until_done()
         self.env.close()
@@ -213,7 +222,14 @@ class Database:
             self.task_queue = None
             self.writer_thread = None
 
-    def _process_batch(self, batch: list[tuple[lmdb._Database, Any, Any]], delete_tasks: list[tuple[lmdb._Database, Any]], clear_task: list[lmdb._Database], drop_task: list[lmdb._Database], total_size: int) -> None:
+    def _process_batch(
+        self,
+        batch: list[tuple[lmdb._Database, Any, Any]],
+        delete_tasks: list[tuple[lmdb._Database, Any]],
+        clear_task: list[lmdb._Database],
+        drop_task: list[lmdb._Database],
+        total_size: int,
+    ) -> None:
         """Processes a batch of writes and deletions, retrying if needed."""
         while True:
             try:
@@ -254,7 +270,7 @@ class Database:
                 )
                 self.writer_thread.start()
 
-    def open_db(self, klass: type[Tid], delete: bool=False) -> lmdb._Database:
+    def open_db(self, klass: type[Tid], delete: bool = False) -> lmdb._Database:
         name: str = get_object_name(klass)
 
         if name in self.dbs:
@@ -290,14 +306,22 @@ class Database:
         assert obj.id is not None
         assert self.task_queue is not None
 
+        parent_class: type[Tid]
+        parent_id: str
+        parent_version: str
+        object_class: type[Tid]
+        object_id: str
+        object_version: str
+        path: str | None
+
         for (
-                parent_class,
-                parent_id,
-                parent_version,
-                object_class,
-                object_id,
-                object_version,
-                path,
+            parent_class,
+            parent_id,
+            parent_version,
+            object_class,
+            object_id,
+            object_version,
+            path,
         ) in update_embedded_referencing(self.serializer, obj):
             if path is not None:
                 embedding_inverse_key = self.serializer.encode_key(
@@ -354,9 +378,8 @@ class Database:
                     (LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value)
                 )
 
-
     def insert_objects_on_queue(
-        self, klass: type[Tid], objects: Iterable[Tid], empty: bool=False
+        self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False
     ) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
         db_handle = self.open_db(klass)
@@ -420,9 +443,13 @@ class Database:
 
         if embedding:
             self.task_queue.put((LmdbActions.CLEAR, self.db_embedding, None, None))
-            self.task_queue.put((LmdbActions.CLEAR, self.db_embedding_inverse, None, None))
+            self.task_queue.put(
+                (LmdbActions.CLEAR, self.db_embedding_inverse, None, None)
+            )
             self.task_queue.put((LmdbActions.CLEAR, self.db_referencing, None, None))
-            self.task_queue.put((LmdbActions.CLEAR, self.db_referencing_inwards, None, None))
+            self.task_queue.put(
+                (LmdbActions.CLEAR, self.db_referencing_inwards, None, None)
+            )
 
     def delete_by_prefix(self, klass: type[Tid], prefix: bytes) -> None:
         """Schedules deletion of all keys with a given prefix using the writer thread."""
@@ -487,7 +514,9 @@ class Database:
 
         return None  # If DB is empty
 
-    def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> Tid | None:
+    def get_single(
+        self, clazz: type[Tid], id: str, version: str | None = None
+    ) -> Tid | None:
         db = self.open_db(clazz)
         if db is None:
             return None
@@ -540,9 +569,7 @@ class Database:
                     (LmdbActions.WRITE, dst_db, bytes(key), bytes(value))
                 )
 
-    def copy_db_embedding(
-        self, target: Database, classes: list[type[Tid]]
-    ) -> None:
+    def copy_db_embedding(self, target: Database, classes: list[type[Tid]]) -> None:
         """
         Copies '_referencing' and '_embedding' databases from `self.env` to `target.env` with high throughput.
         """
@@ -631,5 +658,3 @@ class Database:
                 tables.add(self.get_class_by_name(klass))
 
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
-
-

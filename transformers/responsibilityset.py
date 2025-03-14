@@ -1,10 +1,8 @@
-from typing import Iterable, Dict, Generator, Set
+from typing import Dict, Generator, Set
 
 from netexio.database import Database
-from netexio.dbaccess import write_objects, load_generator, update_generator, load_local
-from netex import ServiceJourneyPattern, Direction, MultilingualString, ResponsibilitySet, ResponsibilityRoleAssignment, \
-    StakeholderRoleTypeEnumeration, Line, Operator, OperatorRef, ServiceJourney, TemplateServiceJourney, LineRef
-from utils.refs import getId, getRef, getIndex
+from netexio.dbaccess import load_generator, load_local
+from netex import ResponsibilitySet, StakeholderRoleTypeEnumeration, Line, OperatorRef, ServiceJourney, TemplateServiceJourney
 
 from utils.utils import project
 
@@ -69,7 +67,6 @@ def infer_operator_from_responsibilityset_and_apply(db_read: Database, db_write:
     mapping = {x: y.pop() for x, y in _mapping.items() if len(y) == 1}
     # Maybe Authority too?
 
-    update_generator(db_write, ServiceJourney, query2(db_read))
-    update_generator(db_write, TemplateServiceJourney, query3(db_read))
-    update_generator(db_write, Line, query1(db_read))
-
+    db_write.insert_objects_on_queue(ServiceJourney, query2(db_read))
+    db_write.insert_objects_on_queue(TemplateServiceJourney, query3(db_read))
+    db_write.insert_objects_on_queue(Line, query1(db_read))

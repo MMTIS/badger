@@ -1,7 +1,7 @@
 from typing import Dict, Generator
 
 from netexio.database import Database
-from netexio.dbaccess import write_objects, load_generator, update_generator
+from netexio.dbaccess import load_generator
 from netex import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef
 from utils.refs import getId, getRef
 

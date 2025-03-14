@@ -50,8 +50,7 @@ from netex import PublicationDelivery, ParticipantRef, MultilingualString, DataO
 
 from netexio.database import Database
 
-from netexio.dbaccess import load_generator, load_local, write_generator, write_objects, \
-    recursive_attributes, fetch_references_classes_generator
+from netexio.dbaccess import load_generator, load_local, recursive_attributes, fetch_references_classes_generator
 from utils.refs import getIndex, getRef, getId, getFakeRef
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
