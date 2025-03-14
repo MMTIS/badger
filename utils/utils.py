@@ -22,9 +22,9 @@ def get_object_name(clazz: type[Tid]) -> str:
 
 def get_element_name_with_ns(clazz: type[Tid]) -> str:
     name = get_object_name(clazz)
-    meta = getattr(type(clazz), "Meta", None)
+    meta = getattr(clazz, "Meta", None)
 
-    return "{" + meta.namespace if meta is not None else "" + "}" + name
+    return "{" + (meta.namespace if meta is not None else "") + "}" + name
 
 
 def project(obj: Tid, clazz: type[Tid], **kwargs: Any) -> Tid:

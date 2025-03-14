@@ -3,7 +3,7 @@ from functools import partial
 from typing import Generator, Dict
 
 from netexio.database import Database
-from netexio.dbaccess import load_generator, write_generator, load_local, write_objects
+from netexio.dbaccess import load_generator, load_local
 from netex import ScheduledStopPoint, Codespace, Version, ServiceJourney
 from multiprocessing import Pool
 
@@ -26,7 +26,8 @@ def dutch_scheduled_stop_point_generator(db_read: Database, db_write: Database, 
         for ssp in pool.imap_unordered(partial(process, generator_defaults=generator_defaults), _load_generator, chunksize=100):
             yield ssp
 
-    write_generator(db_write, ScheduledStopPoint, query(db_read), True)
+    db_write.insert_objects_on_queue(ScheduledStopPoint, query(db_read), True)
+
 
 def dutch_scheduled_stop_point_memory(db_read: Database, db_write: Database, generator_defaults: dict):
     print(sys._getframe().f_code.co_name)
@@ -40,7 +41,8 @@ def dutch_scheduled_stop_point_memory(db_read: Database, db_write: Database, gen
         else:
             print(f"ScheduledStopPoint {ssp.id} does not have a location.")
 
-    write_objects(db_write, scheduled_stop_points, True, True)
+    db_write.insert_objects_on_queue(ScheduledStopPoint, scheduled_stop_points, True)
+
 
 def dutch_service_journey_pattern_time_demand_type_memory(db_read: Database, db_write: Database, generator_defaults: dict):
     print(sys._getframe().f_code.co_name)
@@ -64,7 +66,7 @@ def dutch_service_journey_pattern_time_demand_type_memory(db_read: Database, db_
         sjp = tdtp.getServiceJourneyPatternGenerator(db_read, db_write, sj, ssps)
         tdtp.getTimeDemandTypeGenerator(db_read, db_write, sj, ssps)
         sj.calls = None
-        write_objects(db_write, [sj], False, False, silent=True)
+        db_write.insert_one_object(sj)
         i += 1
         if i % 100 == 0:
             _prev = now

@@ -1,15 +1,26 @@
+from typing import TypeVar
+
+from netex import VersionOfObjectRefStructure
 from netexio.attributes import update_attr, resolve_attr
 from utils.refs import getRef
 
-def split_path(path) -> list[str]:
-    split = []
-    for p in path.split('.'):
+T = TypeVar("T")
+Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
+
+
+def split_path(path: str) -> list[str | int]:
+    split: list[str | int] = []
+    for p in path.split("."):
         if p.isnumeric():
-            p = int(p)
-        split.append(p)
+            split.append(int(p))
+        else:
+            split.append(p)
     return split
 
-def replace_with_reference_inplace(obj, path, klass=None):
+
+def replace_with_reference_inplace(
+    obj: T, path: str, klass: type[Tref] | None = None
+) -> None:
     split = split_path(path)
 
     attribute = resolve_attr(obj, split)

@@ -3,31 +3,30 @@ import logging
 import sys
 import warnings
 from datetime import timedelta, datetime, time
-from typing import Generator, List, TypeVar
+from typing import Generator, TypeVar
 
-T = TypeVar("T")
 
-from numpy.ma.core import negative
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
 from transformers.callsprofile import CallsProfile
-from transformers.gtfsprofile import GtfsProfile
 from netex import Line, Branding, Operator, Authority, ResponsibilitySet, StakeholderRoleTypeEnumeration, \
-    ServiceJourney, LineRef, StopPlace, PassengerStopAssignment, ScheduledStopPoint, TemplateServiceJourney, \
+    ServiceJourney, TemplateServiceJourney, \
     ServiceJourneyPattern, TimeDemandType, RouteView, RouteRef, Route, ValidityConditionsRelStructure, \
     AvailabilityCondition, AvailabilityConditionRef, DayType, DayTypeAssignment, OperatingPeriod, ServiceCalendar, \
     DayTypesRelStructure, OperatingPeriodRef, UicOperatingPeriodRef, OperatingDay, DayTypeRef, \
     OperatingDaysRelStructure, OperatingDayRefStructure, UicOperatingPeriod, OperatingDayRef, \
     PropertiesOfDayRelStructure, PropertyOfDay, DayOfWeekEnumeration, DayTypeRefsRelStructure, Version
 from netexio.database import Database
-from netexio.dbaccess import load_generator, load_local, write_objects, write_generator, copy_table
+from netexio.dbaccess import load_generator, load_local, copy_table
 from transformers.nordicprofile import NordicProfile
 from utils.refs import getRef, getIndex, getIndexByGroup, getId
 from transformers.daytype import get_day_type_from_availability_condition, datetime_weekday_to_dow
 from utils.utils import project, chain
-from utils.aux_logging import *
+from utils.aux_logging import log_all, log_once
 
 import utils.netex_monkeypatching
+
+T = TypeVar("T")
 
 GTFS_CLASSES = [ "Codespace", "StopPlace", "ScheduledStopPoint", "Authority", "Operator", "Line", "DestinationDisplay",
                  "ServiceJourney", "ServiceJourneyPattern", "PassengerStopAssignment", "AvailabilityCondition",

@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from functools import partial
 from multiprocessing import Pool
-from typing import Generator, List, Dict, Set
+from typing import Generator, List, Dict, Set, Any
 import itertools
 
 from dateutil.rrule import rrule, DAILY
@@ -50,8 +50,7 @@ from netex import PublicationDelivery, ParticipantRef, MultilingualString, DataO
 
 from netexio.database import Database
 
-from netexio.dbaccess import load_generator, load_local, write_generator, write_objects, \
-    recursive_attributes, fetch_references_classes_generator
+from netexio.dbaccess import load_generator, load_local, recursive_attributes, fetch_references_classes_generator
 from utils.refs import getIndex, getRef, getId, getFakeRef
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
@@ -59,7 +58,9 @@ from transformers.projection import project_location_4326, project_polygon
 from transformers.timetabled_passing_time import infer_id_and_order_and_apply
 from utils.utils import project
 
-EPIP_CLASSES = [ "Codespace", "StopPlace", "RoutePoint", "RouteLink", "Routes", "ScheduledStopPoint", "Operator", "VehicleType", "Line", "Direction", "DestinationDisplay", "ServiceJourney", "ServiceJourneyPattern", "PassengerStopAssignment", "Notice", "NoticeAssignment", "AvailabilityCondition" ]
+EPIP_CLASSES = {"Codespace", "StopPlace", "RoutePoint", "RouteLink", "Routes", "ScheduledStopPoint", "Operator",
+                "VehicleType", "Line", "Direction", "DestinationDisplay", "ServiceJourney", "ServiceJourneyPattern",
+                "PassengerStopAssignment", "Notice", "NoticeAssignment", "AvailabilityCondition"}
 
 def epip_line_generator(db_read: Database, db_write: Database, generator_defaults: dict, pool: Pool):
     print(sys._getframe().f_code.co_name)
@@ -760,7 +761,7 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
     codespace_ref_or_codespace = GeneratorTester(load_generator(db_epip, Codespace))
     data_source = GeneratorTester(load_generator(db_epip, DataSource))
-    organisation_or_transport_organisation = load_local(db_epip, Authority) + load_local(db_epip, Operator)
+    organisation_or_transport_organisation: list[Any] = load_local(db_epip, Authority) + load_local(db_epip, Operator)
     value_set = GeneratorTester(load_generator(db_epip, ValueSet))
     transport_administrative_zone = GeneratorTester(load_generator(db_epip, TransportAdministrativeZone))
 
