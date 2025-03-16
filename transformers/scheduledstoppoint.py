@@ -1,11 +1,11 @@
-from typing import Iterable, Dict
+from typing import Iterable, Dict, Any
 
 from netexio.database import Database
 from netexio.dbaccess import load_generator
 from netex import PassengerStopAssignment, StopPlace, LocationStructure2, Quay, ScheduledStopPoint, ScheduledStopPointRef, QuayRef, StopPlaceRef
 
 
-def infer_locations_from_quay_or_stopplace_and_apply(db_read: Database, db_write: Database, generator_defaults: dict[str, str]) -> None:
+def infer_locations_from_quay_or_stopplace_and_apply(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
     mapping: Dict[str, LocationStructure2] = {}
     ssp_location: Dict[str, LocationStructure2] = {}
 

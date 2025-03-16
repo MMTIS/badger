@@ -1,13 +1,14 @@
 from typing import Generator
 
-from netex import InterchangeRule, InterchangeRuleParameterStructure, StopAreaRef, StopPlaceRef, ScheduledStopPointRef, \
+from netex import InterchangeRule, ScheduledStopPointRef, \
     StopPlace, PassengerStopAssignment, ServiceJourney, LineRef, FlexibleLineRef, ServiceJourneyPattern, RouteView, \
-    Route, RouteRef, ServiceJourneyRef, FareScheduledStopPointRef, ServiceJourneyInterchange, \
+    Route, RouteRef, FareScheduledStopPointRef, ServiceJourneyInterchange, \
     ServiceJourneyRefStructure, ScheduledStopPointRefStructure, VehicleJourneyRefStructure
 from netexio.database import Database
 from netexio.dbaccess import load_local, load_generator
 from utils.utils import project, projectRef
 from utils.aux_logging import *
+import logging
 
 def getIdOrRef(obj):
     if hasattr(obj, 'ref'):

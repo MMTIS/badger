@@ -456,7 +456,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
     # uic_operating_periods: List[UicOperatingPeriod] = []
     # day_type_assignments: List[DayTypeAssignment] = []
 
-    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read):
+    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read) -> None:
         sj_line_ref = None
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None and (isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineRef) or isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, LineRef)):
             sj_line_ref = service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
@@ -494,7 +494,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict):
+    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict) -> ServiceJourney:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
@@ -556,7 +556,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
 
         # TODO: AvailabilityCondition -> Uic
 
-        sj.validity_conditions_or_valid_between = None
+        sj.validity_conditions_or_valid_between = []
         sj.time_demand_type_ref = None
         sj.key_list = None
         sj.private_code = None
@@ -594,7 +594,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
     log_all(logging.INFO, "Service journeys for now ")
     db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
 
-def epip_service_calendar(db_read: Database, db_write: Database, generator_defaults: dict):
+def epip_service_calendar(db_read: Database, db_write: Database, generator_defaults: dict) -> None:
     log_all(logging.INFO, "Calendar creation...")
 
     service_calendars: List[ServiceCalendar] = load_local(db_read, ServiceCalendar)

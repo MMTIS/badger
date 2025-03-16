@@ -28,12 +28,13 @@ import utils.netex_monkeypatching
 
 T = TypeVar("T")
 
-GTFS_CLASSES = [ "Codespace", "StopPlace", "ScheduledStopPoint", "Authority", "Operator", "Line", "DestinationDisplay",
+GTFS_CLASSES = { "Codespace", "StopPlace", "ScheduledStopPoint", "Authority", "Operator", "Line", "DestinationDisplay",
                  "ServiceJourney", "ServiceJourneyPattern", "PassengerStopAssignment", "AvailabilityCondition",
                  "DayTypeAssignment", "UicOperatingPeriod", "TemplateServiceJourney", "Branding",
-                 "InterchangeRule", "ServiceJourneyInterchange, JourneyMeeting"]
+                 "InterchangeRule", "ServiceJourneyInterchange, JourneyMeeting" }
 
 def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_defaults: dict):
+    operator: Operator
     print(sys._getframe().f_code.co_name)
     lines: list[Line] = load_local(db_read, Line)
     operators_local: list[Operator] = load_local(db_read, Operator)
@@ -43,19 +44,19 @@ def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_d
         # GTFS only has the concept agency (operator) hence all variants will become OperatorRef.
         if line.branding_ref is not None:
             branding: Branding = db_read.get_single(Branding, line.branding_ref.ref, line.branding_ref.version)
-            operator: Operator = project(branding, Operator)
+            operator = project(branding, Operator)
             operators[operator.id] = operator
             line.operator_ref = getRef(operator)
 
         elif line.operator_ref is not None:
             if line.operator_ref.ref not in operators:
-                operator: Operator = db_read.get_single(Operator, line.operator_ref.ref, line.operator_ref.version)
+                operator = db_read.get_single(Operator, line.operator_ref.ref, line.operator_ref.version)
                 operators[operator.id] = operator
                 line.operator_ref = getRef(operator)
 
         elif line.authority_ref is not None:
             authority: Authority = db_read.get_single(Authority, line.authority_ref.ref, line.authority_ref.version)
-            operator: Operator = project(authority, Operator)
+            operator = project(authority, Operator)
             operators[operator.id] = operator
             line.operator_ref = getRef(operator)
 
@@ -65,13 +66,13 @@ def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_d
             if responsibility_set is not None and responsibility_set.roles is not None:
                 for role_assignment in responsibility_set.roles.responsibility_role_assignment:
                     if StakeholderRoleTypeEnumeration.OPERATION in role_assignment.stakeholder_role_type or StakeholderRoleTypeEnumeration.OPERATION_1 in role_assignment.stakeholder_role_type:
-                        operator: Operator = db_read.get_single(db_read.get_class_by_name(role_assignment.responsible_organisation_ref.name_of_ref_class) if role_assignment.responsible_organisation_ref.name_of_ref_class else Operator, role_assignment.responsible_organisation_ref.ref, role_assignment.responsible_organisation_ref.version)
+                        operator = db_read.get_single(db_read.get_class_by_name(role_assignment.responsible_organisation_ref.name_of_ref_class) if role_assignment.responsible_organisation_ref.name_of_ref_class else Operator, role_assignment.responsible_organisation_ref.ref, role_assignment.responsible_organisation_ref.version)
                         operators[operator.id] = operator
                         line.operator_ref = getRef(operator)
 
         if line.operator_ref is None:
             if len(operators_local) == 1:
-                operator: Operator = operators_local[0]
+                operator = operators_local[0]
                 operators[operator.id] = operator
                 line.operator_ref = getRef(operator)
 
@@ -372,8 +373,8 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
     def query_sj(db_read: Database) -> Generator:
         _load_generator = load_generator(db_read, ServiceJourney)
+        sj: ServiceJourney
         for sj in _load_generator:
-            sj: ServiceJourney
             add_calls(db_read, sj)
             calendar_combinations.add(calendars_to_daytype(db_read, sj))
             sj.route_ref = None # TODO: #112
@@ -468,8 +469,8 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 def gtfs_calls_generator(db_read: Database, db_write: Database, generator_defaults: dict):
     def query_sj(db_read: Database) -> Generator:
         _load_generator = load_generator(db_read, ServiceJourney)
+        sj: ServiceJourney
         for sj in _load_generator:
-            sj: ServiceJourney
             if sj.calls:
                 yield sj
             else:
@@ -505,8 +506,8 @@ def gtfs_calls_generator(db_read: Database, db_write: Database, generator_defaul
 
     def query_tsj(db_read: Database) -> Generator:
         _load_generator = load_generator(db_read, TemplateServiceJourney)
+        tsj: TemplateServiceJourney
         for tsj in _load_generator:
-            tsj: TemplateServiceJourney
             if tsj.calls:
                 pass
             else:
@@ -530,6 +531,7 @@ def gtfs_calls_generator(db_read: Database, db_write: Database, generator_defaul
     db_write.insert_objects_on_queue(TemplateServiceJourney, query_tsj(db_read))
 
 def day_type_assignment_to_ac(day_type_assignment: DayTypeAssignment, day_type: DayType, ops: dict[str, OperatingPeriod | UicOperatingPeriod], ods: dict[str, OperatingDay]):
+    od: OperatingDay
     ac: AvailabilityCondition = project(day_type_assignment, AvailabilityCondition)
     ac.is_available = day_type_assignment.is_available
     ac.day_types = DayTypesRelStructure(day_type_ref_or_day_type=[getRef(day_type)])
@@ -540,13 +542,13 @@ def day_type_assignment_to_ac(day_type_assignment: DayTypeAssignment, day_type: 
         uic_operating_period: UicOperatingPeriod = ops[uic_operating_period_ref.ref]
 
         if isinstance(uic_operating_period.from_operating_day_ref_or_from_date, OperatingDayRefStructure):
-            od: OperatingDay = ods[uic_operating_period.from_operating_day_ref_or_from_date.ref]
+            od = ods[uic_operating_period.from_operating_day_ref_or_from_date.ref]
             ac.from_date = od.calendar_date.to_datetime()
         else:
             ac.from_date = uic_operating_period.from_operating_day_ref_or_from_date
 
         if isinstance(uic_operating_period.to_operating_day_ref_or_to_date, OperatingDayRefStructure):
-            od: OperatingDay = ods[uic_operating_period.to_operating_day_ref_or_to_date.ref]
+            od = ods[uic_operating_period.to_operating_day_ref_or_to_date.ref]
             ac.to_date = od.calendar_date.to_datetime()
         else:
             ac.to_date = uic_operating_period.to_operating_day_ref_or_to_date
@@ -565,13 +567,13 @@ def day_type_assignment_to_ac(day_type_assignment: DayTypeAssignment, day_type: 
         operating_period: OperatingPeriod = ops[operating_period_ref.ref]
 
         if isinstance(operating_period.from_operating_day_ref_or_from_date, OperatingDayRefStructure):
-            od: OperatingDay = ods[operating_period.from_operating_day_ref_or_from_date.ref]
+            od = ods[operating_period.from_operating_day_ref_or_from_date.ref]
             ac.from_date = od.calendar_date.to_datetime()
         else:
             ac.from_date = operating_period.from_operating_day_ref_or_from_date
 
         if isinstance(operating_period.to_operating_day_ref_or_to_date, OperatingDayRefStructure):
-            od: OperatingDay = ods[operating_period.to_operating_day_ref_or_to_date.ref]
+            od = ods[operating_period.to_operating_day_ref_or_to_date.ref]
             ac.to_date = od.calendar_date.to_datetime()
         else:
             ac.to_date = operating_period.to_operating_day_ref_or_to_date
@@ -831,8 +833,8 @@ def gtfs_calendar_generator(db_read: Database, db_write: Database, generator_def
         vcs: set[str] = set()
         day_type_refs: set[str] = set()
 
+        sj: ServiceJourney
         for sj in _load_generator:
-            sj: ServiceJourney
             if isinstance(sj.validity_conditions_or_valid_between, ValidityConditionsRelStructure):
                 for vc in sj.validity_conditions_or_valid_between.choice:
                     if isinstance(vc, AvailabilityCondition):

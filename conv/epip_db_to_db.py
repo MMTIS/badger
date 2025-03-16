@@ -44,7 +44,7 @@ generator_defaults = {
 }  # Invent something, that materialises the refs, so VersionFrameDefaultsStructure can be used
 
 
-def main(source_database_file: str, target_database_file: str):
+def main(source_database_file: str, target_database_file: str) -> None:
     classes = get_interesting_classes(EPIP_CLASSES)
 
     with Database(

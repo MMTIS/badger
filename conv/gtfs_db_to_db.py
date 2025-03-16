@@ -10,7 +10,7 @@ from transformers.gtfs import GTFS_CLASSES, gtfs_operator_line_memory, gtfs_sj_p
 from transformers.projection import reprojection_update
 
 
-def main(source_database_file: str, target_database_file: str, clean_database: bool = True):
+def main(source_database_file: str, target_database_file: str, clean_database: bool = True) -> None:
     classes = get_interesting_classes(GTFS_CLASSES)
 
     with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:

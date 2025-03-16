@@ -39,7 +39,7 @@ from configuration import defaults
 from transformers.gtfs import gtfs_calendar_and_dates, gtfs_calendar_and_dates2
 
 
-def extract(archive, database: str):
+def extract(archive: zipfile.ZipFile, database: str) -> None:
     agencies = {}
     used_agencies = set([])
     routes = {}
@@ -229,7 +229,7 @@ def extract(archive, database: str):
             'feed_contact_url': ''
         }], write_header=True)
 
-def main(netex,gtfs):
+def main(netex: str, gtfs: str) -> None:
     with zipfile.ZipFile(gtfs, 'w') as archive:
         extract(archive, netex)
 
