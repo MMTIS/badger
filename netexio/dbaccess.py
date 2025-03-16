@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable, IO, Any
+from typing import TYPE_CHECKING, Iterable, IO, Any, Literal
 import inspect
 
 if TYPE_CHECKING:
@@ -131,11 +131,11 @@ def recursive_resolve(
     db: Database,
     parent: Tid,
     resolved: list[Any],
-    filter: str|None = None,
+    filter: str | Literal[False] | None = None,
     filter_class: set[type[Tid]] = set([]),
     inwards: bool = True,
     outwards: bool = True,
-):
+) -> None:
     resolved_objs: list[Any]
 
     for x in resolved:
@@ -208,7 +208,7 @@ def recursive_resolve(
                         outwards,
                     )  # TODO: not only consider the first
 
-        for obj in recursive_attributes(parent, []):
+        for obj, path in recursive_attributes(parent, []):
             if hasattr(obj, "id"):
                 continue
 
@@ -225,7 +225,8 @@ def recursive_resolve(
                 if not hasattr(netex, obj.name_of_ref_class):
                     # hack for non-existing structures
                     log_all(
-                        logging.WARN, f"No attribute found in module {netex} for {obj.name_of_ref_class}.",
+                        logging.WARN,
+                        f"No attribute found in module {netex} for {obj.name_of_ref_class}.",
                     )
 
                     continue
@@ -292,11 +293,14 @@ def recursive_resolve(
                                     )  # TODO: not only consider the first
                         else:
                             log_all(
-                                logging.WARN, f"Cannot resolve embedded {obj.ref}",
+                                logging.WARN,
+                                f"Cannot resolve embedded {obj.ref}",
                             )
 
 
-def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -> Iterable[Tid]:
+def fetch_references_classes_generator(
+    db: Database, classes: list[type[Tid]]
+) -> Iterable[Tid]:
     list_classes = {get_object_name(clazz) for clazz in classes}
     processed = set()
 
@@ -424,7 +428,9 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
                                     cursor2 = src_txn2.cursor()
 
                                     prefix = db.serializer.encode_key(
-                                        resolve.id, getattr(resolve, "version", None), resolve.__class__
+                                        resolve.id,
+                                        getattr(resolve, "version", None),
+                                        resolve.__class__,
                                     )
                                     if cursor2.set_range(
                                         prefix
@@ -459,11 +465,11 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
 def load_generator(
     db: Database,
     clazz: type[Tid],
-    limit: int|None=None,
-    filter_id: str|None=None,
-    embedding: bool=True,
-    parent: bool=False,
-    cache: bool=True,
+    limit: int | None = None,
+    filter_id: str | None = None,
+    embedding: bool = True,
+    parent: bool = False,
+    cache: bool = True,
 ) -> Iterable[Tid]:
     if db.env and db.open_db(clazz) is not None:
         with db.env.begin(write=False, buffers=True, db=db.open_db(clazz)) as txn:
@@ -500,7 +506,12 @@ def load_generator(
 
 
 def load_embedded_transparent_generator(
-    db: Database, clazz: type[Tid], limit: int|None=None, filter: str|None=None, parent: bool=False, cache: bool=True
+    db: Database,
+    clazz: type[Tid],
+    limit: int | None = None,
+    filter: str | None = None,
+    parent: bool = False,
+    cache: bool = True,
 ) -> Iterable[Tid]:
     # TODO: Expensive for classes that are not available, it will do a complete sequential scan and for each time it will depicle each individual object
 
@@ -549,7 +560,11 @@ def load_embedded_transparent_generator(
 
 
 def copy_table(
-    db_read: Database, db_write: Database, classes: list[type[Tid]], clean: bool=False, embedding: bool=False
+    db_read: Database,
+    db_write: Database,
+    classes: list[type[Tid]],
+    clean: bool = False,
+    embedding: bool = False,
 ) -> None:
     for klass in classes:
         # print(klass.__name__)
@@ -570,7 +585,9 @@ def missing_class_update(source_db: Database, target_db: Database) -> None:
     copy_table(source_db, target_db, list(missing_classes))
 
 
-def setup_database(db: Database, classes: tuple[list[str], list[str], list[Any]], clean: bool=False) -> None:
+def setup_database(
+    db: Database, classes: tuple[list[str], list[str], list[Any]], clean: bool = False
+) -> None:
     clean_element_names, interesting_element_names, interesting_classes = classes
 
     if clean:
@@ -589,9 +606,12 @@ def get_local_name(element: type[Tid]) -> str:
 def update_embedded_referencing(
     serializer: Serializer, deserialized: Tid
 ) -> Iterable[tuple[type[Tid], str, str, type[Tid], str, str, str | None]]:
+    assert deserialized.id is not None
+
     for obj, path in recursive_attributes(deserialized, []):
-        if hasattr(obj, "id"):
-            if obj.id is not None and obj.__class__ in serializer.interesting_classes:
+        if hasattr(obj, "id") and obj.id is not None:
+            if obj.__class__ in serializer.interesting_classes:
+                assert obj.id is not None
                 yield (
                     deserialized.__class__,
                     deserialized.id,
@@ -603,26 +623,26 @@ def update_embedded_referencing(
                 )
 
         elif hasattr(obj, "ref"):
-            if obj.ref is not None:
-                if obj.name_of_ref_class is None:
-                    # Hack, because NeTEx does not define the default name of ref class yet
-                    if obj.__class__.__name__.endswith("RefStructure"):
-                        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
-                    elif obj.__class__.__name__.endswith("Ref"):
-                        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+            assert obj.ref is not None
+            if obj.name_of_ref_class is None:
+                # Hack, because NeTEx does not define the default name of ref class yet
+                if obj.__class__.__name__.endswith("RefStructure"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                elif obj.__class__.__name__.endswith("Ref"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
-                yield (
-                    deserialized.__class__,
-                    deserialized.id,
-                    getattr(deserialized, "version", "any"),
-                    # The object that contains the reference
-                    serializer.name_object[
-                        obj.name_of_ref_class
-                    ],  # The object that the reference is towards
-                    obj.ref,
-                    getattr(obj, "version", "any"),
-                    None,
-                )
+            yield (
+                deserialized.__class__,
+                deserialized.id,
+                getattr(deserialized, "version", "any"),
+                # The object that contains the reference
+                serializer.name_object[
+                    obj.name_of_ref_class
+                ],  # The object that the reference is towards
+                obj.ref,
+                getattr(obj, "version", "any"),
+                None,
+            )
 
 
 def insert_database(
@@ -831,7 +851,7 @@ def insert_database(
                     try:
                         db.insert_one_object(object)
                     except:
-                        print(etree.tostring(element))
+                        print("1", etree.tostring(element))
                         raise
                         pass
 
@@ -846,7 +866,7 @@ def insert_database(
                     try:
                         db.insert_one_object(object)
                     except:
-                        print(etree.tostring(element))
+                        print("2", etree.tostring(element), object)
                         raise
                         pass
 
@@ -854,7 +874,7 @@ def insert_database(
                     try:
                         db.insert_one_object(object)
                     except:
-                        print(etree.tostring(element))
+                        print("3", etree.tostring(element))
                         raise
                         pass
 
@@ -909,7 +929,7 @@ def recursive_attributes(
                             if issubclass(
                                 x.__class__, VersionOfObjectRef
                             ) or issubclass(x.__class__, VersionOfObjectRefStructure):
-                                yield x, mydepth
+                                yield x, mydepth  # TODO: mydepth result is incorrect when list() but not as iterator
                             elif (
                                 hasattr(x, "__dataclass_fields__")
                                 and x.__class__.__name__ in netex.set_all  # type: ignore
