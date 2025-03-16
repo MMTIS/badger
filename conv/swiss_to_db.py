@@ -1,18 +1,19 @@
 import logging
-
+from typing import Any, IO
+import sys
 from netexio.database import Database
 from netexio.dbaccess import open_netex_file, setup_database, insert_database
 from utils.utils import get_interesting_classes
 from netexio.pickleserializer import MyPickleSerializer
 import utils.netex_monkeypatching
-from utils.aux_logging import *
+from utils.aux_logging import log_all, prepare_logger
 
-SWISS_CLASSES = ["Codespace", "StopPlace", "ScheduledStopPoint", "Operator", "VehicleType", "Line", "Direction",
+SWISS_CLASSES = {"Codespace", "StopPlace", "ScheduledStopPoint", "Operator", "VehicleType", "Line", "Direction",
                  "DestinationDisplay", "ServiceJourney", "TemplateServiceJourney", "ServiceCalendar",
-                 "PassengerStopAssignment", "AvailabilityCondition", "TopographicPlace", "ResponsibilitySet"]
+                 "PassengerStopAssignment", "AvailabilityCondition", "TopographicPlace", "ResponsibilitySet"}
 
 
-def main(swiss_zip_file: str, database: str, clean_database: bool = True):
+def main(swiss_zip_file: str, database: str, clean_database: bool = True) -> None:
     for file in open_netex_file(swiss_zip_file):
         if file.name.endswith(".xml"):
             if not check_if_swiss_file(file):
@@ -31,7 +32,7 @@ def main(swiss_zip_file: str, database: str, clean_database: bool = True):
             insert_database(db, classes, file)
 
 
-def check_if_swiss_file(file_handler):
+def check_if_swiss_file(file_handler: IO[Any]) -> bool:
     if file_handler.name.endswith(".xml"):
         fn = file_handler.name
         if "_CHE_" not in fn:
@@ -53,5 +54,5 @@ if __name__ == '__main__':
     try:
         main(args.swiss_zip_file, args.database, args.clean_database)
     except Exception as e:
-        log_all(logging.ERROR, f'{e}', traceback.format_exc())
+        log_all(logging.ERROR, traceback.format_exc())
         raise e
