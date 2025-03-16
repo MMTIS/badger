@@ -11,7 +11,16 @@ import os
 import json
 from chardet.universaldetector import UniversalDetector
 
-agency_txt = {'agency_id': 'VARCHAR', 'agency_name': 'VARCHAR', 'agency_url': 'VARCHAR', 'agency_timezone': 'VARCHAR', 'agency_lang': 'VARCHAR', 'agency_phone': 'VARCHAR', 'agency_fare_url': 'VARCHAR', 'agency_email': 'VARCHAR'}
+agency_txt = {
+    'agency_id': 'VARCHAR',
+    'agency_name': 'VARCHAR',
+    'agency_url': 'VARCHAR',
+    'agency_timezone': 'VARCHAR',
+    'agency_lang': 'VARCHAR',
+    'agency_phone': 'VARCHAR',
+    'agency_fare_url': 'VARCHAR',
+    'agency_email': 'VARCHAR',
+}
 stops_txt = {
     'stop_id': 'VARCHAR',
     'stop_code': 'VARCHAR',
@@ -42,7 +51,18 @@ routes_txt = {
     'continuous_drop_off': 'INTEGER',
     'network_id': 'VARCHAR',
 }
-trips_txt = {'route_id': 'VARCHAR', 'service_id': 'VARCHAR', 'trip_id': 'VARCHAR', 'trip_headsign': 'VARCHAR', 'trip_short_name': 'VARCHAR', 'direction_id': 'INTEGER', 'block_id': 'VARCHAR', 'shape_id': 'VARCHAR', 'wheelchair_accessible': 'INTEGER', 'bikes_allowed': 'INTEGER'}
+trips_txt = {
+    'route_id': 'VARCHAR',
+    'service_id': 'VARCHAR',
+    'trip_id': 'VARCHAR',
+    'trip_headsign': 'VARCHAR',
+    'trip_short_name': 'VARCHAR',
+    'direction_id': 'INTEGER',
+    'block_id': 'VARCHAR',
+    'shape_id': 'VARCHAR',
+    'wheelchair_accessible': 'INTEGER',
+    'bikes_allowed': 'INTEGER',
+}
 stop_times_txt = {
     'trip_id': 'VARCHAR',
     'arrival_time': 'VARCHAR',
@@ -62,13 +82,63 @@ stop_times_txt = {
     'timepoint': 'INTEGER',
     'drop_off_booking_rule_id': 'VARCHAR',
 }
-calendar_txt = {'service_id': 'VARCHAR', 'monday': 'INTEGER', 'tuesday': 'INTEGER', 'wednesday': 'INTEGER', 'thursday': 'INTEGER', 'friday': 'INTEGER', 'saturday': 'INTEGER', 'sunday': 'INTEGER', 'start_date': 'CHAR(8)', 'end_date': 'CHAR(8)'}
-calendar_dates_txt = {'service_id': 'VARCHAR', 'date': 'CHAR(8)', 'exception_type': 'INTEGER'}
-feed_info_txt = {'feed_publisher_name': 'VARCHAR', 'feed_publisher_url': 'VARCHAR', 'feed_lang': 'VARCHAR', 'default_lang': 'VARCHAR', 'feed_start_date': 'CHAR(8)', 'feed_end_date': 'CHAR(8)', 'feed_version': 'VARCHAR', 'feed_contact_email': 'VARCHAR', 'feed_contact_url': 'VARCHAR'}
-shapes_txt = {'shape_id': 'VARCHAR', 'shape_pt_lat': 'FLOAT', 'shape_pt_lon': 'FLOAT', 'shape_pt_sequence': 'INTEGER', 'shape_dist_traveled': 'FLOAT'}
-transfers_txt = {'from_stop_id': 'VARCHAR', 'to_stop_id': 'VARCHAR', 'from_route_id': 'VARCHAR', 'to_route_id': 'VARCHAR', 'from_trip_id': 'VARCHAR', 'to_trip_id': 'VARCHAR', 'transfer_type': 'INTEGER', 'min_transfer_time': 'INTEGER'}
-levels_txt = {'level_id': 'VARCHAR', 'level_index': 'FLOAT', 'level_name': 'VARCHAR'}
-frequencies_txt = {'trip_id': 'VARCHAR', 'start_time': 'VARCHAR', 'end_time': 'VARCHAR', 'headway_secs': 'INTEGER', 'exact_times': 'INTEGER'}
+calendar_txt = {
+    'service_id': 'VARCHAR',
+    'monday': 'INTEGER',
+    'tuesday': 'INTEGER',
+    'wednesday': 'INTEGER',
+    'thursday': 'INTEGER',
+    'friday': 'INTEGER',
+    'saturday': 'INTEGER',
+    'sunday': 'INTEGER',
+    'start_date': 'CHAR(8)',
+    'end_date': 'CHAR(8)',
+}
+calendar_dates_txt = {
+    'service_id': 'VARCHAR',
+    'date': 'CHAR(8)',
+    'exception_type': 'INTEGER',
+}
+feed_info_txt = {
+    'feed_publisher_name': 'VARCHAR',
+    'feed_publisher_url': 'VARCHAR',
+    'feed_lang': 'VARCHAR',
+    'default_lang': 'VARCHAR',
+    'feed_start_date': 'CHAR(8)',
+    'feed_end_date': 'CHAR(8)',
+    'feed_version': 'VARCHAR',
+    'feed_contact_email': 'VARCHAR',
+    'feed_contact_url': 'VARCHAR',
+}
+shapes_txt = {
+    'shape_id': 'VARCHAR',
+    'shape_pt_lat': 'FLOAT',
+    'shape_pt_lon': 'FLOAT',
+    'shape_pt_sequence': 'INTEGER',
+    'shape_dist_traveled': 'FLOAT',
+}
+transfers_txt = {
+    'from_stop_id': 'VARCHAR',
+    'to_stop_id': 'VARCHAR',
+    'from_route_id': 'VARCHAR',
+    'to_route_id': 'VARCHAR',
+    'from_trip_id': 'VARCHAR',
+    'to_trip_id': 'VARCHAR',
+    'transfer_type': 'INTEGER',
+    'min_transfer_time': 'INTEGER',
+}
+levels_txt = {
+    'level_id': 'VARCHAR',
+    'level_index': 'FLOAT',
+    'level_name': 'VARCHAR',
+}
+frequencies_txt = {
+    'trip_id': 'VARCHAR',
+    'start_time': 'VARCHAR',
+    'end_time': 'VARCHAR',
+    'headway_secs': 'INTEGER',
+    'exact_times': 'INTEGER',
+}
 pathways_txt = {
     'pathway_id': 'VARCHAR',
     'from_stop_id': 'VARCHAR',
@@ -199,7 +269,9 @@ def handle_file(con: duckdb.DuckDBPyConnection, zip: zipfile.ZipFile, filename: 
 
             this_mapping_str = json.dumps(this_mapping)
 
-            sql_create_table = f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{filename}', delim=',', header=true, auto_detect=true, columns = {this_mapping_str});"""
+            sql_create_table = (
+                f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{filename}', delim=',', header=true, auto_detect=true, columns = {this_mapping_str});"""
+            )
             # print(sql_create_table)
             cur.execute(sql_create_table)
 
