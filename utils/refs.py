@@ -1,6 +1,6 @@
 from operator import attrgetter
 from itertools import groupby
-from typing import Optional, List, TypeVar, Any
+from typing import Optional, List, TypeVar, Any, cast
 
 from netex import (
     MultilingualString,
@@ -25,13 +25,13 @@ Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
 Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-def getRef(obj: Tid, klass: type[T] | None = None) -> T | None:
+def getRef(obj: Tid, klass: type[EntityStructure] | None = None) -> VersionOfObjectRefStructure | None:
     if obj is None:
         return None
 
     if klass is None:
         asobj = type(obj).__name__ + "Ref"  # Was: RefStructure
-        klass = globals()[asobj]
+        klass = cast(type[VersionOfObjectRefStructure], globals()[asobj])  # TODO: review
 
     assert klass is not None, "Class is not none"
 
@@ -79,16 +79,12 @@ def getClassFromRefClass(ref: Tref) -> Any:
     if ref.name_of_ref_class is not None:
         klass = ref.name_of_ref_class
     else:
-        klass = re.sub(
-            r"LineRef(Structure)?", "Line", type(ref).__name__
-        )  # TODO: review
+        klass = re.sub(r"LineRef(Structure)?", "Line", type(ref).__name__)  # TODO: review
 
     return globals()[klass]
 
 
-def getFakeRef(
-    id: str, klass: type[Tref], version: str, version_ref: str | None = None
-) -> Tref | None:
+def getFakeRef(id: str, klass: type[Tref], version: str, version_ref: str | None = None) -> Tref | None:
     return (
         klass(
             ref=id,
@@ -118,9 +114,7 @@ def getIndexByGroup(objects: List[T], attr: str) -> dict[object, list[T]]:
     return {i: list(j) for i, j in groupby(objects, lambda x: f(x))}
 
 
-def setIdVersion(
-    obj: Tidversion, codespace: Codespace, id: str, version: Optional[Version]
-) -> None:
+def setIdVersion(obj: Tidversion, codespace: Codespace, id: str, version: Optional[Version]) -> None:
     name = getattr(getattr(type(obj), "Meta", None), "name", type(obj).__name__)
     obj.id = "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(":", "-"))
     if version:

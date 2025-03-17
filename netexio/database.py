@@ -9,7 +9,7 @@ import threading
 import queue
 import os
 import cloudpickle
-from typing import TypeVar, Iterable, Any, Optional, Type
+from typing import TypeVar, Iterable, Any, Optional, Type, Literal
 from enum import IntEnum
 
 from netex import (
@@ -56,12 +56,7 @@ class Referencing:
 
 
 class Database:
-    task_queue: (
-        queue.Queue[
-            tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]
-        ]
-        | None
-    )
+    task_queue: queue.Queue[tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]] | None
     writer_thread: threading.Thread | None
 
     def __init__(
@@ -92,9 +87,7 @@ class Database:
 
     def __enter__(self) -> Database:
         if self.readonly:
-            self.env = lmdb.open(
-                self.path, max_dbs=self.max_dbs, readonly=self.readonly
-            )
+            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly)
 
         else:
             self.initial_size = self.initial_size
@@ -115,18 +108,10 @@ class Database:
                 subdir=True,
             )
 
-        self.db_embedding: lmdb._Database = self.env.open_db(
-            b"_embedding", create=not self.readonly, dupsort=True
-        )
-        self.db_embedding_inverse: lmdb._Database = self.env.open_db(
-            b"_embedding_inverse", create=not self.readonly, dupsort=True
-        )
-        self.db_referencing: lmdb._Database = self.env.open_db(
-            b"_referencing", create=not self.readonly, dupsort=True
-        )
-        self.db_referencing_inwards: lmdb._Database = self.env.open_db(
-            b"_referencing_inwards", create=not self.readonly, dupsort=True
-        )
+        self.db_embedding: lmdb._Database = self.env.open_db(b"_embedding", create=not self.readonly, dupsort=True)
+        self.db_embedding_inverse: lmdb._Database = self.env.open_db(b"_embedding_inverse", create=not self.readonly, dupsort=True)
+        self.db_referencing: lmdb._Database = self.env.open_db(b"_referencing", create=not self.readonly, dupsort=True)
+        self.db_referencing_inwards: lmdb._Database = self.env.open_db(b"_referencing_inwards", create=not self.readonly, dupsort=True)
 
         return self
 
@@ -135,10 +120,10 @@ class Database:
         exception_type: Optional[Type[BaseException]],
         exception_value: Optional[BaseException],
         exception_traceback: Optional[TracebackType],
-    ) -> Optional[bool]:
+    ) -> Literal[False]:
         self.block_until_done()
         self.env.close()
-        return True
+        return False  # Allow errors to propagate!
 
     def usage(self) -> tuple[int, int]:
         with self.lock:
@@ -181,7 +166,7 @@ class Database:
 
             try:
                 for _ in range(self.batch_size):
-                    action, database, key, value = self.task_queue.get(timeout=3)
+                    action, database, key, value = self.task_queue.get(timeout=30)
 
                     match action:
                         case LmdbActions.WRITE:
@@ -210,9 +195,7 @@ class Database:
                 pass
 
             if batch or delete_tasks or clear_tasks or drop_tasks:
-                self._process_batch(
-                    batch, delete_tasks, clear_tasks, drop_tasks, total_size
-                )
+                self._process_batch(batch, delete_tasks, clear_tasks, drop_tasks, total_size)
 
             if action == LmdbActions.STOP:
                 break
@@ -265,9 +248,7 @@ class Database:
         with self.lock:
             if self.task_queue is None:
                 self.task_queue = queue.Queue(maxsize=1000)  # Shared queue
-                self.writer_thread = threading.Thread(
-                    target=self._writer, args=(), daemon=True
-                )
+                self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
     def open_db(self, klass: type[Tid], delete: bool = False) -> lmdb._Database:
@@ -324,12 +305,8 @@ class Database:
             path,
         ) in update_embedded_referencing(self.serializer, obj):
             if path is not None:
-                embedding_inverse_key = self.serializer.encode_key(
-                    object_id, object_version, object_class, include_clazz=True
-                )
-                embedding_inverse_value = cloudpickle.dumps(
-                    (get_object_name(parent_class), parent_id, parent_version, path)
-                )
+                embedding_inverse_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
+                embedding_inverse_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
                 self.task_queue.put(
                     (
                         LmdbActions.WRITE,
@@ -339,12 +316,8 @@ class Database:
                     )
                 )
 
-                embedding_key = self.serializer.encode_key(
-                    parent_id, parent_version, parent_class, include_clazz=True
-                )
-                embedding_value = cloudpickle.dumps(
-                    (get_object_name(object_class), object_id, object_version, path)
-                )
+                embedding_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
+                embedding_value = cloudpickle.dumps((get_object_name(object_class), object_id, object_version, path))
                 self.task_queue.put(
                     (
                         LmdbActions.WRITE,
@@ -358,29 +331,15 @@ class Database:
                 # TODO: This won't work because of out of order behavior
                 # self.task_queue.put((LmdbActions.DELETE_PREFIX, self.db_referencing, key_prefix))
 
-                ref_key = self.serializer.encode_key(
-                    parent_id, parent_version, parent_class, include_clazz=True
-                )
-                ref_value = cloudpickle.dumps(
-                    (get_object_name(object_class), object_id, object_version)
-                )
-                self.task_queue.put(
-                    (LmdbActions.WRITE, self.db_referencing, ref_key, ref_value)
-                )
+                ref_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
+                ref_value = cloudpickle.dumps((get_object_name(object_class), object_id, object_version))
+                self.task_queue.put((LmdbActions.WRITE, self.db_referencing, ref_key, ref_value))
 
-                ref_key = self.serializer.encode_key(
-                    object_id, object_version, object_class, include_clazz=True
-                )
-                ref_value = cloudpickle.dumps(
-                    (get_object_name(parent_class), parent_id, parent_version)
-                )
-                self.task_queue.put(
-                    (LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value)
-                )
+                ref_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
+                ref_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version))
+                self.task_queue.put((LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value))
 
-    def insert_objects_on_queue(
-        self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False
-    ) -> None:
+    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
         db_handle = self.open_db(klass)
         if db_handle is None:
@@ -401,11 +360,11 @@ class Database:
             self._insert_embedding_on_queue(obj)
 
     def insert_one_object(self, object: Tid) -> None:
+        if object.id == 'SBB:DataSource:SBB':
+            pass
         return self.insert_objects_on_queue(object.__class__, [object])
 
-    def insert_raw_on_queue(
-        self, objects: Iterable[tuple[lmdb._Database, bytes, bytes]]
-    ) -> None:
+    def insert_raw_on_queue(self, objects: Iterable[tuple[lmdb._Database, bytes, bytes]]) -> None:
         """Places a hybrid list of encoded pairs in the shared queue for writing, starting writer if needed."""
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
@@ -443,13 +402,9 @@ class Database:
 
         if embedding:
             self.task_queue.put((LmdbActions.CLEAR, self.db_embedding, None, None))
-            self.task_queue.put(
-                (LmdbActions.CLEAR, self.db_embedding_inverse, None, None)
-            )
+            self.task_queue.put((LmdbActions.CLEAR, self.db_embedding_inverse, None, None))
             self.task_queue.put((LmdbActions.CLEAR, self.db_referencing, None, None))
-            self.task_queue.put(
-                (LmdbActions.CLEAR, self.db_referencing_inwards, None, None)
-            )
+            self.task_queue.put((LmdbActions.CLEAR, self.db_referencing_inwards, None, None))
 
     def delete_by_prefix(self, klass: type[Tid], prefix: bytes) -> None:
         """Schedules deletion of all keys with a given prefix using the writer thread."""
@@ -514,9 +469,7 @@ class Database:
 
         return None  # If DB is empty
 
-    def get_single(
-        self, clazz: type[Tid], id: str, version: str | None = None
-    ) -> Tid | None:
+    def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> Tid | None:
         db = self.open_db(clazz)
         if db is None:
             return None
@@ -529,9 +482,7 @@ class Database:
                     return self.serializer.unmarshall(value, clazz)
             else:
                 cursor = txn.cursor()
-                if cursor.set_range(
-                    prefix
-                ):  # Position cursor at the first key >= prefix
+                if cursor.set_range(prefix):  # Position cursor at the first key >= prefix
                     for key, value in cursor:
                         if not bytes(key).startswith(prefix):
                             break  # Stop when keys no longer match the prefix
@@ -565,9 +516,7 @@ class Database:
         with self.env.begin(write=False, buffers=True, db=src_db) as src_txn:
             cursor = src_txn.cursor()
             for key, value in cursor:
-                target.task_queue.put(
-                    (LmdbActions.WRITE, dst_db, bytes(key), bytes(value))
-                )
+                target.task_queue.put((LmdbActions.WRITE, dst_db, bytes(key), bytes(value)))
 
     def copy_db_embedding(self, target: Database, classes: list[type[Tid]]) -> None:
         """
@@ -579,9 +528,7 @@ class Database:
         target._start_writer_if_needed()
         assert target.task_queue is not None, "Task queue must not be none"
 
-        classes_name = {
-            self.serializer.encode_key(None, None, klass, True) for klass in classes
-        }
+        classes_name = {self.serializer.encode_key(None, None, klass, True) for klass in classes}
 
         def _copy_db(src_db: lmdb._Database, dst_db: lmdb._Database) -> None:
             """Helper function to copy data between LMDB databases efficiently."""
@@ -599,9 +546,7 @@ class Database:
                     if cursor.set_range(prefix):
                         key = bytes(cursor.key())
                         while key.startswith(prefix):
-                            target.task_queue.put(
-                                (LmdbActions.WRITE, dst_db, key, bytes(cursor.value()))
-                            )
+                            target.task_queue.put((LmdbActions.WRITE, dst_db, key, bytes(cursor.value())))
                             if not cursor.next():
                                 break
 
@@ -631,6 +576,17 @@ class Database:
 
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
 
+    def stats(self) -> None:
+        print("stats:")
+        with self.env.begin(write=False) as txn:
+            cursor = txn.cursor()
+            for key, _ in cursor:
+                name = bytes(key).decode("utf-8")
+                with self.env.begin(db=self.env.open_db(key), write=False) as txn2:
+                    cursor2 = txn2.cursor()
+                    key_count = sum(1 for _ in cursor2)  # Count keys manually
+                    print(name, key_count)
+
     def referencing(self, exclusively: set[type[Tid]] | None = None) -> list[type[Tid]]:
         if exclusively is None:
             exclusively = set(self.serializer.interesting_classes)
@@ -649,9 +605,7 @@ class Database:
             exclusively = set(self.serializer.interesting_classes)
 
         tables: set[type[Tid]] = set([])
-        with self.env.begin(
-            write=False, buffers=True, db=self.db_embedding_inverse
-        ) as txn:
+        with self.env.begin(write=False, buffers=True, db=self.db_embedding_inverse) as txn:
             cursor = txn.cursor()
             for _key, value in cursor:
                 klass, *_ = cloudpickle.loads(value)

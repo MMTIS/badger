@@ -20,9 +20,12 @@ def main(source_database_file: str, target_database_file: str, clean_database: b
 
         with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
             # Copy tables that we don't change as-is.
-            copy_table(db_read, db_write,
-                       [DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea,
-                        InterchangeRule, Version], clean=True)
+            copy_table(
+                db_read,
+                db_write,
+                [DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea, InterchangeRule, Version],
+                clean=True,
+            )
 
             # Flatten the Operator, Authority, Branding, ResponsibilitySet; Provides Line and Operator
             gtfs_operator_line_memory(db_read, db_write, {})
@@ -43,7 +46,7 @@ def main(source_database_file: str, target_database_file: str, clean_database: b
 
         # Our target database must be reprojected to WGS84            apply_availability_conditions_via_day_type_ref(db_read, db_write)
 
-        target_db.block_until_done()
+        db_write.block_until_done()
 
         reprojection_update(db_write, crs_to="urn:ogc:def:crs:EPSG::4326")
 

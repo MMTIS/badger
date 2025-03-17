@@ -1,6 +1,5 @@
-import utils.netex_monkeypatching
-from netex import AvailabilityCondition, UicOperatingPeriod, OperatingDay, DayTypeAssignment, DayType, OperatingDayRef, \
-    DayTypeRef, DayOfWeekEnumeration
+import utils.netex_monkeypatching  # noqa: F401
+from netex import AvailabilityCondition, UicOperatingPeriod, OperatingDay, DayTypeAssignment, DayType, OperatingDayRef, DayTypeRef, DayOfWeekEnumeration
 from netexio.database import Database
 from netexio.dbaccess import load_local
 from utils.refs import getRef
@@ -27,8 +26,9 @@ def datetime_weekday_to_dow(wd: int) -> DayOfWeekEnumeration:
     return DayOfWeekEnumeration.NONE
 
 
-def get_day_type_from_availability_condition(db_read: Database, availability_condition: AvailabilityCondition) -> tuple[
-    DayType, list[DayTypeAssignment], list[OperatingDay], UicOperatingPeriod]:
+def get_day_type_from_availability_condition(
+    db_read: Database, availability_condition: AvailabilityCondition
+) -> tuple[DayType, list[DayTypeAssignment], list[OperatingDay], UicOperatingPeriod]:
     day_type = None
     day_type_assignments = []
     my_operating_days = []
@@ -39,9 +39,7 @@ def get_day_type_from_availability_condition(db_read: Database, availability_con
             if isinstance(availability_condition.day_types.day_type_ref_or_day_type[0], DayType):
                 day_type = availability_condition.day_types.day_type_ref_or_day_type[0]
             elif isinstance(availability_condition.day_types.day_type_ref_or_day_type[0], DayTypeRef):
-                day_type = load_local(db_read, DayType, limit=1,
-                                      filter=availability_condition.day_types.day_type_ref_or_day_type[0].id,
-                                      cursor=True)[0]
+                day_type = load_local(db_read, DayType, limit=1, filter_id=availability_condition.day_types.day_type_ref_or_day_type[0].id, cursor=True)[0]
         else:
             day_type = project(availability_condition, DayType)
     else:
@@ -52,8 +50,7 @@ def get_day_type_from_availability_condition(db_read: Database, availability_con
         uic_operating_period.from_operating_day_ref_or_from_date = availability_condition.from_date
         uic_operating_period.to_operating_day_ref_or_to_date = availability_condition.to_date
         day_type_assignment: DayTypeAssignment = project(availability_condition, DayTypeAssignment)
-        day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(
-            uic_operating_period)
+        day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(uic_operating_period)
         day_type_assignment.day_type_ref = getRef(day_type)
         day_type_assignment.order = 1
         day_type_assignments.append(day_type_assignment)
