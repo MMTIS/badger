@@ -241,12 +241,12 @@ def handle_file(con: duckdb.DuckDBPyConnection, zip: zipfile.ZipFile, filename: 
                     break
             detector.close()
 
+            assert detector.result is not None, "Detector must have a result"
+
             with zip.open(filename, mode='r') as f:
                 g = io.TextIOWrapper(f, detector.result['encoding'])
                 reader = csv.reader(g)
                 header = next(reader)
-
-            assert detector.result is not None
 
             if (detector.result['encoding'] or '').lower() not in ('utf-8', 'utf-8-sig', 'ascii'):
                 with zip.open(filename, 'r') as f_in:

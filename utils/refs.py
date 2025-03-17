@@ -33,13 +33,13 @@ def getRef(obj: Tid, klass: type[T] | None = None) -> T | None:
         asobj = type(obj).__name__ + "Ref"  # Was: RefStructure
         klass = globals()[asobj]
 
-    assert klass is not None
+    assert klass is not None, "Class is not none"
 
     if hasattr(obj, "id"):
-        assert obj.id is not None
+        assert obj.id is not None, "Object does not have an id"
         instance = klass(ref=obj.id)
     elif hasattr(obj, "ref"):
-        assert obj.ref is not None
+        assert obj.ref is not None, "Object does not have a ref"
         instance = klass(ref=obj.ref)
     else:
         return None
@@ -135,7 +135,7 @@ def getId(clazz: type[Tid], codespace: Codespace, id: str) -> str:
 
 
 def getVersionOfObjectRef(obj: Tid) -> VersionOfObjectRefStructure:
-    assert obj.id is not None
+    assert obj.id is not None, "Object without id"
     return VersionOfObjectRefStructure(name_of_ref_class=type(obj).__name__, ref=obj.id)
 
 

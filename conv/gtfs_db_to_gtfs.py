@@ -71,10 +71,10 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
 
                 if sp is not None:
                     if isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPoint) or isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, FareScheduledStopPoint):
-                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id is not None
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id is not None, "psa must have an id"
                         psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id] = sp
                     elif isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPointRef):
-                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref is not None
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref is not None, "psa must have a ref"
                         psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = sp
 
             elif psa.taxi_stand_ref_or_quay_ref_or_quay is not None:
@@ -85,10 +85,10 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
 
                 if sp is not None:
                     if isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPoint) or isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, FareScheduledStopPoint):
-                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id is not None
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id is not None, "psa must have an id"
                         psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id] = sp
                     elif isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPointRef):
-                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref is not None
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref is not None, "psa must have a ref"
                         psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = sp
 
         # TODO: GTFS does not support Branding, so in order to facilitate it we will make it a separate Agency
@@ -100,7 +100,7 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         stop: dict[str, Any] | None
         scheduled_stop_point: ScheduledStopPoint
         for scheduled_stop_point in load_local(db_read, ScheduledStopPoint):
-            assert scheduled_stop_point.id is not None
+            assert scheduled_stop_point.id is not None, "ScheduledStopPoint must have an id"
             stop_place = psas.get(scheduled_stop_point.id, None)
             if stop_place is not None:
                 stop_place_ref = getRef(stop_place)
@@ -186,26 +186,30 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         service_journey_patterns = load_local(db_read, ServiceJourneyPattern)
 
         service_journey_patterns_index = getIndex(service_journey_patterns)
+        service_journey_pattern: ServiceJourneyPattern | None = None
 
         for service_journey in load_generator(db_read, ServiceJourney):
-            service_journey_pattern = (sjp := service_journey_patterns_index.get(service_journey.journey_pattern_ref.ref)) if service_journey.journey_pattern_ref else None
+            if not service_journey.calls:
+                service_journey_pattern = (sjp := service_journey_patterns_index.get(service_journey.journey_pattern_ref.ref)) if service_journey.journey_pattern_ref else None
+                assert service_journey_pattern is not None, f"{service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
+                CallsProfile.getCallsFromTimetabledPassingTimes(service_journey, service_journey_pattern)
+
             trip = GtfsProfile.projectServiceJourneyToTrip(service_journey, service_journey_pattern)
             trips.append(trip)
 
-            assert service_journey_pattern is not None, f"{service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
-            CallsProfile.getCallsFromTimetabledPassingTimes(service_journey, service_journey_pattern)
             stop_times += list(GtfsProfile.projectServiceJourneyToStopTimes(service_journey))
 
         frequencies = []
         for template_service_journey in load_generator(db_read, TemplateServiceJourney):
-            service_journey_pattern = (sjp := service_journey_patterns_index.get(template_service_journey.journey_pattern_ref.ref)) if template_service_journey.journey_pattern_ref else None
+            if not service_journey.calls:
+                service_journey_pattern = (sjp := service_journey_patterns_index.get(template_service_journey.journey_pattern_ref.ref)) if template_service_journey.journey_pattern_ref else None
+                assert service_journey_pattern is not None, f"{template_service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
+                CallsProfile.getCallsFromTimetabledPassingTimes(template_service_journey, service_journey_pattern)
+
             trip = GtfsProfile.projectServiceJourneyToTrip(template_service_journey, service_journey_pattern)
             trips.append(trip)
 
-            assert service_journey_pattern is not None, f"{template_service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
-            CallsProfile.getCallsFromTimetabledPassingTimes(template_service_journey, service_journey_pattern)
             stop_times += list(GtfsProfile.projectServiceJourneyToStopTimes(service_journey))
-
             frequencies += list(GtfsProfile.projectTemplateServiceJourneyToFrequency(template_service_journey))
 
         # TODO: maybe do this per trip?

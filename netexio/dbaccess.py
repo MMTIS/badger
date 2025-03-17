@@ -147,7 +147,7 @@ def recursive_resolve(
     if inwards and (
         filter is False or filter == parent.id or parent.__class__ in filter_class
     ):
-        assert parent.id is not None
+        assert parent.id is not None, "Parent.id must not be none"
         resolved_parents = load_referencing_inwards(
             db, parent.__class__, filter_id=parent.id
         )
@@ -180,7 +180,7 @@ def recursive_resolve(
 
     # In principle this would already take care of everything recursive_attributes could find, but now does it inwards.
     if outwards:
-        assert parent.id is not None
+        assert parent.id is not None, "parent.id must not be none"
         resolved_parents = load_referencing(db, parent.__class__, filter_id=parent.id)
         for y in resolved_parents:
             already_done = False
@@ -220,8 +220,8 @@ def recursive_resolve(
                     elif obj.__class__.__name__.endswith("Ref"):
                         obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
-                assert obj.ref is not None
-                assert obj.name_of_ref_class is not None
+                assert obj.ref is not None, "Object ref must not be none"
+                assert obj.name_of_ref_class is not None, "Object name of ref class must not be none"
                 if not hasattr(netex, obj.name_of_ref_class):
                     # hack for non-existing structures
                     log_all(
@@ -342,7 +342,7 @@ def fetch_references_classes_generator(
                     embedded_parent=True,
                 )
                 if len(results) > 0:
-                    assert results[0].id is not None
+                    assert results[0].id is not None, "results[0].id must not be none"
                     needle = get_object_name(results[0].__class__) + "|" + results[0].id
                     if (
                         results[0].__class__ in classes
@@ -405,7 +405,7 @@ def fetch_references_classes_generator(
                         )
 
                         for resolve in resolved:
-                            assert resolve.id is not None
+                            assert resolve.id is not None, "resolve.id must not be none"
                             needle = (
                                 get_object_name(resolve.__class__) + "|" + resolve.id
                             )
@@ -606,12 +606,12 @@ def get_local_name(element: type[Tid]) -> str:
 def update_embedded_referencing(
     serializer: Serializer, deserialized: Tid
 ) -> Iterable[tuple[type[Tid], str, str, type[Tid], str, str, str | None]]:
-    assert deserialized.id is not None
+    assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
             if obj.__class__ in serializer.interesting_classes:
-                assert obj.id is not None
+                assert obj.id is not None, "Object.id must not be none"
                 yield (
                     deserialized.__class__,
                     deserialized.id,
@@ -623,7 +623,7 @@ def update_embedded_referencing(
                 )
 
         elif hasattr(obj, "ref"):
-            assert obj.ref is not None
+            assert obj.ref is not None, "Object ref must not be none"
             if obj.name_of_ref_class is None:
                 # Hack, because NeTEx does not define the default name of ref class yet
                 if obj.__class__.__name__.endswith("RefStructure"):

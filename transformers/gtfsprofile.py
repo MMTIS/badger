@@ -150,9 +150,14 @@ class GtfsProfile:
         return original_id
 
     @staticmethod
-    def getOriginalGtfsIdFromRef(vor: VersionOfObjectRefStructure | str) -> str:
+    def getOriginalGtfsIdFromRef(vor: VersionOfObjectRefStructure | str) -> str: # TODO: refactor, this is not correct
         global gtfs_id_lookup
-        return gtfs_id_lookup.get(getattr(vor, "ref", vor), vor)
+        if hasattr(vor, "ref"):
+            return gtfs_id_lookup.get(vor.ref, vor.ref)
+        else:
+            return gtfs_id_lookup.get(vor, vor)
+
+        # return gtfs_id_lookup.get(getattr(vor, "ref", vor), vor)
 
     @staticmethod
     def projectAuthorityToAgency(authority: Authority) -> dict[str, Any]:
@@ -358,7 +363,7 @@ class GtfsProfile:
         if interchange_rule.stay_seated == True:
             transfer_type = 4
 
-        elif interchange_rule.stay_seated == False:
+        elif interchange_rule.stay_seated is False:
             transfer_type = 5
 
         if interchange_rule.minimum_transfer_time:

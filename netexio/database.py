@@ -167,7 +167,7 @@ class Database:
     def _writer(self) -> None:
         """Handles both inserts and deletions from the queue, with retry on failure."""
 
-        assert self.task_queue is not None
+        assert self.task_queue is not None, "Task queue must not be none"
 
         action = LmdbActions.STOP
 
@@ -185,13 +185,13 @@ class Database:
 
                     match action:
                         case LmdbActions.WRITE:
-                            assert key is not None
-                            assert value is not None
+                            assert key is not None, "Key must not be none"
+                            assert value is not None, "Value must not be none"
                             batch.append((database, key, value))
                             total_size += len(key) + len(value)  # Key + Value size
 
                         case LmdbActions.DELETE_PREFIX:
-                            assert key is not None
+                            assert key is not None, "Key must not be none"
                             delete_tasks.append((database, key))
 
                         case LmdbActions.CLEAR:
@@ -303,8 +303,8 @@ class Database:
             self.dbs[name] = self.env.open_db(name_bytes)
 
     def _insert_embedding_on_queue(self, obj: Tid) -> None:
-        assert obj.id is not None
-        assert self.task_queue is not None
+        assert obj.id is not None, "Object must have an id"
+        assert self.task_queue is not None, "Task queue must not be none"
 
         parent_class: type[Tid]
         parent_id: str
@@ -387,13 +387,13 @@ class Database:
             return
 
         self._start_writer_if_needed()
-        assert self.task_queue is not None
+        assert self.task_queue is not None, "Task queue must not be none"
 
         if empty:
             self.task_queue.put((LmdbActions.CLEAR, db_handle, None, None))
 
         for obj in objects:
-            assert obj.id is not None
+            assert obj.id is not None, "Object must have an id"
             version = obj.version if hasattr(obj, "version") else None
             key = self.serializer.encode_key(obj.id, version, klass)
             value = self.serializer.marshall(obj, klass)
@@ -408,7 +408,7 @@ class Database:
     ) -> None:
         """Places a hybrid list of encoded pairs in the shared queue for writing, starting writer if needed."""
         self._start_writer_if_needed()
-        assert self.task_queue is not None
+        assert self.task_queue is not None, "Task queue must not be none"
 
         for db_handle, key, value in objects:
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
@@ -418,7 +418,7 @@ class Database:
             return
 
         self._start_writer_if_needed()
-        assert self.task_queue is not None
+        assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
             db_handle = self.open_db(klass)
@@ -432,7 +432,7 @@ class Database:
             return
 
         self._start_writer_if_needed()
-        assert self.task_queue is not None
+        assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
             db_handle = self.open_db(klass, delete=True)
@@ -461,7 +461,7 @@ class Database:
             return
 
         self._start_writer_if_needed()
-        assert self.task_queue is not None
+        assert self.task_queue is not None, "Task queue must not be none"
 
         self.task_queue.put((LmdbActions.DELETE_PREFIX, db_handle, prefix, None))
 
@@ -470,8 +470,8 @@ class Database:
             return
 
         if self.task_queue is not None and self.writer_thread is not None:
-            assert self.writer_thread is not None
-            assert self.task_queue is not None
+            assert self.writer_thread is not None, "Writer thread must not be none"
+            assert self.task_queue is not None, "Task queue must not be none"
 
             self.task_queue.put((LmdbActions.STOP, None, None, None))
             self.writer_thread.join()  # Wait for writer to finish
@@ -552,7 +552,7 @@ class Database:
             return
 
         target._start_writer_if_needed()
-        assert target.task_queue is not None
+        assert target.task_queue is not None, "Task queue must not be none"
 
         src_db = self.open_db(klass)
         if src_db is None:
@@ -577,7 +577,7 @@ class Database:
             return
 
         target._start_writer_if_needed()
-        assert target.task_queue is not None
+        assert target.task_queue is not None, "Task queue must not be none"
 
         classes_name = {
             self.serializer.encode_key(None, None, klass, True) for klass in classes
@@ -591,7 +591,7 @@ class Database:
             if dst_db is None:
                 return
 
-            assert target.task_queue is not None
+            assert target.task_queue is not None, "Task queue must not be none"
 
             with self.env.begin(write=False, buffers=True, db=src_db) as src_txn:
                 cursor = src_txn.cursor()

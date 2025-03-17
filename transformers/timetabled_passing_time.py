@@ -17,7 +17,7 @@ def infer_id_and_order_and_apply(service_journey: ServiceJourney) -> None:
             order = 1
             for pt in service_journey.passing_times.timetabled_passing_time:
                 if pt.id is None:
-                    assert service_journey.id is not None
+                    assert service_journey.id is not None, "ServiceJourney without id"
                     pt.id = (
                         service_journey.id.replace(
                             "ServiceJourney", "TimetabledPassingTime"
