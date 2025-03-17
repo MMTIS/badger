@@ -9,7 +9,7 @@ from netex import ServiceJourney, StopPointInJourneyPattern, ServiceJourneyPatte
     OnwardTimingLinkView, TimeDemandType, JourneyRunTimesRelStructure, JourneyWaitTimesRelStructure, TimeDemandTypeRef, \
     TimeDemandTypeRefStructure, RouteView, ScheduledStopPoint, Route, CallsRelStructure, TimingPointInJourneyPattern, \
     ScheduledStopPointRef, ServiceLinkInJourneyPattern, TimingLinkInJourneyPattern, JourneyPatternWaitTimesRelStructure, \
-    TimetabledPassingTime, TimetabledPassingTimesRelStructure
+    TimetabledPassingTime, TimetabledPassingTimesRelStructure, TemplateServiceJourney
 from utils.refs import setIdVersion, getRef, getIndex, getIdByRef
 from utils.utils import project
 from utils.aux_logging import log_print
@@ -330,7 +330,7 @@ class CallsProfile:
         service_journey.passing_times = tpts
 
     @staticmethod
-    def getCallsFromTimetabledPassingTimes(service_journey: ServiceJourney,
+    def getCallsFromTimetabledPassingTimes(service_journey: ServiceJourney | TemplateServiceJourney,
                                            service_journey_pattern: ServiceJourneyPattern):
         if service_journey.calls is not None:
             return

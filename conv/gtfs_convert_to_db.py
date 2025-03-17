@@ -2,7 +2,7 @@ import datetime
 import hashlib
 import math
 from _decimal import Decimal
-from typing import List, Generator
+from typing import List, Generator, TypeVar, Any
 
 import duckdb
 import numpy
@@ -47,8 +47,9 @@ from netex import Codespace, DataSource, MultilingualString, Version, VersionFra
 from utils.refs import getRef, getIndex, getBitString2, getFakeRef, getOptionalString, getId
 from utils.aux_logging import *
 
+T = TypeVar("T")
 
-def get_or_none(l: list, i: int, cast_clazz=None):
+def get_or_none(l: list[Any] | None, i: int, cast_clazz: type[T] | None=None) -> T | None:
     if l is None:
         return l
 
@@ -61,27 +62,27 @@ def get_or_none(l: list, i: int, cast_clazz=None):
     return l[i]
 
 
-def gtfs_date(d: str):
+def gtfs_date(d: str) -> datetime.datetime:
     return datetime.datetime(year=int(str(d)[0:4]), month=int(str(d)[4:6]), day=int(str(d)[6:8]))
 
 
-def date_to_xmldatetime(d: datetime.date):
+def date_to_xmldatetime(d: datetime.date) -> XmlDateTime:
     x = datetime.datetime.combine(d, datetime.datetime.min.time())
     return XmlDateTime.from_datetime(x)
 
 
-def date_to_xmldate(d: datetime.date):
+def date_to_xmldate(d: datetime.date) -> XmlDate:
     return XmlDate.from_date(d)
 
 
 class GtfsNeTexProfile(CallsProfile):
     @staticmethod
-    def getShortName(name: str):
+    def getShortName(name: str) -> str:
         if len(name) > 8:
             return ''.join([x[0].upper() for x in name.split(' ')])
         return name
 
-    def getCodespaceAndDataSource(self) -> (Codespace, DataSource, Version, VersionFrameDefaultsStructure):
+    def getCodespaceAndDataSource(self) -> tuple[Codespace, DataSource, Version, VersionFrameDefaultsStructure]:
         feed_info_sql = """select * from feed_info limit 1;"""
 
         with self.conn.cursor() as cur:
@@ -120,7 +121,7 @@ class GtfsNeTexProfile(CallsProfile):
 
             return (codespace, data_source, version, frame_defaults)
 
-    def getResourceFrame(self, operators, id="ResourceFrame") -> ResourceFrame:
+    def getResourceFrame(self, operators: list[Operator], id: str="ResourceFrame") -> ResourceFrame:
         resource_frame = ResourceFrame(id=getId(ResourceFrame, self.codespace, id), version=self.version.version)
         resource_frame.data_sources = DataSourcesInFrameRelStructure(data_source=[self.data_source])
         # resource_frame.zones = ZonesInFrameRelStructure(transport_administrative_zone=[transport_administrative_zone])
@@ -132,13 +133,13 @@ class GtfsNeTexProfile(CallsProfile):
         # resource_frame.vehicles = VehiclesInFrameRelStructure(train_element_or_vehicle=getVehicles(codespace))
         return resource_frame
 
-    def get_agency_id(self, agency_id):
+    def get_agency_id(self, agency_id: str) -> str:
         if ':Operator:' in agency_id:
             return agency_id
         else:
             return getId(Operator, self.codespace, agency_id)
 
-    def getOperators(self, agency_sql={'query': """select * from agency;"""}) -> list[Operator]:
+    def getOperators(self, agency_sql: dict[str, str]={'query': """select * from agency;"""}) -> list[Operator]:
         results = []
 
         with self.conn.cursor() as cur:
@@ -175,7 +176,7 @@ class GtfsNeTexProfile(CallsProfile):
         return results
 
     @staticmethod
-    def gtfsToNeTEx(route_type: int):
+    def gtfsToNeTEx(route_type: int) -> AllVehicleModesOfTransportEnumeration | None:
         if route_type == 0:
             return AllVehicleModesOfTransportEnumeration.TRAM
         elif route_type == 1:
@@ -214,7 +215,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return operational_contexts
 
-    def get_route_id(self, route_id):
+    def get_route_id(self, route_id: str) -> str:
         if ':Line:' in route_id:
             return route_id
         else:
@@ -269,7 +270,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return lines
 
-    def get_stop_id_sa(self, stop_id):
+    def get_stop_id_sa(self, stop_id: str) -> str:
         if ':StopArea:' in stop_id:
             return stop_id
         elif ':StopPlace:' in stop_id:
@@ -277,7 +278,7 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(StopArea, self.codespace, stop_id)
 
-    def getStopAreas(self, stop_area_sql={
+    def getStopAreas(self, stop_area_sql: dict[str, str]={
         'query': """select distinct * from stops where location_type = 1 order by stop_id;"""}) -> list[StopArea]:
         stop_areas = []
 
@@ -305,7 +306,7 @@ class GtfsNeTexProfile(CallsProfile):
                                      name=MultilingualString(value=stop_names[i]),
                                      public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[
                                                                                                  i] is not None else None,
-                                     description=getOptionalString(get_or_none(stop_descs, i)),
+                                     description=[getOptionalString(get_or_none(stop_descs, i))], # TODO: list insanity for description
                                      private_codes=PrivateCodes(
                                          private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
                                      centroid=SimplePointVersionStructure(location=
@@ -318,7 +319,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return stop_areas
 
-    def get_stop_id(self, stop_id):
+    def get_stop_id(self, stop_id: str) -> str:
         if ':ScheduledStopPoint:' in stop_id:
             return stop_id
         elif ':Quay:' in stop_id:
@@ -326,7 +327,7 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(ScheduledStopPoint, self.codespace, stop_id)
 
-    def getScheduledStopPoints(self, stop_areas, scheduled_stop_points_sql={
+    def getScheduledStopPoints(self, stop_areas: Iterable[StopArea], scheduled_stop_points_sql: dict[str, str]={
         'query': """select distinct * from stops where location_type = 0 or location_type is null order by stop_id;"""}) -> \
     list[ScheduledStopPoint]:
         stop_areas = getIndex(stop_areas)
@@ -411,7 +412,7 @@ class GtfsNeTexProfile(CallsProfile):
         return scheduled_stop_points
 
     # TODO: implement
-    def getStopPlaces(self, stop_places_sql={
+    def getStopPlaces(self, stop_places_sql: dict[str, str]={
         'query': """select distinct * from stops order by coalesce(parent_station, '') asc, stop_id;"""}) -> (
     List[StopPlace], List[PassengerStopAssignment]):
         stop_places = {}
@@ -658,7 +659,7 @@ class GtfsNeTexProfile(CallsProfile):
     #     pl = PathLink()
     #
     #
-    def getRoutes(self) -> (list[Route], list[RoutePoint], list[RouteLink]):
+    def getRoutes(self) -> tuple[list[Route], list[RoutePoint], list[RouteLink]]:
         lines = getIndex(self.lines)
 
         shape_route_mapping = {}
@@ -766,7 +767,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return (list(routes.values()), route_points, route_links)
 
-    def getLineStrings(self, shape_sql={
+    def getLineStrings(self, shape_sql: dict[str, str]={
         'query': """select shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled from shapes order by shape_id, shape_pt_sequence, shape_dist_traveled;"""}) -> \
     List[LinkSequenceProjection]:
         link_sequence_projection = []
@@ -823,7 +824,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return link_sequence_projection
 
-    def getServiceFrame(self, lines, stop_areas, scheduled_stop_points, id="ServiceFrame") -> ServiceFrame:
+    def getServiceFrame(self, lines: list[Line], stop_areas: list[StopArea], scheduled_stop_points: list[ScheduledStopPoint], id: str="ServiceFrame") -> ServiceFrame:
         if lines is None:
             lines = self.lines
 
@@ -901,7 +902,7 @@ class GtfsNeTexProfile(CallsProfile):
         #
         return service_frame
 
-    def get_service_id_ac(self, service_id):
+    def get_service_id_ac(self, service_id: str) -> str:
         if ':AvailabilityCondition:' in service_id:
             return service_id
         elif ':DayType:' in service_id:
@@ -909,7 +910,7 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(AvailabilityCondition, self.codespace, service_id)
 
-    def get_service_id_dt(self, service_id):
+    def get_service_id_dt(self, service_id: str) -> str:
         if ':DayType:' in service_id:
             return service_id
         if ':AvailabilityCondition:' in service_id:
@@ -917,8 +918,8 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(DayType, self.codespace, service_id)
 
-    def getAvailabilityConditions(self, availability_condition_sql={
-        'query': """select * from calendar order by service_id;"""}, exceptions_sql={
+    def getAvailabilityConditions(self, availability_condition_sql: dict[str, str]={
+        'query': """select * from calendar order by service_id;"""}, exceptions_sql: dict[str, str]={
         'query': """select service_id, exception_type, array_agg(date order by date) as dates from calendar_dates group by service_id, exception_type;"""}) -> \
     list[AvailabilityCondition]:
         availability_conditions = []
@@ -994,7 +995,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return availability_conditions
 
-    def getDayTypes(self, day_type_sql={'query': """select * from calendar order by service_id;"""}, exceptions_sql={
+    def getDayTypes(self, day_type_sql: dict[str, str]={'query': """select * from calendar order by service_id;"""}, exceptions_sql: dict[str, str]={
         'query': """select service_id, exception_type, date from calendar_dates order by date, exception_type;"""}) -> \
     tuple[list[DayType], list[DayTypeAssignment], list[OperatingPeriod]]:
         day_types = []
@@ -1087,9 +1088,9 @@ class GtfsNeTexProfile(CallsProfile):
 
         return day_types, day_type_assignments, operating_periods
 
-    def getInterchangeRules(self, transfers_sql={
+    def getInterchangeRules(self, transfers_sql: dict[str, str]={
         'query': """select transfers.*, from_stop.location_type as from_stop_location_type, to_stop.location_type as to_stop_location_type from transfers join stops as from_stop on (from_stop_id = from_stop.stop_id) join stops as to_stop on (to_stop_id = to_stop.stop_id) order by from_route_id, to_route_id, from_trip_id, to_trip_id, from_stop_id, to_stop_id;"""}) -> \
-    Generator[InterchangeRule, None, None]:
+    Iterable[InterchangeRule]:
         # from_stop_id, to_stop_id, from_route_id, to_route_id, from_trip_id, to_trip_id, transfer_type, min_transfer_time:
         with self.conn.cursor() as cur:
             cur.execute(**transfers_sql)
@@ -1202,14 +1203,14 @@ class GtfsNeTexProfile(CallsProfile):
                                           distributor_filter=distributor_filter)
 
     @staticmethod
-    def noonTimeToNeTEx(time: str):
+    def noonTimeToNeTEx(time: str) -> tuple[XmlTime, int]:
         hour, minute, second = time.split(':')
-        hour = int(hour)
-        day_offset = int(math.floor(hour / 24))
-        return (XmlTime(hour=hour % 24, minute=int(minute), second=int(second)), day_offset)
+        hour_i = int(hour)
+        day_offset = int(math.floor(hour_i / 24))
+        return (XmlTime(hour=hour_i % 24, minute=int(minute), second=int(second)), day_offset)
 
     @staticmethod
-    def directionToNeTEx(direction_id: int):
+    def directionToNeTEx(direction_id: int) -> DirectionTypeEnumeration | None:
         if direction_id is None:
             return None
 
@@ -1219,7 +1220,7 @@ class GtfsNeTexProfile(CallsProfile):
         return DirectionTypeEnumeration.OUTBOUND
 
     @staticmethod
-    def wheelchairToNeTEx(wheelchair_accessible: int):
+    def wheelchairToNeTEx(wheelchair_accessible: int) -> LimitationStatusEnumeration:
         if wheelchair_accessible == 1:
             return LimitationStatusEnumeration.TRUE
 
@@ -1229,7 +1230,7 @@ class GtfsNeTexProfile(CallsProfile):
         return LimitationStatusEnumeration.UNKNOWN
 
     @staticmethod
-    def bicyclesToNeTEx(bikes_allowed: int):
+    def bicyclesToNeTEx(bikes_allowed: int) -> LuggageCarriageEnumeration:
         if bikes_allowed == 1:
             return LuggageCarriageEnumeration.TRUE
 
@@ -1238,30 +1239,30 @@ class GtfsNeTexProfile(CallsProfile):
 
         return LuggageCarriageEnumeration.UNKNOWN
 
-    def gtfs_shape_to_linestring(self, shape_sql={'query': """select * from shapes order by shape_id;"""}):
+    def gtfs_shape_to_linestring(self, shape_sql: dict[str, str]={'query': """select * from shapes order by shape_id;"""}) -> None:
 
         with self.conn.cursor() as cur:
             cur.execute(**shape_sql)
 
-    def get_trip_id(self, trip_id):
+    def get_trip_id(self, trip_id: str) -> str:
         if ':ServiceJourney:' in trip_id:
             return trip_id
         else:
             return getId(ServiceJourney, self.codespace, trip_id)
 
-    def get_trip_id_aa(self, trip_id):
+    def get_trip_id_aa(self, trip_id: str) -> str:
         if ':ServiceJourney:' in trip_id:
             return trip_id.replace(':ServiceJourney:', ':AccessibilityAssessment:')
         else:
             return getId(AccessibilityAssessment, self.codespace, trip_id)
 
-    def get_trip_id_sfs(self, trip_id):
+    def get_trip_id_sfs(self, trip_id: str) -> str:
         if ':ServiceJourney:' in trip_id:
             return trip_id.replace(':ServiceJourney:', ':ServiceFacilitySet:')
         else:
             return getId(ServiceFacilitySet, self.codespace, trip_id)
 
-    def get_trip_id_call(self, trip_id, sequence):
+    def get_trip_id_call(self, trip_id: str, sequence: int) -> str:
         if ':ServiceJourney:' in trip_id:
             return trip_id.replace(':ServiceJourney:', ':Call:') + '_' + str(sequence)
         elif ':TemplateServiceJourney:' in trip_id:
@@ -1269,10 +1270,10 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(Call, self.codespace, trip_id) + '_' + str(sequence)
 
-    def getServiceJourneys(self, availability_conditions, trips_sql={
+    def getServiceJourneys(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""},
-                           stop_times_sql={'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
-    Generator[ServiceJourney, None, None]:
+                           stop_times_sql: dict[str, str]={'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
+    Iterable[ServiceJourney]:
         availability_conditions = getIndex(availability_conditions)
 
         service_journeys = {}
@@ -1447,11 +1448,11 @@ class GtfsNeTexProfile(CallsProfile):
                 yield service_journey
 
     # TODO: Shares too much code, clean up
-    def getServiceJourneysDayType(self, trips_sql={
+    def getServiceJourneysDayType(self, trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""},
-                                  stop_times_sql={
+                                  stop_times_sql: dict[str, str]={
                                       'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
-    Generator[ServiceJourney, None, None]:
+    Iterable[ServiceJourney]:
         service_journeys = {}
         shape_used = set([])
 
@@ -1617,7 +1618,7 @@ class GtfsNeTexProfile(CallsProfile):
             if trip_id is not None:
                 yield service_journey
 
-    def getServiceJourneys2(self, availability_conditions, trips_sql={
+    def getServiceJourneys2(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""}) -> \
     Generator[ServiceJourney, None, None]:
         availability_conditions = getIndex(availability_conditions)
@@ -1784,9 +1785,9 @@ class GtfsNeTexProfile(CallsProfile):
 
                 yield service_journey
 
-    def getServiceJourneys2DayType(self, trips_sql={
+    def getServiceJourneys2DayType(self, trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""}) -> \
-    Generator[ServiceJourney, None, None]:
+    Iterable[ServiceJourney]:
 
         shape_used = set([])
 
@@ -1945,7 +1946,7 @@ class GtfsNeTexProfile(CallsProfile):
 
                 yield service_journey
 
-    def get_trip_id_tsj(self, trip_id):
+    def get_trip_id_tsj(self, trip_id: str) -> str:
         if ':TemplateServiceJourney:' in trip_id:
             return trip_id
         if ':ServiceJourney:' in trip_id:
@@ -1953,7 +1954,7 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(TemplateServiceJourney, self.codespace, trip_id)
 
-    def getTemplateServiceJourneys(self, availability_conditions, trips_sql={
+    def getTemplateServiceJourneys(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips WHERE trip_id IN (SELECT trip_id FROM frequencies) order by trip_id;"""}) -> \
     Generator[TemplateServiceJourney, None, None]:
         availability_conditions = getIndex(availability_conditions)
@@ -2153,7 +2154,7 @@ class GtfsNeTexProfile(CallsProfile):
                     )
                 yield template_service_journey
 
-    def getTemplateServiceJourneysDayType(self, trips_sql={
+    def getTemplateServiceJourneysDayType(self, trips_sql: dict[str, str]={
         'query': """select * from trips WHERE trip_id IN (SELECT trip_id FROM frequencies) order by trip_id;"""}) -> \
     Generator[TemplateServiceJourney, None, None]:
         shape_used = set([])
@@ -2346,7 +2347,7 @@ class GtfsNeTexProfile(CallsProfile):
                     )
                 yield template_service_journey
 
-    def getTimetableFrame(self, availability_conditions, service_journeys, id="TimetableFrame") -> TimetableFrame:
+    def getTimetableFrame(self, availability_conditions: list[AvailabilityCondition], service_journeys: list[ServiceJourney], id: str="TimetableFrame") -> TimetableFrame:
         timetable_frame = TimetableFrame(id=getId(TimetableFrame, self.codespace, id), version=self.version.version)
 
         timetable_frame.vehicle_journeys = JourneysInFrameRelStructure(
@@ -2357,8 +2358,8 @@ class GtfsNeTexProfile(CallsProfile):
 
         return timetable_frame
 
-    def getServiceCalendarFrame(self, day_types, operating_periods, day_type_assignments,
-                                id="ServiceCalendarFrame") -> ServiceCalendarFrame:
+    def getServiceCalendarFrame(self, day_types: list[DayType], operating_periods: list[OperatingPeriod], day_type_assignments: list[DayTypeAssignment],
+                                id: str="ServiceCalendarFrame") -> ServiceCalendarFrame:
         service_calendar_frame = ServiceCalendarFrame(id=getId(ServiceCalendarFrame, self.codespace, id),
                                                       version=self.version.version)
 

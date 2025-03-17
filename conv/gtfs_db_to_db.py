@@ -43,6 +43,8 @@ def main(source_database_file: str, target_database_file: str, clean_database: b
 
         # Our target database must be reprojected to WGS84            apply_availability_conditions_via_day_type_ref(db_read, db_write)
 
+        target_db.block_until_done()
+
         reprojection_update(db_write, crs_to="urn:ogc:def:crs:EPSG::4326")
 
 

@@ -25,7 +25,7 @@ Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
 Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-def getRef(obj: Tidversion, klass: type[Tref] | None = None) -> Tref | None:
+def getRef(obj: Tid, klass: type[T] | None = None) -> T | None:
     if obj is None:
         return None
 
@@ -53,8 +53,7 @@ def getRef(obj: Tidversion, klass: type[Tref] | None = None) -> Tref | None:
     elif name.endswith("RefStructure"):
         name = name.replace("RefStructure", "Ref")
 
-    if hasattr(obj, "version"):
-        instance.version = obj.version
+    instance.version = getattr(obj, "version", None)
 
     kname = klass.__name__
     meta_kname = klass.__name__
@@ -161,5 +160,5 @@ def getBitString2(
     return out
 
 
-def getOptionalString(name: str) -> MultilingualString | None:
+def getOptionalString(name: str | None) -> MultilingualString | None:
     return MultilingualString(value=name) if name else None

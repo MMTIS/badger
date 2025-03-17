@@ -3,8 +3,7 @@ import logging
 import sys
 import warnings
 from datetime import timedelta, datetime, time
-from typing import Generator, TypeVar
-
+from typing import Generator, TypeVar, Iterable, Any
 
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
@@ -371,7 +370,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
     all_operating_days = set()
     all_uic_operating_period = set()
 
-    def query_sj(db_read: Database) -> Generator:
+    def query_sj(db_read: Database) -> Iterator[ServiceJourney]:
         _load_generator = load_generator(db_read, ServiceJourney)
         sj: ServiceJourney
         for sj in _load_generator:
@@ -636,7 +635,7 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
     db_write.insert_objects_on_queue(ServiceJourney, query_sj(db_read, mapping, ServiceJourney))
     db_write.insert_objects_on_queue(TemplateServiceJourney, query_sj(db_read, mapping, TemplateServiceJourney))
 
-def gtfs_calendar2(service_id: str, day_type: DayType, operating_period: OperatingPeriod):
+def gtfs_calendar2(service_id: str, day_type: DayType, operating_period: OperatingPeriod) -> Iterable[tuple[dict[str, Any] | None, dict[str, Any]] | None]:
     yield tuple(({'service_id': service_id,
                   'monday': int(DayOfWeekEnumeration.MONDAY in day_type.properties.property_of_day[0].days_of_week),
                   'tuesday': int(DayOfWeekEnumeration.TUESDAY in day_type.properties.property_of_day[0].days_of_week),
@@ -679,13 +678,15 @@ def netex_to_python_weekday(days_of_week: list[DayOfWeekEnumeration]) -> set[int
         5 if DayOfWeekEnumeration.FRIDAY in days_of_week else None,
         6 if DayOfWeekEnumeration.SATURDAY in days_of_week else None})
 
-def gtfs_calendar_and_dates2(db_read: Database, day_type: DayType, day_type_assignments: list[DayTypeAssignment]):
+def gtfs_calendar_and_dates2(db_read: Database, day_type: DayType, day_type_assignments: Iterable[DayTypeAssignment]) -> Iterable[tuple[dict[str, Any] | None, dict[str, Any] | None]]:
     if day_type.private_codes:
         service_ids = [private_code.value for private_code in day_type.private_codes.private_code if
                        private_code.type_value == 'service_id']
         service_id = service_ids[0] if len(service_ids) > 0 else day_type.id
     else:
         service_id = day_type.id
+
+    assert service_id is not None, f"{day_type.id}, service_id must not be None"
 
     for day_type_assignment in day_type_assignments:
         if isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, XmlDate):
@@ -800,6 +801,7 @@ def gtfs_calendar_and_dates(db_read: Database, day_type_ref: DayTypeRef, day_typ
                     yield tuple((None, {'service_id': service_id, 'date': str(
                         removed_date.replace('-', '')), 'exception_type': 2},))
 
+"""
 def gtfs_calendar_generator(db_read: Database, db_write: Database, generator_defaults: dict):
     # This functions purpose is to transform calendars from NeTEx in such way it can be referenced by GTFS.
     # GTFS only has a validity on a Trip, hence the list of calendars is limited by the validity structure
@@ -847,4 +849,4 @@ def gtfs_calendar_generator(db_read: Database, db_write: Database, generator_def
             if sj.day_types is not None:
                 for day_type_ref in sj.day_types.day_type_ref:
                     day_type_refs.add(day_type_ref.ref)
-
+"""

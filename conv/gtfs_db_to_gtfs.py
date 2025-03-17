@@ -1,42 +1,22 @@
 import datetime
-import glob
-import re
-import warnings
 from itertools import groupby
-from typing import List
-
-from xsdata.formats.dataclass.context import XmlContext
-from xsdata.formats.dataclass.parsers import XmlParser
-from xsdata.formats.dataclass.parsers.config import ParserConfig
-from xsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
-
-import lxml
-import hashlib
+from typing import List, Iterator, cast, Any
 
 from transformers.callsprofile import CallsProfile
-from netexio import dbaccess
 from netexio.database import Database
 from netexio.dbaccess import load_local, load_generator
 from transformers.gtfsprofile import GtfsProfile
-from netex import Line, StopPlace, Codespace, ScheduledStopPoint, LocationStructure2, PassengerStopAssignment, \
-    Authority, Operator, Branding, UicOperatingPeriod, DayTypeAssignment, ServiceJourney, ServiceJourneyPattern, \
+from netex import Line, StopPlace, Codespace, ScheduledStopPoint, PassengerStopAssignment, \
+    Authority, Operator, DayTypeAssignment, ServiceJourney, ServiceJourneyPattern, \
     DataSource, StopPlaceEntrance, TemplateServiceJourney, InterchangeRule, ServiceJourneyInterchange, JourneyMeeting, \
-    AvailabilityCondition, DayType, PropertiesOfDayRelStructure, DayOfWeekEnumeration, OperatingPeriod, Version
+    DayType, Version, \
+    StopPlaceRef, QuayRef, Quay, FareScheduledStopPoint, ScheduledStopPointRef
 from netexio.pickleserializer import MyPickleSerializer
-from transformers.nordicprofile import NordicProfile
-from utils.refs import getId, getRef, getIndex
-
-from decimal import Decimal
-
-from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
-
-import csv
+from utils.refs import getRef, getIndex
 
 import zipfile
-from utils.aux_logging import *
-import traceback
 from configuration import defaults
-from transformers.gtfs import gtfs_calendar_and_dates, gtfs_calendar_and_dates2
+from transformers.gtfs import gtfs_calendar_and_dates2
 
 
 def extract(archive: zipfile.ZipFile, database: str) -> None:
@@ -44,32 +24,33 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
     used_agencies = set([])
     routes = {}
     stops = {}
-    psas = {}
-    uic_operating_periods = {}
+    psas: dict[str, StopPlace]
     max_date = str(datetime.date.today()).replace('-', '')
-    calendars = {}
-    calendar_dates = {}
+    calendars: dict[str, dict[str, Any]] = {}
+    calendar_dates: dict[str, list[dict[str, Any]]] = {}
 
     # We can't append in a ZipFile
     # GtfsProfile.writeToZipFile(archive, 'trips.txt', [GtfsProfile.empty_trip], write_header=True)
     # GtfsProfile.writeToZipFile(archive, 'stop_times.txt', [GtfsProfile.empty_stop_time], write_header=True)
 
-    with Database(database, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
+    with (Database(database, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read):
         datasources: List[DataSource] = load_local(db_read, DataSource, 1)
         codespaces: List[Codespace] = load_local(db_read, Codespace, 1)
 
+        authority: Authority
         for authority in load_generator(db_read, Authority):
             agency = GtfsProfile.projectAuthorityToAgency(authority)
             agencies[agency['agency_id']] = agency
 
+        operator: Operator
         for operator in load_generator(db_read, Operator):
             agency = GtfsProfile.projectOperatorToAgency(operator)
             agencies[agency['agency_id']] = agency
 
         stop_places = getIndex(load_local(db_read, StopPlace))
         quay_to_sp = {}
+        stop_place: StopPlace | None
         for stop_place in stop_places.values():
-            stop_place: StopPlace
             if stop_place.quays:
                 for quay in stop_place.quays.taxi_stand_ref_or_quay_ref_or_quay:
                     # TODO: Replace with proper checks based on object type.
@@ -79,16 +60,36 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
                         quay_to_sp[quay.ref] = stop_place
 
         psas = {}
+        psa: PassengerStopAssignment
+        sp: StopPlace | None
         for psa in load_generator(db_read, PassengerStopAssignment):
-            psa: PassengerStopAssignment
             if psa.taxi_rank_ref_or_stop_place_ref_or_stop_place is not None:
-                sp = stop_places.get(psa.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref, None)
+                if isinstance(psa.taxi_rank_ref_or_stop_place_ref_or_stop_place, StopPlace):
+                    sp = psa.taxi_rank_ref_or_stop_place_ref_or_stop_place
+                elif isinstance(psa.taxi_rank_ref_or_stop_place_ref_or_stop_place, StopPlaceRef):
+                    sp = stop_places.get(psa.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref, None)
+
                 if sp is not None:
-                    psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = sp
+                    if isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPoint) or isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, FareScheduledStopPoint):
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id is not None
+                        psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id] = sp
+                    elif isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPointRef):
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref is not None
+                        psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = sp
+
             elif psa.taxi_stand_ref_or_quay_ref_or_quay is not None:
-                sp = quay_to_sp.get(psa.taxi_stand_ref_or_quay_ref_or_quay.ref, None)
+                if isinstance(psa.taxi_stand_ref_or_quay_ref_or_quay, Quay):
+                    sp = quay_to_sp.get(psa.taxi_stand_ref_or_quay_ref_or_quay.id, None)
+                elif isinstance(psa.taxi_stand_ref_or_quay_ref_or_quay, QuayRef):
+                    sp = quay_to_sp.get(psa.taxi_stand_ref_or_quay_ref_or_quay.ref, None)
+
                 if sp is not None:
-                    psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = sp
+                    if isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPoint) or isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, FareScheduledStopPoint):
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id is not None
+                        psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.id] = sp
+                    elif isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPointRef):
+                        assert psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref is not None
+                        psas[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = sp
 
         # TODO: GTFS does not support Branding, so in order to facilitate it we will make it a separate Agency
         # A branding must have an 'original' agency or authority
@@ -96,7 +97,10 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         #     agency = GtfsProfile.projectBrandingToAgency(branding)
         #     agencies[agency['agency_id']] = agency
 
+        stop: dict[str, Any] | None
+        scheduled_stop_point: ScheduledStopPoint
         for scheduled_stop_point in load_local(db_read, ScheduledStopPoint):
+            assert scheduled_stop_point.id is not None
             stop_place = psas.get(scheduled_stop_point.id, None)
             if stop_place is not None:
                 stop_place_ref = getRef(stop_place)
@@ -131,15 +135,18 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         # A DayTypeAssignment is a relationship to a DayTypeRef; being either Available or Unavailable with a "Date" is analogue to calendar_dates.txt
         # A DayTypeAssignment is a relationship to a DayTypeRef: being Available with an "OperatingPeriod" is analogue to calendar.txt
 
-        day_types: dict[str, DayType] = getIndex(load_local(db_read, DayType))
+        day_types: dict[str, DayType] = cast(dict[str, DayType], getIndex(load_local(db_read, DayType)))
+
+        day_type: DayType
 
         # TODO: replace
         for day_type in load_generator(db_read, DayType):
             GtfsProfile.temporaryDayTypeServiceId(day_type)
 
+        day_type_assignments: Iterator[DayTypeAssignment]
         for day_type_ref, day_type_assignments in groupby(load_generator(db_read, DayTypeAssignment), key=lambda day_type_assignment: day_type_assignment.day_type_ref):
-            day_type: DayType = day_types[day_type_ref.ref]
-            day_type_assignments: list[DayTypeAssignment] = list(day_type_assignments)
+            day_type = day_types[day_type_ref.ref]
+            day_type_assignments_list = list(day_type_assignments)
 
             if day_type.private_codes:
                 service_ids = [private_code.value for private_code in day_type.private_codes.private_code if private_code.type_value == 'service_id']
@@ -147,8 +154,10 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
             else:
                 service_id = day_type.id
 
+            assert service_id is not None, f"{day_type_ref}: service_id must not be None."
+
             exceptions = []
-            for calendar, calendar_date in gtfs_calendar_and_dates2(db_read, day_type, day_type_assignments):
+            for calendar, calendar_date in gtfs_calendar_and_dates2(db_read, day_type, day_type_assignments_list):
                 if calendar is not None:
                     calendars[service_id] = calendar
 
@@ -179,20 +188,22 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         service_journey_patterns_index = getIndex(service_journey_patterns)
 
         for service_journey in load_generator(db_read, ServiceJourney):
-            service_journey_pattern = service_journey_patterns_index.get(service_journey.journey_pattern_ref.ref) if service_journey.journey_pattern_ref else None
+            service_journey_pattern = (sjp := service_journey_patterns_index.get(service_journey.journey_pattern_ref.ref)) if service_journey.journey_pattern_ref else None
             trip = GtfsProfile.projectServiceJourneyToTrip(service_journey, service_journey_pattern)
             trips.append(trip)
 
+            assert service_journey_pattern is not None, f"{service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
             CallsProfile.getCallsFromTimetabledPassingTimes(service_journey, service_journey_pattern)
             stop_times += list(GtfsProfile.projectServiceJourneyToStopTimes(service_journey))
 
         frequencies = []
         for template_service_journey in load_generator(db_read, TemplateServiceJourney):
-            service_journey_pattern = service_journey_patterns_index.get(template_service_journey.journey_pattern_ref.ref) if template_service_journey.journey_pattern_ref else None
+            service_journey_pattern = (sjp := service_journey_patterns_index.get(template_service_journey.journey_pattern_ref.ref)) if template_service_journey.journey_pattern_ref else None
             trip = GtfsProfile.projectServiceJourneyToTrip(template_service_journey, service_journey_pattern)
             trips.append(trip)
 
-            CallsProfile.getCallsFromTimetabledPassingTimes(service_journey, service_journey_pattern)
+            assert service_journey_pattern is not None, f"{template_service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
+            CallsProfile.getCallsFromTimetabledPassingTimes(template_service_journey, service_journey_pattern)
             stop_times += list(GtfsProfile.projectServiceJourneyToStopTimes(service_journey))
 
             frequencies += list(GtfsProfile.projectTemplateServiceJourneyToFrequency(template_service_journey))
@@ -203,12 +214,20 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
             GtfsProfile.writeToZipFile(archive, 'frequencies.txt', frequencies, write_header=True)
 
         GtfsProfile.writeToZipFile(archive,'stop_times.txt', stop_times, write_header=True)
-        trips = frequencies = stop_times = None
 
-        routes = agency = stops = None
+        del trips
+        del frequencies
+        del stop_times
+        del routes
+        del agency
+        del stops
 
+        transfers = [GtfsProfile.projectInterchangeRuleToTransfer(transfer) for transfer in
+                     load_generator(db_read, InterchangeRule)] + [
+                        GtfsProfile.projectServiceJourneyInterchangeToTransfer(transfer) for transfer in
+                        load_generator(db_read, ServiceJourneyInterchange)] # TODO: ServiceJourneyMeeting is missing
 
-        transfers = [GtfsProfile.projectInterchangeRuleToTransfer(transfer) for transfer in load_generator(db_read, InterchangeRule)] + [GtfsProfile.projectServiceJourneyInterchangeToTransfer(transfer) for transfer in load_generator(db_read, ServiceJourneyInterchange)] + [GtfsProfile.projectServiceJourneyMeeting(transfer) for transfer in load_generator(db_read, JourneyMeeting)]
+        # transfers = [GtfsProfile.projectInterchangeRuleToTransfer(transfer) for transfer in load_generator(db_read, InterchangeRule)] + [GtfsProfile.projectServiceJourneyInterchangeToTransfer(transfer) for transfer in load_generator(db_read, ServiceJourneyInterchange)] + [GtfsProfile.projectServiceJourneyMeeting(transfer) for transfer in load_generator(db_read, JourneyMeeting)]
 
         transfers = list({(v['from_stop_id'], v['to_stop_id'], v['from_route_id'], v['to_route_id'], v['from_trip_id'], v['to_trip_id'], v['transfer_type'], v['min_transfer_time']):v for v in transfers}.values())
 
@@ -218,12 +237,12 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         versions = load_local(db_read, Version)
 
         GtfsProfile.writeToZipFile(archive,'feed_info.txt', [{
-            'feed_publisher_name': datasources[0].name.value if len(datasources) > 0 else defaults["feed_publisher_name"],
-            'feed_publisher_url': codespaces[0].xmlns_url if len(codespaces) > 0 else defaults["feed_publisher_url"],
+            'feed_publisher_name': (ds.name.value if ds and ds.name else defaults["feed_publisher_name"]) if (ds := datasources[0]) else defaults["feed_publisher_name"],
+            'feed_publisher_url': (cs := codespaces[0]).xmlns_url if codespaces else defaults["feed_publisher_url"],
             'feed_lang': 'en', # TODO
             'default_lang': 'en', # TODO
-            'feed_start_date': str(versions[0].start_date.to_datetime().date()).replace('-', '') if len(versions) > 0 else '',
-            'feed_end_date': str(versions[0].end_date.to_datetime().date()).replace('-', '') if len(versions) > 0 else '',
+            'feed_start_date': (dt := versions[0].start_date) and str(dt.to_datetime().date()).replace('-', '') if versions else '',
+            'feed_end_date': (dt := versions[0].end_date) and str(dt.to_datetime().date()).replace('-', '') if versions else '',
             'feed_version': str(datetime.date.today()).replace('-', ''),
             'feed_contact_email': '',
             'feed_contact_url': ''

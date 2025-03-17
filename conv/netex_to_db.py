@@ -7,7 +7,7 @@ from utils.utils import get_interesting_classes
 from utils.aux_logging import *
 
 
-def main(filenames: list[str], database: str, clean_database: bool = True):
+def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
     # if filenames is not a list of str  => error
     if not (isinstance(filenames, list) and all(isinstance(item, str) for item in filenames)):
         log_all(logging.ERROR, f'filenames parameter must be a [] of file names.')
