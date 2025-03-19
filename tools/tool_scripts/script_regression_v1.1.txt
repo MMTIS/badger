@@ -1,0 +1,289 @@
+                             [
+
+           {
+    "block": "fr_ardennes",
+    "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
+    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0045-0000/fluo-grand-est-fluo08-netex.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+
+             {
+    "block": "fr_aube",
+    "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0046-0000-1",
+    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0046-0000/fluo-grand-est-fluo10-netex.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb "},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb "},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+             {
+    "block": "fr_bas_rhin",
+    "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0049-0000-1",
+    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0049-0000/fluo-grand-est-fluo67-netex.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb "},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb "},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+
+
+             {
+    "block": "fr_sncf_ic",
+    "url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-intercites-netex-last.zip",
+    "download_url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-intercites-netex-last.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb "},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb "},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+
+
+             {
+    "block": "fr_sncf_ter",
+    "url":"https://eu.ftp.opendatasoft.com/sncf/horaires/export-ter-netex-last.zip",
+    "download_url":"https://eu.ftp.opendatasoft.com/sncf/horaires/export-ter-netex-last.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb "},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb "},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+
+             {
+    "block": "at-test",
+    "url":"https://github.com/user-attachments/files/18965099/20250224-2317_netex_vmobil_2025.zip",
+    "download_url":"https://github.com/user-attachments/files/18965099/20250224-2317_netex_vmobil_2025.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb "},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb "},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+{
+"block":"sncf-list",
+"description":"List of all sncf data to fetch and transform",
+"downlaod_urls":[
+    "https://eu.ftp.opendatasoft.com/sncf/horaires/export-ter-netex-last.zip",
+    "https://eu.ftp.opendatasoft.com/sncf/horaires/export-ter-netex-last.zip"
+],
+"scripts": [
+ {"step":"1", "script": "process_url_list", "args": "netex2epip"}
+]
+},
+{
+"block":"mobigo-list",
+"description":"List of some mobigo data to fetch and transform",
+"download_urls":[
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT89",
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT71",
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT25",
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT70",
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT21",
+    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
+],
+"scripts": [
+ {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+]
+},
+{
+"block":"de-list",
+"description":"List of a first GTFS from Germany",
+"download_urls":[
+    "https://download.gtfs.de/germany/fv_free/latest.zip"
+],
+"scripts": [
+ {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+]
+},
+{
+"block":"nvbw-list",
+"description":"List of a first GTFS from NVBW",
+"download_urls":[
+    "https://www.nvbw.de/fileadmin/user_upload/service/open_data/fahrplandaten_ohne_liniennetz/rbfreiburg.zip"
+],
+"scripts": [
+ {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+]
+},
+  {
+    "block": "aura",
+    "download_url":"https://mobi-iti-ara.okina.fr/static/mobiiti_technique/DAT_AURA_GTFS_ExportAOM.zip",
+    "description":"aggregat Aura",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+       {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
+        {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
+        {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.lmdb %%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "#tools.netex_check_assertions", "args": "./scripts/flixbus-assertions.txt %%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":9,"script": "#tools.netex_stats", "args": "%%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "conv.netex_to_db", "args": "[%%dir%%/07-%%block%%-netex.xml.gz] %%dir%%/10-netex-database.lmdb "},
+        {"step":11,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/10-netex-database.lmdb %%dir%%/11-netex-database.lmdb"},
+        {"step":12,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.lmdb %%dir%%/12-%%block%%-gtfs.zip"},
+        {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
+        {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 10"}
+        ]
+  },
+
+  {
+    "block": "mobigo-jura",
+    "download_url":"https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
+    "description":"Réseau interurbain Mobigo! mer Dateien",
+      "scripts": [
+       {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+       {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
+        {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
+        {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.lmdb %%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":8,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":9,"script": "#tools.netex_stats", "args": "%%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "conv.netex_to_db", "args": "[%%dir%%/07-%%block%%-netex.xml.gz] %%dir%%/10-netex-database.lmdb "},
+        {"step":11,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/10-netex-database.lmdb %%dir%%/11-netex-database.lmdb"},
+        {"step":12,"script": "conv.tfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.lmdb %%dir%%/12-%%block%%-gtfs.zip"},
+        {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
+        {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 10"}
+
+         ]
+  },
+
+  {
+"block":"it-list",
+"description":"List of all sncf data to fetch and transform",
+    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/5486",
+"description":"Regions: Aostatal, Piemont, Lombarei, Trentino-Südtirol, Venetien, (Friaul, Lulisch Venetien)",
+"download_urls":[
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131116/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131873/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131910/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131947/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/132386/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/132195/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131494/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/310527/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/315/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/194547/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/2219/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/180710/checkedResource",
+    "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/181861/checkedResource"
+    ],
+    "scripts": [
+        {"step":"1", "script": "process_url_list", "args": "netex2epipgtfs"}
+        ]
+},
+
+
+       {
+    "block": "lombardiatrainitalia",
+    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/5486",
+    "download_url":"https://github.com/user-attachments/files/18585826/IT-ITC4-TRENITALIA_126_L1.xml.gz",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.lmdb "},
+        {"step":4,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
+        {"step":5,"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
+        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":7,"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.lmdb %%dir%%/07-netex-database.lmdb"},
+        {"step":8,"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.lmdb %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"step":9,"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.lmdb "},
+        {"step":10,"script": "#related_explorer", "args": "%%dir%%/08-gtfs.lmdb Line random %%dir%%/09-line.xml.gz "},
+        {"step":11,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.lmdb %%dir%%/10-gtfs.lmdb"},
+        {"step":12,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.lmdb %%dir%%/11-%%block%%-gtfs.zip"},
+        {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
+        {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+        {
+    "block": "5t",
+    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/6",
+    "download_url":"https://github.com/user-attachments/files/18589535/IT-ITC1-TRENITALIA_L1.xml.gz",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.lmdb "},
+        {"step":4,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
+        {"step":5,"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
+        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":7,"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.lmdb %%dir%%/07-netex-database.lmdb"},
+        {"step":8,"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.lmdb %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"step":9,"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.lmdb "},
+        {"step":10,"script": "#related_explorer", "args": "%%dir%%/08-gtfs.lmdb Line random %%dir%%/09-line.xml.gz "},
+        {"step":11,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.lmdb %%dir%%/10-gtfs.lmdb"},
+        {"step":12,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.lmdb %%dir%%/11-%%block%%-gtfs.zip"},
+        {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
+        {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  }
+]
