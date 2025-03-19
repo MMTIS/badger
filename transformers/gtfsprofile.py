@@ -627,9 +627,9 @@ class GtfsProfile:
 
             arrival_time = GtfsProfile.addDayOffset(call.arrival.time, call.arrival.day_offset)
             departure_time = GtfsProfile.addDayOffset(call.departure.time, call.departure.day_offset)
-            if arrival_time is None:
+            if arrival_time is None or arrival_time=="None":
                 arrival_time = departure_time
-            elif departure_time is None:
+            elif departure_time is None or departure_time=="None":
                 departure_time = arrival_time
             stop_time = {'trip_id': GtfsProfile.getOriginalGtfsId(service_journey, 'trip_id'),
                          'arrival_time': arrival_time,
