@@ -9,6 +9,8 @@ from netex import (
     VersionOfObjectRefStructure,
     Codespace,
     Version,
+    CodespaceRefStructure,
+    DataSourceRefStructure,
 )
 
 # TODO: This is required for globals to work, lets fix that later.
@@ -25,7 +27,9 @@ Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
 Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-def getRef(obj: Tid, klass: type[VersionOfObjectRefStructure] | None = None) -> VersionOfObjectRefStructure:
+def getRef(
+    obj: Tid, klass: type[VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure] | None = None
+) -> VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure:
     assert obj is not None, "A reference must be made from an existing object."
 
     if klass is None:
@@ -52,7 +56,8 @@ def getRef(obj: Tid, klass: type[VersionOfObjectRefStructure] | None = None) -> 
     elif name.endswith("RefStructure"):
         name = name.replace("RefStructure", "Ref")
 
-    instance.version = getattr(obj, "version", None)
+    if hasattr(instance, "version"):
+        instance.version = getattr(obj, "version", None)
 
     kname = klass.__name__
     meta_kname = klass.__name__
@@ -85,12 +90,10 @@ def getClassFromRefClass(ref: Tref) -> Any:
 
 def getFakeRef(id: str, klass: type[Tref], version: str | None, version_ref: str | None = None) -> Tref:
     assert id is not None, "A reference must start with a valid id"
-    return (
-        klass(
-            ref=id,
-            version=version if version_ref is None else None,
-            version_ref=version_ref,
-        )
+    return klass(
+        ref=id,
+        version=version if version_ref is None else None,
+        version_ref=version_ref,
     )
 
 
