@@ -65,7 +65,7 @@ class Database:
         serializer: Serializer,
         readonly: bool = True,
         logger: Logger | None = None,
-        initial_size: int = 1 * 1024**3,
+        initial_size: int = 4 * 1024**3,
         growth_size: int | None = None,
         max_size: int = 36 * 1024**3,
         batch_size: int = 10_000,
