@@ -282,15 +282,16 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         versions = load_local(db_read, Version)
         if datasources and len(datasources) > 0:
             ds = datasources[0]
-            result = ds.name.value if ds and ds.name else defaults["feed_publisher_name"]
+            feed_publisher_name = ds.name.value if ds and ds.name else defaults["feed_publisher_name"]
         else:
-            result = defaults["feed_publisher_name"]
+            feed_publisher_name = defaults["feed_publisher_name"]
+
         GtfsProfile.writeToZipFile(
             archive,
             'feed_info.txt',
             [
                 {
-                    'feed_publisher_name': result,
+                    'feed_publisher_name': feed_publisher_name,
                     'feed_publisher_url': codespaces[0].xmlns_url if codespaces else defaults["feed_publisher_url"],
                     'feed_lang': 'en',  # TODO
                     'default_lang': 'en',  # TODO
