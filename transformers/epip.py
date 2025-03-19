@@ -404,18 +404,11 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
     for pis in piss:
         pis.id = getId(StopPointInJourneyPattern, generator_defaults['codespace'], f"{id}-{pis.order}")
 
-    return ServiceJourneyPattern(
-        id=getId(ServiceJourneyPattern, generator_defaults['codespace'], id),
-        version=sj.version,
-        route_ref_or_route_view=RouteView(flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view),
-        direction_type=sj.direction_type,
-        destination_display_ref_or_destination_display_view=(
-            sj.journey_pattern_view.destination_display_ref_or_destination_display_view if sj.journey_pattern_view else None
-        ),
-        points_in_sequence=PointsInJourneyPatternRelStructure(
-            point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern=piss
-        ),
-    )
+    return ServiceJourneyPattern(id=getId(ServiceJourneyPattern, generator_defaults['codespace'], id), version=sj.version,
+                                 route_ref_or_route_view=RouteView(flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view),
+                                 direction_type=sj.direction_type.value, # https://github.com/NeTEx-CEN/NeTEx/issues/842
+                                 destination_display_ref_or_destination_display_view=sj.journey_pattern_view.destination_display_ref_or_destination_display_view if sj.journey_pattern_view else None,
+                                 points_in_sequence=PointsInJourneyPatternRelStructure(point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern=piss))
 
 
 def service_journey_ac_to_day_type(

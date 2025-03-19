@@ -33,6 +33,26 @@ def reversedate() -> str:
     formatted_date = current_date.strftime("%Y%m%d")
     return formatted_date
 
+def estimate_size_lmdb(file_name: str) -> int:
+    # Check if the file exists
+    if not os.path.isfile(file_name):
+        log_all(logging.ERROR, f'file {file_name}does not exist')
+        raise
+
+    # Get the size of the file in bytes
+    file_size = os.path.getsize(file_name)
+
+    # Calculate the estimated size based on the file factor
+    if file_name.endswith(".zip") or file_name.endswith(".gzip"):
+        # Estimate size for zip/gzip files: 2000/12
+        return int(file_size * (2200 // 13.5))
+    elif file_name.endswith(".xml"):
+        # Estimate size for XML files: 610
+        return file_size * 12
+
+    log_all(logging.ERROR,f'file {file_name} cannot contain data')
+    raise
+    return 0
 
 def parse_command_line_arguments(input_string: str) -> list[str]:
     arguments = re.findall(r"\[.*?\]|\S+", input_string)
@@ -235,7 +255,7 @@ def main(
     todo_block: str,
     begin_step: int = 1,
     end_step: int = 99999,
-    this_step: int = -1,
+    this_step: int = 99999,
     url: Optional[str] = None,
     parent_block: str = "",
 ) -> None:
@@ -273,18 +293,16 @@ def main(
         script_input_file_path = "NOT SET YET"
         for script in scripts:
             step = step + 1
-            # skip some steps if this is mandated
-            if step != this_step:
-                if step < begin_step:
+            if this_step==99999:
+                if step<begin_step:
                     continue
-                if blockstop:
-                    break
-                if step > end_step:
-                    # only process until here
-                    break
+                if step>end_step:
+                    continue
             else:
-                blockstop = True  # we only process this one step
-
+                if step != this_step:
+                    continue
+            if blockstop:
+                break
             if "download_urls" not in block.keys() and (
                 step < begin_step
             ):  # if it is a list we always begin with 1 the begin_step is then used within the list
@@ -450,7 +468,7 @@ if __name__ == "__main__":
         help="last step to execute. default not set.",
     )
     parser.add_argument(
-        "--this_step", type=int, default=-1, help="not set. Only this step is done"
+        "--this_step", type=int, default=99999, help="not set. Only this step is done"
     )
     parser.add_argument(
         "--log_level",
