@@ -152,7 +152,7 @@ def interchange_rules_to_service_journey_interchanges(db: Database) -> Generator
             if interchange_rule.distributor_filter.stop_place_ref is not None:
                 all_ssps = sp_ssp.get(interchange_rule.distributor_filter.stop_place_ref.ref, [])
 
-                sjs = load_local(db, ServiceJourney, filter=sj_ref.ref, cursor=True)
+                sjs = load_local(db, ServiceJourney, filter_id=sj_ref.ref, cursor=True)
                 if len(sjs) > 0:
                     for ssp_ref in get_all_stops(db, sjs[0]):
                         if ssp_ref.ref in all_ssps:
