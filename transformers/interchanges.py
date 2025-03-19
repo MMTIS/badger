@@ -87,7 +87,7 @@ def get_all_stops(db: Database, sj: ServiceJourney):
             if isinstance(call.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view, FareScheduledStopPointRef) or isinstance(call.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view, ScheduledStopPointRef):
                 yield call.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view
     elif sj.journey_pattern_ref is not None:
-        sjps = load_local(db, ServiceJourneyPattern, limit=1, filter=sj.journey_pattern_ref.ref)
+        sjps = load_local(db, ServiceJourneyPattern, limit=1, filter_id=sj.journey_pattern_ref.ref)
         if len(sjps) > 0:
             sjp: ServiceJourneyPattern = sjps[0]
             if sjp.points_in_sequence:
@@ -133,7 +133,7 @@ def interchange_rules_to_service_journey_interchanges(db: Database) -> Generator
             if interchange_rule.feeder_filter.stop_place_ref is not None:
                 all_ssps = sp_ssp.get(interchange_rule.feeder_filter.stop_place_ref.ref, [])
 
-                sjs = load_local(db, ServiceJourney, filter=sj_ref.ref, cursor=True)
+                sjs = load_local(db, ServiceJourney, filter_id=sj_ref.ref, cursor=True)
                 if len(sjs) > 0:
                     for ssp_ref in get_all_stops(db, sjs[0]):
                         if ssp_ref.ref in all_ssps:

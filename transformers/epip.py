@@ -541,7 +541,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
 
             if len(route_point_projection) > 0:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteRef):
-                    routes: list[Route] = load_local(db_read, Route, limit=1, filter=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False)
+                    routes: list[Route] = load_local(db_read, Route, limit=1, filter_id=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False)
                     if len(routes) > 0:
                         RoutesProfile.projectRouteToServiceLinks(db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults)
 
