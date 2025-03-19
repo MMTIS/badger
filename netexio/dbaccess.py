@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable, IO, Any
+from typing import TYPE_CHECKING, Iterable, IO, Any, Literal
 import inspect
 
 if TYPE_CHECKING:
@@ -7,7 +7,7 @@ if TYPE_CHECKING:
 
 import pickle
 import warnings
-from typing import TypeVar, List, Generator, Tuple
+from typing import TypeVar, List
 
 import cloudpickle
 
@@ -24,9 +24,9 @@ from netex import (
     VersionOfObjectRef,
     VersionOfObjectRefStructure,
     EntityInVersionStructure,
-    DataManagedObject,
     ResponsibilitySetRef,
     DataSourceRefStructure,
+    EntityStructure,
 )
 from netexio.serializer import Serializer
 from netexio.xmlserializer import MyXmlSerializer
@@ -37,6 +37,8 @@ import logging
 from lxml import etree
 
 T = TypeVar("T")
+Tid = TypeVar("Tid", bound=EntityStructure)
+Tver = TypeVar("Tver", bound=EntityInVersionStructure)
 
 ns_map = {"": "http://www.netex.org.uk/netex", "gml": "http://www.opengis.net/gml/3.2"}
 
@@ -48,44 +50,10 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 # TODO: For all load_ functions filter by id + version, not only id
 
 
-# TODO: This must be fixed, this is an incorrect implementation!!
-def load_embedded(db: Database, clazz: T, filter, cursor=False):
-    # TODO: maybe return something here, which includes *ALL* objects that are embedded within this object, so it does not have to be resolved anymore
-    objectname = get_object_name(clazz)
-
-    result = []
-
-    with db.env.begin(
-        db=db.env.open_db(b"_embedding"), buffers=True, write=False
-    ) as txn:
-        cursor = txn.cursor()
-        for key, value in cursor:
-            # parent_class, parent_id, parent_version, *_ = pickle.loads(key)
-            (
-                parent_class,
-                parent_id,
-                parent_version,
-                embedding_class,
-                embedding_id,
-                embedding_version,
-                *_,
-            ) = pickle.loads(value)
-            if embedding_id == filter and embedding_class == objectname:
-                result.append(
-                    (
-                        parent_id,
-                        parent_version,
-                        parent_class,
-                    )
-                )
-
-    return result
-
-
-def load_referencing(db: Database, clazz: T, filter, cursor=False):
-    result = []
-
-    prefix = db.serializer.encode_key(filter, None, clazz, include_clazz=True)
+def load_referencing(
+    db: Database, clazz: type[Tid], filter_id: str
+) -> Iterable[tuple[str, str, str]]:
+    prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as txn:
         cursor = txn.cursor()
@@ -97,21 +65,14 @@ def load_referencing(db: Database, clazz: T, filter, cursor=False):
                 referencing_class, referencing_id, referencing_version = (
                     cloudpickle.loads(value)
                 )
-                result.append(
-                    (
-                        referencing_id,
-                        referencing_version,
-                        referencing_class,
-                    )
-                )
 
-    return result
+                yield referencing_id, referencing_version, referencing_class
 
 
-def load_referencing_inwards(db: Database, clazz: T, filter, cursor=False):
-    result = []
-
-    prefix = db.serializer.encode_key(filter, None, clazz, include_clazz=True)
+def load_referencing_inwards(
+    db: Database, clazz: type[Tid], filter_id: str
+) -> Iterable[tuple[str, str, str]]:
+    prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing_inwards, buffers=True, write=False) as txn:
         cursor = txn.cursor()
@@ -121,41 +82,36 @@ def load_referencing_inwards(db: Database, clazz: T, filter, cursor=False):
                     break  # Stop when keys no longer match the prefix
 
                 parent_class, parent_id, parent_version = cloudpickle.loads(value)
-                result.append(
-                    (
-                        parent_id,
-                        parent_version,
-                        parent_class,
-                    )
-                )
 
-    return result
+                yield parent_id, parent_version, parent_class
 
 
 def load_local(
     db: Database,
-    clazz: T,
-    limit=None,
-    filter=None,
-    cursor=False,
-    embedding=True,
-    embedded_parent=False,
-    cache=True,
-) -> list[T]:
+    clazz: type[Tid],
+    limit: int | None = None,
+    filter_id: str | None = None,
+    cursor: bool = False,
+    embedding: bool = True,
+    embedded_parent: bool = False,
+    cache: bool = True,
+) -> list[Tid]:
     return list(
-        load_generator(db, clazz, limit, filter, embedding, embedded_parent, cache)
+        load_generator(db, clazz, limit, filter_id, embedding, embedded_parent, cache)
     )
 
 
 def recursive_resolve(
     db: Database,
-    parent,
-    resolved,
-    filter=None,
-    filter_class=set([]),
-    inwards=True,
-    outwards=True,
-):
+    parent: Tid,
+    resolved: list[Any],
+    filter: str | Literal[False] | None = None,
+    filter_class: set[type[Tid]] = set([]),
+    inwards: bool = True,
+    outwards: bool = True,
+) -> None:
+    resolved_objs: list[Any]
+
     for x in resolved:
         if parent.id == x.id and parent.__class__ == x.__class__:
             return
@@ -165,72 +121,68 @@ def recursive_resolve(
     if inwards and (
         filter is False or filter == parent.id or parent.__class__ in filter_class
     ):
+        assert parent.id is not None, "Parent.id must not be none"
         resolved_parents = load_referencing_inwards(
-            db, parent.__class__, filter=parent.id
+            db, parent.__class__, filter_id=parent.id
         )
-        if len(resolved_parents) > 0:
-            for y in resolved_parents:
-                already_done = False
-                for x in resolved:
-                    y_class = db.get_class_by_name(y[2])
-                    if (
-                        y[0] == x.id and y_class == x.__class__
-                    ) or y_class in filter_class:
-                        already_done = True
-                        break
+        for y in resolved_parents:
+            already_done = False
+            for x in resolved:
+                y_class: type[Tid] = db.get_class_by_name(y[2])
+                if (y[0] == x.id and y_class == x.__class__) or y_class in filter_class:
+                    already_done = True
+                    break
 
-                if not already_done:
-                    resolved_objs = load_local(
+            if not already_done:
+                resolved_objs = load_local(
+                    db,
+                    db.get_class_by_name(y[2]),
+                    filter_id=y[0],
+                    embedding=True,
+                    embedded_parent=True,
+                )
+                if len(resolved_objs) > 0:
+                    recursive_resolve(
                         db,
-                        db.get_class_by_name(y[2]),
-                        filter=y[0],
-                        embedding=True,
-                        embedded_parent=True,
-                    )
-                    if len(resolved_objs) > 0:
-                        recursive_resolve(
-                            db,
-                            resolved_objs[0],
-                            resolved,
-                            filter,
-                            filter_class,
-                            inwards,
-                            outwards,
-                        )  # TODO: not only consider the first
+                        resolved_objs[0],
+                        resolved,
+                        filter,
+                        filter_class,
+                        inwards,
+                        outwards,
+                    )  # TODO: not only consider the first
 
     # In principle this would already take care of everything recursive_attributes could find, but now does it inwards.
     if outwards:
-        resolved_parents = load_referencing(db, parent.__class__, filter=parent.id)
-        if len(resolved_parents) > 0:
-            for y in resolved_parents:
-                already_done = False
-                for x in resolved:
-                    if y[0] == x.id and db.get_class_by_name(y[2]) == x.__class__:
-                        already_done = True
-                        break
+        assert parent.id is not None, "parent.id must not be none"
+        resolved_parents = load_referencing(db, parent.__class__, filter_id=parent.id)
+        for y in resolved_parents:
+            already_done = False
+            for x in resolved:
+                if y[0] == x.id and db.get_class_by_name(y[2]) == x.__class__:
+                    already_done = True
+                    break
 
-                if not already_done:
-                    resolved_objs = load_local(
+            if not already_done:
+                resolved_objs = load_local(
+                    db,
+                    db.get_class_by_name(y[2]),
+                    filter_id=y[0],
+                    embedding=True,
+                    embedded_parent=True,
+                )
+                if len(resolved_objs) > 0:
+                    recursive_resolve(
                         db,
-                        db.get_class_by_name(y[2]),
-                        filter=y[0],
-                        embedding=True,
-                        embedded_parent=True,
-                    )
-                    if len(resolved_objs) > 0:
-                        recursive_resolve(
-                            db,
-                            resolved_objs[0],
-                            resolved,
-                            filter,
-                            filter_class,
-                            inwards,
-                            outwards,
-                        )  # TODO: not only consider the first
-        # else:
-        #      print(f"Cannot resolve referencing {parent.id}")
+                        resolved_objs[0],
+                        resolved,
+                        filter,
+                        filter_class,
+                        inwards,
+                        outwards,
+                    )  # TODO: not only consider the first
 
-        for obj in recursive_attributes(parent, []):
+        for obj, path in recursive_attributes(parent, []):
             if hasattr(obj, "id"):
                 continue
 
@@ -242,11 +194,12 @@ def recursive_resolve(
                     elif obj.__class__.__name__.endswith("Ref"):
                         obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
+                assert obj.ref is not None, "Object ref must not be none"
+                assert obj.name_of_ref_class is not None, "Object name of ref class must not be none"
                 if not hasattr(netex, obj.name_of_ref_class):
                     # hack for non-existing structures
                     log_all(
                         logging.WARN,
-                        "related_explorer",
                         f"No attribute found in module {netex} for {obj.name_of_ref_class}.",
                     )
 
@@ -265,7 +218,11 @@ def recursive_resolve(
 
                 if not already_done:
                     resolved_objs = load_local(
-                        db, clazz, filter=obj.ref, embedding=True, embedded_parent=True
+                        db,
+                        clazz,
+                        filter_id=obj.ref,
+                        embedding=True,
+                        embedded_parent=True,
                     )
                     if len(resolved_objs) > 0:
                         recursive_resolve(
@@ -279,45 +236,45 @@ def recursive_resolve(
                         )  # TODO: not only consider the first
                     else:
                         # print(obj.ref)
-                        resolved_parents = load_embedded(db, clazz, filter=obj.ref)
-                        if len(resolved_parents) > 0:
-                            for y in resolved_parents:
-                                already_done = False
-                                for x in resolved:
-                                    if (
-                                        y[0] == x.id
-                                        and db.get_class_by_name(y[2]) == x.__class__
-                                    ):
-                                        already_done = True
-                                        break
+                        resolved_parents = load_embedded_transparent_generator(db, clazz, filter=obj.ref)
+                        for y in resolved_parents:
+                            already_done = False
+                            for x in resolved:
+                                if (
+                                    y[0] == x.id
+                                    and db.get_class_by_name(y[2]) == x.__class__
+                                ):
+                                    already_done = True
+                                    break
 
-                                if not already_done:
-                                    resolved_objs = load_local(
+                            if not already_done:
+                                resolved_objs = load_local(
+                                    db,
+                                    db.get_class_by_name(y[2]),
+                                    filter_id=y[0],
+                                    embedding=True,
+                                    embedded_parent=True,
+                                )
+                                if len(resolved_objs) > 0:
+                                    recursive_resolve(
                                         db,
-                                        db.get_class_by_name(y[2]),
-                                        filter=y[0],
-                                        embedding=True,
-                                        embedded_parent=True,
-                                    )
-                                    if len(resolved_objs) > 0:
-                                        recursive_resolve(
-                                            db,
-                                            resolved_objs[0],
-                                            resolved,
-                                            filter,
-                                            filter_class,
-                                            inwards,
-                                            outwards,
-                                        )  # TODO: not only consider the first
+                                        resolved_objs[0],
+                                        resolved,
+                                        filter,
+                                        filter_class,
+                                        inwards,
+                                        outwards,
+                                    )  # TODO: not only consider the first
                         else:
                             log_all(
                                 logging.WARN,
-                                "related_explorer",
                                 f"Cannot resolve embedded {obj.ref}",
                             )
 
 
-def fetch_references_classes_generator(db: Database, classes: list):
+def fetch_references_classes_generator(
+    db: Database, classes: list[type[Tid]]
+) -> Iterable[Tid]:
     list_classes = {get_object_name(clazz) for clazz in classes}
     processed = set()
 
@@ -349,16 +306,17 @@ def fetch_references_classes_generator(db: Database, classes: list):
                 value
             )  # TODO: check if this goes right
             if ref_class not in list_classes:
-                results = load_local(
+                results: list[Tid] = load_local(
                     db,
                     db.get_class_by_name(ref_class),
                     limit=1,
-                    filter=ref_id,
+                    filter_id=ref_id,
                     cursor=True,
                     embedding=True,
                     embedded_parent=True,
                 )
                 if len(results) > 0:
+                    assert results[0].id is not None, "results[0].id must not be none"
                     needle = get_object_name(results[0].__class__) + "|" + results[0].id
                     if (
                         results[0].__class__ in classes
@@ -408,7 +366,7 @@ def fetch_references_classes_generator(db: Database, classes: list):
                         yield results[0]
 
                         # An element may obviously also include other references.
-                        resolved = []
+                        resolved: list[Tid] = []
                         filter_set = {results[0].__class__}.union(classes)
                         recursive_resolve(
                             db,
@@ -421,6 +379,7 @@ def fetch_references_classes_generator(db: Database, classes: list):
                         )
 
                         for resolve in resolved:
+                            assert resolve.id is not None, "resolve.id must not be none"
                             needle = (
                                 get_object_name(resolve.__class__) + "|" + resolve.id
                             )
@@ -443,7 +402,9 @@ def fetch_references_classes_generator(db: Database, classes: list):
                                     cursor2 = src_txn2.cursor()
 
                                     prefix = db.serializer.encode_key(
-                                        resolve.id, resolve.version, resolve.__class__
+                                        resolve.id,
+                                        getattr(resolve, "version", None),
+                                        resolve.__class__,
                                     )
                                     if cursor2.set_range(
                                         prefix
@@ -477,18 +438,18 @@ def fetch_references_classes_generator(db: Database, classes: list):
 
 def load_generator(
     db: Database,
-    clazz: T,
-    limit=None,
-    filter=None,
-    embedding=True,
-    parent=False,
-    cache=True,
-):
+    clazz: type[Tid],
+    limit: int | None = None,
+    filter_id: str | None = None,
+    embedding: bool = True,
+    parent: bool = False,
+    cache: bool = True,
+) -> Iterable[Tid]:
     if db.env and db.open_db(clazz) is not None:
         with db.env.begin(write=False, buffers=True, db=db.open_db(clazz)) as txn:
             cursor = txn.cursor()
-            if filter:
-                prefix = db.serializer.encode_key(filter, None, clazz)
+            if filter_id:
+                prefix = db.serializer.encode_key(filter_id, None, clazz)
                 if cursor.set_range(
                     prefix
                 ):  # Position cursor at the first key >= prefix
@@ -514,13 +475,18 @@ def load_generator(
 
     if embedding:
         yield from load_embedded_transparent_generator(
-            db, clazz, limit, filter, parent, cache
+            db, clazz, limit, filter_id, parent, cache
         )
 
 
 def load_embedded_transparent_generator(
-    db: Database, clazz: T, limit=None, filter=None, parent=False, cache=True
-):
+    db: Database,
+    clazz: type[Tid],
+    limit: int | None = None,
+    filter: str | None = None,
+    parent: bool = False,
+    cache: bool = True,
+) -> Iterable[Tid]:
     # TODO: Expensive for classes that are not available, it will do a complete sequential scan and for each time it will depicle each individual object
 
     if db.env:
@@ -567,26 +533,13 @@ def load_embedded_transparent_generator(
                         i += 1
 
 
-def write_objects(
-    db: Database, objs, empty=False, many=False, silent=False, cursor=False
-):
-    if len(objs) == 0:
-        return
-
-    clazz = objs[0].__class__
-    db.insert_many_objects(clazz, objs)
-
-
-def write_generator(db: Database, clazz, generator: Generator, empty=False):
-    if empty:
-        db.clear([clazz])
-
-    db.insert_objects_on_queue(clazz, generator)
-
-
 def copy_table(
-    db_read: Database, db_write: Database, classes: list, clean=False, embedding=False
-):
+    db_read: Database,
+    db_write: Database,
+    classes: list[type[Tid]],
+    clean: bool = False,
+    embedding: bool = False,
+) -> None:
     for klass in classes:
         # print(klass.__name__)
         db_read.copy_db(db_write, klass)
@@ -595,22 +548,20 @@ def copy_table(
         db_read.copy_db_embedding(db_write, classes)
 
 
-def missing_class_update(source_db: Database, target_db: Database):
+def missing_class_update(source_db: Database, target_db: Database) -> None:
     # TODO: As written in #223 some of the objects have not been copied at this point, but are still referenced.
-    target_classes = set(target_db.tables())
-    referencing_classes = set(target_db.referencing())
-    embedded_classes = set(target_db.embedded())
-    missing_classes = referencing_classes - (
+    target_classes: set[type[EntityStructure]] = set(target_db.tables())
+    referencing_classes: set[type[EntityStructure]] = set(target_db.referencing())
+    embedded_classes: set[type[EntityStructure]] = set(target_db.embedded())
+    missing_classes: set[type[EntityStructure]] = referencing_classes - (
         target_classes.union(embedded_classes)
     )  # This is naive because there may be indirections
-    copy_table(source_db, target_db, missing_classes)
+    copy_table(source_db, target_db, list(missing_classes))
 
 
-def update_generator(db: Database, clazz, generator: Generator):
-    db.insert_many_objects(clazz, generator)
-
-
-def setup_database(db: Database, classes, clean=False):
+def setup_database(
+    db: Database, classes: tuple[list[str], list[str], list[Any]], clean: bool = False
+) -> None:
     clean_element_names, interesting_element_names, interesting_classes = classes
 
     if clean:
@@ -618,67 +569,64 @@ def setup_database(db: Database, classes, clean=False):
         # db.vacuum()
 
 
-def get_local_name(element):
-    if hasattr(element, "Meta") and hasattr(element.Meta, "name"):
-        return element.Meta.name
+def get_local_name(element: type[Tid]) -> str:
+    meta = getattr(element, "Meta", None)
+    if meta:
+        return getattr(meta, "name", element.__name__)
+
     return element.__name__
 
 
 def update_embedded_referencing(
-    serializer: Serializer, deserialized
-) -> Generator[list[str], None, None]:
+    serializer: Serializer, deserialized: Tid
+) -> Iterable[tuple[type[Tid], str, str, type[Tid], str, str, str | None]]:
+    assert deserialized.id is not None, "deserialised.id must not be none"
+
     for obj, path in recursive_attributes(deserialized, []):
-        if hasattr(obj, "id"):
-            if obj.id is not None and obj.__class__ in serializer.interesting_classes:
-                yield [
+        if hasattr(obj, "id") and obj.id is not None:
+            if obj.__class__ in serializer.interesting_classes:
+                assert obj.id is not None, "Object.id must not be none"
+                yield (
                     deserialized.__class__,
                     deserialized.id,
-                    deserialized.version,
+                    getattr(deserialized, "version", "any"),
                     obj.__class__,
                     obj.id,
-                    (
-                        obj.version
-                        if hasattr(obj, "version") and obj.version is not None
-                        else "any"
-                    ),
+                    getattr(obj, "version", "any"),
                     ".".join([str(s) for s in path]),
-                ]
+                )
 
         elif hasattr(obj, "ref"):
-            if obj.ref is not None:
-                if obj.name_of_ref_class is None:
-                    # Hack, because NeTEx does not define the default name of ref class yet
-                    if obj.__class__.__name__.endswith("RefStructure"):
-                        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
-                    elif obj.__class__.__name__.endswith("Ref"):
-                        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+            assert obj.ref is not None, "Object ref must not be none"
+            if obj.name_of_ref_class is None:
+                # Hack, because NeTEx does not define the default name of ref class yet
+                if obj.__class__.__name__.endswith("RefStructure"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                elif obj.__class__.__name__.endswith("Ref"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
-                yield [
-                    deserialized.__class__,
-                    deserialized.id,
-                    deserialized.version,
-                    # The object that contains the reference
-                    serializer.name_object[
-                        obj.name_of_ref_class
-                    ],  # The object that the reference is towards
-                    obj.ref,
-                    (
-                        obj.version
-                        if hasattr(obj, "version") and obj.version is not None
-                        else "any"
-                    ),
-                    None,
-                ]
+            yield (
+                deserialized.__class__,
+                deserialized.id,
+                getattr(deserialized, "version", "any"),
+                # The object that contains the reference
+                serializer.name_object[
+                    obj.name_of_ref_class
+                ],  # The object that the reference is towards
+                obj.ref,
+                getattr(obj, "version", "any"),
+                None,
+            )
 
 
 def insert_database(
     db: Database,
-    classes,
-    f=None,
-    type_of_frame_filter=None,
-    cursor=False,
-    direct_embedding=False,
-):
+    classes: tuple[list[str], list[str], list[Any]],
+    f: IO[Any] | None = None,
+    type_of_frame_filter: list[str] | None = None,
+    cursor: bool = False,
+    direct_embedding: bool = False,
+) -> None:
     xml_serializer = MyXmlSerializer()
     clsmembers = inspect.getmembers(netex, inspect.isclass)
     all_frames = [
@@ -711,7 +659,7 @@ def insert_database(
         if hasattr(x[1], "Meta") and hasattr(x[1], "srs_name")
     ]
 
-    frame_defaults_stack = []
+    frame_defaults_stack: list[VersionFrameDefaultsStructure | None] = []
     if f is None:
         return
 
@@ -877,7 +825,7 @@ def insert_database(
                     try:
                         db.insert_one_object(object)
                     except:
-                        print(etree.tostring(element))
+                        print("1", etree.tostring(element))
                         raise
                         pass
 
@@ -892,7 +840,7 @@ def insert_database(
                     try:
                         db.insert_one_object(object)
                     except:
-                        print(etree.tostring(element))
+                        print("2", etree.tostring(element), object)
                         raise
                         pass
 
@@ -900,32 +848,33 @@ def insert_database(
                     try:
                         db.insert_one_object(object)
                     except:
-                        print(etree.tostring(element))
+                        print("3", etree.tostring(element))
                         raise
                         pass
 
                 current_element_tag = None
 
 
-def recursive_attributes(obj, depth: List[int]) -> Tuple[object, List[int]]:
+def recursive_attributes(
+    obj: Tid, depth: List[int | str]
+) -> Iterable[tuple[Any, list[int | str]]]:
     # qprint(obj.__class__.__name__)
-    if (
-        issubclass(obj.__class__, EntityInVersionStructure)
-        and obj.data_source_ref_attribute is not None
-    ):
-        yield DataSourceRefStructure(ref=obj.data_source_ref_attribute), depth + [
+
+    data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
+    if data_source_ref_attribute:
+        yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + [
             "data_source_ref_attribute"
         ]
 
-    if (
-        issubclass(obj.__class__, DataManagedObject)
-        and obj.responsibility_set_ref_attribute is not None
-    ):
-        yield ResponsibilitySetRef(ref=obj.responsibility_set_ref_attribute), depth + [
+    responsibility_set_ref_attribute = getattr(
+        obj, "responsibility_set_ref_attribute", None
+    )
+    if responsibility_set_ref_attribute:
+        yield ResponsibilitySetRef(ref=responsibility_set_ref_attribute), depth + [
             "responsibility_set_ref_attribute"
         ]
 
-    mydepth = depth.copy()
+    mydepth: list[int | str] = depth.copy()
     mydepth.append(0)
     for key in obj.__dataclass_fields__.keys():
         mydepth[-1] = key
@@ -940,7 +889,7 @@ def recursive_attributes(obj, depth: List[int]) -> Tuple[object, List[int]]:
             else:
                 if (
                     hasattr(v, "__dataclass_fields__")
-                    and v.__class__.__name__ in netex.set_all
+                    and v.__class__.__name__ in netex.set_all  # type: ignore
                 ):
                     if hasattr(v, "id"):
                         yield v, mydepth
@@ -954,10 +903,10 @@ def recursive_attributes(obj, depth: List[int]) -> Tuple[object, List[int]]:
                             if issubclass(
                                 x.__class__, VersionOfObjectRef
                             ) or issubclass(x.__class__, VersionOfObjectRefStructure):
-                                yield x, mydepth
+                                yield x, mydepth  # TODO: mydepth result is incorrect when list() but not as iterator
                             elif (
                                 hasattr(x, "__dataclass_fields__")
-                                and x.__class__.__name__ in netex.set_all
+                                and x.__class__.__name__ in netex.set_all  # type: ignore
                             ):
                                 if hasattr(x, "id"):
                                     yield x, mydepth
@@ -965,9 +914,9 @@ def recursive_attributes(obj, depth: List[int]) -> Tuple[object, List[int]]:
                     mydepth.pop()
 
 
-def open_netex_file(filename : str) -> Iterable[IO[Any]]:
+def open_netex_file(filename: str) -> Iterable[IO[Any]]:
     if filename.endswith(".xml.gz"):
-        yield igzip_threaded.open(filename, "rb", compresslevel=3, threads=3)
+        yield igzip_threaded.open(filename, "rb", compresslevel=3, threads=3)  # type: ignore
     elif filename.endswith(".xml"):
         yield open(filename, "rb")
     elif filename.endswith(".zip"):

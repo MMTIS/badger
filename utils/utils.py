@@ -22,13 +22,13 @@ def get_object_name(clazz: type[Tid]) -> str:
 
 def get_element_name_with_ns(clazz: type[Tid]) -> str:
     name = get_object_name(clazz)
-    meta = getattr(type(clazz), "Meta", None)
+    meta = getattr(clazz, "Meta", None)
 
-    return "{" + meta.namespace if meta is not None else "" + "}" + name
+    return "{" + (meta.namespace if meta is not None else "") + "}" + name
 
 
 def project(obj: Tid, clazz: type[Tid], **kwargs: Any) -> Tid:
-    assert clazz.__dataclass_fields__ is not None
+    assert clazz.__dataclass_fields__ is not None, "Class must have __dataclass_fields__"
 
     # if issubclass(obj.__class__, clazz_intermediate):
     attributes: dict[str, Any] = {
@@ -48,7 +48,7 @@ def project(obj: Tid, clazz: type[Tid], **kwargs: Any) -> Tid:
 
 
 def projectRef(obj: T, clazz: type[Tref]) -> Tref:
-    assert clazz.__dataclass_fields__ is not None
+    assert clazz.__dataclass_fields__ is not None, "Class must have __dataclass_fields__"
 
     attributes = {
         x: getattr(obj, x, None)

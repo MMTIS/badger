@@ -22,7 +22,7 @@ def export_publication_delivery_xml(
     }
 
     if output_filename.endswith(".gz"):
-        with igzip_threaded.open(
+        with igzip_threaded.open(  # type: ignore
             output_filename,
             "wt",
             compresslevel=3,

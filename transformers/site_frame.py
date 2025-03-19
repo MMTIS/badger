@@ -3,7 +3,7 @@ from itertools import groupby
 from typing import List, Generator, Tuple
 
 from netexio.database import Database
-from netexio.dbaccess import load_local, write_objects, write_generator, load_embedding_generator, load_generator
+from netexio.dbaccess import load_local, load_embedding_generator, load_generator
 from utils.refs import getIndex, getRef
 from utils.utils import project
 
@@ -62,13 +62,13 @@ def infer_stop_places(db_read: Database, db_write: Database, generator_defaults:
 
     stop_areas = load_local(db_read, StopArea)
     scheduled_stop_points = load_local(db_read, ScheduledStopPoint)
-    write_generator(db_write, StopPlace, [], True)
-    write_generator(db_write, PassengerStopAssignment, [], True)
+
+    db_write.drop([StopPlace, PassengerStopAssignment])
 
     # TODO: How to write to the database, a pair of input from a generator?
     for stop_place, psas in groupby_stop_area(stop_areas, scheduled_stop_points):
-        write_objects(db_write, [stop_place], False, False)
-        write_objects(db_write, psas, False, False)
+        db_write.insert_objects_on_queue(StopPlace, [stop_place])
+        db_write.insert_objects_on_queue(PassengerStopAssignment, psas)
 
 
 # Create an inverse index for ScheduledStopPoint to StopPlace

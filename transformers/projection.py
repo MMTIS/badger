@@ -2,6 +2,7 @@ import functools
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from itertools import chain
+from typing import Iterable, Any
 
 from pyproj import Transformer
 from pyproj.exceptions import CRSError
@@ -16,11 +17,11 @@ from utils.utils import get_interesting_classes
 from netexio.serializer import Serializer
 from utils.utils import get_object_name
 
-transformers = {}
+transformers: dict[str, Transformer] = {}
 
 GEO_CLASSES = {LocationStructure2, LineString, Polygon, MultiSurface}
 
-def get_all_geo_elements():
+def get_all_geo_elements() -> Iterable[Any]:
     classes = get_interesting_classes()
     clean_element_names, interesting_element_names, interesting_classes = classes
     for clazz_parent in interesting_classes:
@@ -38,7 +39,7 @@ def get_all_geo_elements():
                     yield clazz_parent
                     break
 
-def reprojection(deserialized: object, crs_to: str):
+def reprojection(deserialized: object, crs_to: str) -> Any:
     # TODO: This function would walk over the class iteratively.
     # A general optimisation would be to precompute the paths within
     # a class to directly have a list (per class) of possible location targets
@@ -68,12 +69,6 @@ def reprojection(deserialized: object, crs_to: str):
 
     return deserialized
 
-def reprojection_udf(serializer: Serializer, serialized: bytes, clazz: str, crs_to: str) -> bytes:
-    deserialized = serializer.unmarshall(serialized, clazz)
-    result = reprojection(deserialized, crs_to)
-    # TODO: optimisation, don't update, if nothing changed
-    reserialised = serializer.marshall(result, clazz)
-    return reserialised
 
 def reprojection_update(db: Database, crs_to: str, batch_size=100_000, max_mem=4 * 1024 ** 3):
     # Within this function we are reading and writing towards the target database.
@@ -107,24 +102,24 @@ def get_transformer_by_srs_name(location, crs_to) -> Transformer:
         return None
 
     mapping = f"{srs_name}_{crs_to}"
-    transformer = transformers.setdefault(mapping, None)
+    transformer = transformers.get(mapping, None)
     if transformer is None:
         try:
             transformer = Transformer.from_crs(srs_name, crs_to) # TODO: Test if we can use accuracy instead of quantitize later
         except CRSError:
             # TODO: Implement logging rule that handles error
-            log_once(logging.ERROR, f"Unknown transformation {srs_name} for {crs_to}, we now assume WGS84, and hope the target is available")
+            log_once(logging.ERROR, f"Unknown transformation {srs_name} for {crs_to}", f"Unknown transformation {srs_name} for {crs_to}, we now assume WGS84, and hope the target is available")
             transformer = Transformer.from_crs('urn:ogc:def:crs:EPSG::4326', crs_to)
             pass
         except:
-            log_once(logging.ERROR, f"Unknown transformation {srs_name} for {crs_to}, we now assume WGS84, and hope the target is available")
+            log_once(logging.ERROR, f"Unknown transformation {srs_name} for {crs_to}", f"Unknown transformation {srs_name} for {crs_to}, we now assume WGS84, and hope the target is available")
             transformer = Transformer.from_crs('urn:ogc:def:crs:EPSG::4326', crs_to)
             pass
 
         transformers[mapping] = transformer
     return transformer
 
-def project_location_4326(location, quantize='0.000001'):
+def project_location_4326(location: LocationStructure2, quantize: str='0.000001') -> None:
     crs_to = 'urn:ogc:def:crs:EPSG::4326'
     if location.pos is not None:
         transformer = get_transformer_by_srs_name(location, crs_to)
@@ -142,7 +137,7 @@ def project_location_4326(location, quantize='0.000001'):
     elif location.srs_name not in (None, 'EPSG:4326', 'urn:ogc:def:crs:EPSG::4326'):
         print("TODO: Crazy not WGS84")
 
-def project_location(location: LocationStructure2, crs_to: str, quantize='0.000001'):
+def project_location(location: LocationStructure2, crs_to: str, quantize: str='0.000001') -> None:
     if location.srs_name == crs_to:
         return
 
@@ -168,7 +163,7 @@ def project_location(location: LocationStructure2, crs_to: str, quantize='0.0000
         print("TODO: Crazy not WGS84")
 
 
-def project_linestring2(transformer, linestring):
+def project_linestring2(transformer: Transformer, linestring: LineString) -> None:
     # TODO: Refactor arguments
     srs_dimension = linestring.srs_dimension if hasattr(linestring, 'srs_dimension') and linestring.srs_dimension else 2
     xx = []
@@ -194,7 +189,7 @@ def project_linestring2(transformer, linestring):
 
     # TODO: I would really want to apply the crs_to here
 
-def project_polygon(polygon: Polygon, crs_to):
+def project_polygon(polygon: Polygon, crs_to: str) -> None:
     if polygon.srs_name == crs_to:
         return
 

@@ -8,17 +8,17 @@ from xsdata.formats.dataclass.parsers.config import ParserConfig
 from xsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
 from xsdata.formats.dataclass.serializers import XmlSerializer
 from xsdata.formats.dataclass.serializers.config import SerializerConfig
-from xsdata.models.datatype import XmlDuration, XmlTime
+from xsdata.models.datatype import XmlDuration
 
 from netex import ServiceJourney, ServiceJourneyPattern, StopPointInJourneyPattern, TimetabledPassingTime, \
-    PointsInJourneyPatternRelStructure, Codespace, TimetabledPassingTimesRelStructure, \
-    PointInJourneyPatternRef, ServiceJourneyPatternRef, Call, MultilingualString, RouteView, Version, TimeDemandType, \
-    DepartureStructure, ArrivalStructure, TimingLink, ScheduledStopPoint, TimingPointRefStructure, \
+    PointsInJourneyPatternRelStructure, Codespace, \
+    Call, Version, TimeDemandType, \
+    TimingLink, ScheduledStopPoint, TimingPointRefStructure, \
     JourneyRunTime, JourneyWaitTime, JourneyRunTimesRelStructure, TimingLinkRef, JourneyWaitTimesRelStructure, \
     ScheduledStopPointRef, TimingLinkRefStructure, PublicationDelivery, GeneralFrame, ServiceLink, \
     TimingPointInJourneyPattern
-from netexio.dbaccess import load_local, write_objects
-from utils.refs import getRef, getIndex, getId, getFakeRef
+from netexio.dbaccess import load_local
+from utils.refs import getRef, getId, getFakeRef
 
 
 class TimeDemandTypesProfile:
@@ -66,8 +66,8 @@ class TimeDemandTypesProfile:
     def getTimeDemandTypeHash(tdt: TimeDemandType):
         # TODO: REVIEW and replace with hashlib.sha256 digest!!
         # TODO: Check if the output of this code is the same as inline
-        l = [(x.run_time, x.timing_link_ref.ref) for x in tdt.run_times.journey_run_time] + [(x.wait_time, x.timing_point_ref_or_scheduled_stop_point_ref_or_parking_point_ref_or_relief_point_ref.ref) for x in tdt.wait_times.journey_wait_time]
-        return hash(l)
+        run_times = [(x.run_time, x.timing_link_ref.ref) for x in tdt.run_times.journey_run_time] + [(x.wait_time, x.timing_point_ref_or_scheduled_stop_point_ref_or_parking_point_ref_or_relief_point_ref.ref) for x in tdt.wait_times.journey_wait_time]
+        return hash(run_times)
 
     @staticmethod
     def getTimeDemandTypeHash2(native_runtime: List[Tuple[XmlDuration, str,]], native_waittime: List[Tuple[XmlDuration, str,]]):
@@ -113,7 +113,7 @@ class TimeDemandTypesProfile:
                 if len(tdt.wait_times.journey_wait_time) == 0:
                     tdt.wait_times = None
 
-                write_objects(write_con, [tdt], False, False)
+                write_con.insert_one_object(tdt)
             else:
                 tdt = tdt[0]
 
@@ -153,40 +153,6 @@ class TimeDemandTypesProfile:
             tdt = time_demand_types[time_demand_types_hash[tdt_hash]]
 
         service_journey.time_demand_type_ref = getRef(tdt)
-
-    def getTimeDemandTypeByDatedCalls(self, service_journey: ServiceJourney, time_demand_types: Dict[str, TimeDemandType], time_demand_types_hash: Dict[int, str], ssps: Dict[str, ScheduledStopPoint], tls: Dict[str, TimingLink]):
-        dated_calls: List[DatedCall] = sorted(service_journey.calls.call, key=lambda c: c.order)
-        run_times: List[Tuple[XmlDuration, str,]] = []
-        wait_times: List[Tuple[XmlDuration, str,]] = []
-
-        for i in range(0, len(dated_calls) - 1):
-            run_time = XmlDuration(
-                value="PT{:d}S".format(TimeDemandTypesProfile.getRunTimeDatedCall(dated_calls[i], dated_calls[i + 1])))
-            wait_time = XmlDuration(value="PT{:d}S".format(TimeDemandTypesProfile.getWaitTimeDatedCall(dated_calls[i])))
-            ssp = ssps[dated_calls[
-                i].fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view.ref]
-            ssp_next = ssps[dated_calls[
-                i + 1].fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view.ref]
-
-            if dated_calls[i].onward_timing_link_view and dated_calls[i].onward_timing_link_view.timing_link_ref and \
-                    dated_calls[i].onward_timing_link_view.timing_link_ref in tls:
-                tl_ref = dated_calls[i].onward_timing_link_view.timing_link_ref
-            else:
-                tl_ref = getId(TimingLink, self.codespace,
-                               TimeDemandTypesProfile.getHexHash(hash(ssp.id + "-" + ssp_next.id)))
-
-            if tl_ref not in tls:
-                tls[tl_ref] = TimingLink(id=getId(TimingLink, self.codespace,
-                                                  TimeDemandTypesProfile.getHexHash(hash(ssp.id + "-" + ssp_next.id))),
-                                         version=self.version.version,
-                                         from_point_ref=getRef(ssp, TimingPointRefStructure),
-                                         to_point_ref=getRef(ssp_next, TimingPointRefStructure))
-
-            run_times.append((run_time, tl_ref,))
-            wait_times.append((wait_time, ssp.id,))
-
-        self.getTimeDemandTypeByTimes(service_journey, time_demand_types, time_demand_types_hash, ssps, tls, run_times, wait_times)
-        service_journey.departure_time = dated_calls[0].departure.time
 
 
     def getTimeDemandTypeByCalls(self, service_journey: ServiceJourney, time_demand_types: Dict[str, TimeDemandType], time_demand_types_hash: Dict[int, str], ssps: Dict[str, ScheduledStopPoint], tls: Dict[str, TimingLink]):
@@ -253,7 +219,7 @@ class TimeDemandTypesProfile:
                                     from_point_ref=getRef(ssp, TimingPointRefStructure),
                                     to_point_ref=getRef(ssp_next, TimingPointRefStructure))
 
-                    write_objects(write_con, [tl], empty=False, many=False)
+                    write_con.insert_one_object(tl)
 
             run_times.append((run_time, tl_ref,))
             wait_times.append((wait_time, ssp.id,))
@@ -341,7 +307,7 @@ class TimeDemandTypesProfile:
                         tl = load_local(write_con, TimingLink, 1, tl_ref)
                         if len(tl) == 0:
                             tl = TimeDemandTypesProfile.getObjectFromObject(sl, TimingLink, tl_ref)
-                            write_objects(write_con, [tl], False, False)
+                            write_con.insert_one_object(tl)
 
                     pis.onward_service_link_ref = None
                 else:
@@ -434,12 +400,11 @@ class TimeDemandTypesProfile:
                                                     version=self.version.version,
                                                     from_point_ref=getRef(ssp, TimingPointRefStructure),
                                                     to_point_ref=getRef(ssp_next, TimingPointRefStructure))
-
-                                    write_objects(write_con, [tl], empty=False, many=False)
+                                    write_con.insert_one_object(tl)
 
                             pis.onward_timing_link_ref=getRef(tl, TimingLinkRefStructure)
 
-                write_objects(write_con, [sjp], empty=False, many=False)
+                write_con.insert_one_object(sjp)
             return sjp
 
         if isinstance(service_journey.calls.call[0], Call):
@@ -466,7 +431,7 @@ class TimeDemandTypesProfile:
                                         from_point_ref=getRef(ssp, TimingPointRefStructure),
                                         to_point_ref=getRef(ssp_next, TimingPointRefStructure))
 
-                        write_objects(write_con, [tl], empty=False, many=False)
+                        write_con.insert_one_object(tl)
 
                 ssps_in_seq.append(ssp)
                 onward_tls.append(tl_ref)
@@ -499,7 +464,7 @@ class TimeDemandTypesProfile:
 
             service_journey.journey_pattern_ref = getRef(sjp)
 
-            write_objects(write_con, [sjp], empty=False, many=False)
+            write_con.insert_one_object(sjp)
             return sjp
 
     def getServiceJourneyPattern(self, service_journey: ServiceJourney, service_journey_patterns: Dict[str, ServiceJourneyPattern], service_journey_patterns_hash: Dict[int, str],

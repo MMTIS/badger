@@ -20,7 +20,7 @@ from netex import (
 
 
 def ref_version_hash(self: VersionOfObjectRefStructure) -> int:
-    assert self.ref is None
+    assert self.ref is None, "Reference must not be none"
     return hash(self.ref + ";" + self.version or "any")
 
 
@@ -50,10 +50,10 @@ def vc_refs_hash(self: ValidityConditionsRelStructure) -> int:
     refs = []
     for vc in self.choice:
         if hasattr(vc, "id"):
-            assert vc.id is not None
+            assert vc.id is not None, "VC does not have an id"
             refs.append(vc.id + ";" + (vc.version or "any"))
         elif hasattr(vc, "ref"):
-            assert vc.ref is not None
+            assert vc.ref is not None, "VC does not have a ref"
             refs.append(vc.ref + ";" + (vc.version or "any"))
 
     return hash("\n".join(refs))
@@ -63,7 +63,7 @@ setattr(ValidityConditionsRelStructure, "__hash__", vc_refs_hash)
 
 
 def id_version_hash(self: EntityInVersion) -> int:
-    assert self.id is not None and self.version is not None
+    assert self.id is not None and self.version is not None, "Id and version must not be None"
     return hash(self.id + ";" + (self.version or "any"))
 
 

@@ -5,7 +5,7 @@ from datetime import datetime, date, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from functools import partial
 from multiprocessing import Pool
-from typing import Generator, List, Dict, Set
+from typing import Generator, List, Dict, Set, Any
 import itertools
 
 from dateutil.rrule import rrule, DAILY
@@ -50,8 +50,7 @@ from netex import PublicationDelivery, ParticipantRef, MultilingualString, DataO
 
 from netexio.database import Database
 
-from netexio.dbaccess import load_generator, load_local, write_generator, write_objects, \
-    recursive_attributes, fetch_references_classes_generator
+from netexio.dbaccess import load_generator, load_local, recursive_attributes, fetch_references_classes_generator
 from utils.refs import getIndex, getRef, getId, getFakeRef
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
@@ -59,7 +58,9 @@ from transformers.projection import project_location_4326, project_polygon
 from transformers.timetabled_passing_time import infer_id_and_order_and_apply
 from utils.utils import project
 
-EPIP_CLASSES = [ "Codespace", "StopPlace", "RoutePoint", "RouteLink", "Routes", "ScheduledStopPoint", "Operator", "VehicleType", "Line", "Direction", "DestinationDisplay", "ServiceJourney", "ServiceJourneyPattern", "PassengerStopAssignment", "Notice", "NoticeAssignment", "AvailabilityCondition" ]
+EPIP_CLASSES = {"Codespace", "StopPlace", "RoutePoint", "RouteLink", "Routes", "ScheduledStopPoint", "Operator",
+                "VehicleType", "Line", "Direction", "DestinationDisplay", "ServiceJourney", "ServiceJourneyPattern",
+                "PassengerStopAssignment", "Notice", "NoticeAssignment", "AvailabilityCondition"}
 
 def epip_line_generator(db_read: Database, db_write: Database, generator_defaults: dict, pool: Pool):
     print(sys._getframe().f_code.co_name)
@@ -300,7 +301,8 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
 
     return ServiceJourneyPattern(id=getId(ServiceJourneyPattern, generator_defaults['codespace'], id), version=sj.version,
                                  route_ref_or_route_view=RouteView(flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view),
-                                 direction_type=sj.direction_type, destination_display_ref_or_destination_display_view=sj.journey_pattern_view.destination_display_ref_or_destination_display_view if sj.journey_pattern_view else None,
+                                 direction_type=sj.direction_type.value, # https://github.com/NeTEx-CEN/NeTEx/issues/842
+                                 destination_display_ref_or_destination_display_view=sj.journey_pattern_view.destination_display_ref_or_destination_display_view if sj.journey_pattern_view else None,
                                  points_in_sequence=PointsInJourneyPatternRelStructure(point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern=piss))
 
 
@@ -455,7 +457,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
     # uic_operating_periods: List[UicOperatingPeriod] = []
     # day_type_assignments: List[DayTypeAssignment] = []
 
-    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read):
+    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read) -> None:
         sj_line_ref = None
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None and (isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineRef) or isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, LineRef)):
             sj_line_ref = service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
@@ -493,7 +495,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict):
+    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict) -> ServiceJourney:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
@@ -539,7 +541,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
 
             if len(route_point_projection) > 0:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteRef):
-                    routes: list[Route] = load_local(db_read, Route, limit=1, filter=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False)
+                    routes: list[Route] = load_local(db_read, Route, limit=1, filter_id=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False)
                     if len(routes) > 0:
                         RoutesProfile.projectRouteToServiceLinks(db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults)
 
@@ -555,7 +557,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
 
         # TODO: AvailabilityCondition -> Uic
 
-        sj.validity_conditions_or_valid_between = None
+        sj.validity_conditions_or_valid_between = []
         sj.time_demand_type_ref = None
         sj.key_list = None
         sj.private_code = None
@@ -593,7 +595,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
     log_all(logging.INFO, "Service journeys for now ")
     db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
 
-def epip_service_calendar(db_read: Database, db_write: Database, generator_defaults: dict):
+def epip_service_calendar(db_read: Database, db_write: Database, generator_defaults: dict) -> None:
     log_all(logging.INFO, "Calendar creation...")
 
     service_calendars: List[ServiceCalendar] = load_local(db_read, ServiceCalendar)
@@ -760,7 +762,7 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
     codespace_ref_or_codespace = GeneratorTester(load_generator(db_epip, Codespace))
     data_source = GeneratorTester(load_generator(db_epip, DataSource))
-    organisation_or_transport_organisation = load_local(db_epip, Authority) + load_local(db_epip, Operator)
+    organisation_or_transport_organisation: list[Any] = load_local(db_epip, Authority) + load_local(db_epip, Operator)
     value_set = GeneratorTester(load_generator(db_epip, ValueSet))
     transport_administrative_zone = GeneratorTester(load_generator(db_epip, TransportAdministrativeZone))
 
