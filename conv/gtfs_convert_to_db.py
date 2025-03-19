@@ -1222,9 +1222,9 @@ class GtfsNeTexProfile(CallsProfile):
             return None
 
         elif direction_id == 1:
-            return DirectiontType(DirectionTypeEnumeration.INBOUND)
+            return DirectionType(value=DirectionTypeEnumeration.INBOUND)
 
-        return DirectionType(DirectionTypeEnumeration.OUTBOUND)
+        return DirectionType(value=DirectionTypeEnumeration.OUTBOUND)
 
     @staticmethod
     def wheelchairToNeTEx(wheelchair_accessible: int) -> LimitationStatusEnumeration:
