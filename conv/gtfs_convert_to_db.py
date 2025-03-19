@@ -2,7 +2,7 @@ import datetime
 import hashlib
 import math
 from _decimal import Decimal
-from typing import List, Generator, TypeVar, Any
+from typing import List, Generator, TypeVar, Any, Iterable
 
 import duckdb
 import numpy
@@ -42,22 +42,29 @@ from netex import Codespace, DataSource, MultilingualString, Version, VersionFra
     LineInDirectionRef, EmptyType2, StopPlaceRef, ServiceJourneyRefStructure, PrivateCodes, DayTypeAssignment, \
     DayTypeRefsRelStructure, ServiceCalendarFrame, DayTypesInFrameRelStructure, \
     OperatingPeriodsInFrameRelStructure, DayTypeAssignmentsInFrameRelStructure, DayTypeRef, OperatingPeriod, \
-    PublicCodeStructure, GeneralFrame
+    PublicCodeStructure, GeneralFrame, DirectionType
 
 from utils.refs import getRef, getIndex, getBitString2, getFakeRef, getOptionalString, getId
-from utils.aux_logging import *
+from utils.aux_logging import log_all, prepare_logger
+import logging
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Any)
 
-def get_or_none(l: list[Any] | None, i: int, cast_clazz: type[T] | None=None) -> T | None:
+def get_or_none(l: list[Any] | None, i: int, cast_clazz: type[T] | None=None) -> Any | None:
     if l is None:
         return l
 
-    if cast_clazz is not None:
-        return cast_clazz(l[i])
+    if i >= len(l):  # Prevent index errors
+        return None
 
     if isinstance(l[i], NAType):
         return None
+
+    if cast_clazz is not None:
+        if not isinstance(cast_clazz, type) or cast_clazz is object:
+            raise TypeError(f"Invalid cast class: {cast_clazz}")
+
+        return cast_clazz(l[i])
 
     return l[i]
 
@@ -444,7 +451,7 @@ class GtfsNeTexProfile(CallsProfile):
                                            name=MultilingualString(value=stop_names[i]),
                                            public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[
                                                                                                        i] is not None else None,
-                                           description=getOptionalString(get_or_none(stop_descs, i)),
+                                           description=[getOptionalString(get_or_none(stop_descs, i))], # TODO: description list crazyness
                                            private_codes=PrivateCodes(
                                                private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]) if
                                            location_types[i] == 1 else None,
@@ -481,7 +488,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                name=MultilingualString(value=stop_names[i]),
                                                public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[
                                                                                                            i] is not None else None,
-                                               description=getOptionalString(get_or_none(stop_descs, i)),
+                                               description=[getOptionalString(get_or_none(stop_descs, i))],  # TODO: description list crazyness
                                                private_codes=PrivateCodes(private_code=[
                                                    PrivateCode(value=stop_ids[i], type_value="stop_id")]) if
                                                location_types[i] == 1 else None,
@@ -525,7 +532,7 @@ class GtfsNeTexProfile(CallsProfile):
                                 name=MultilingualString(value=stop_names[i]),
                                 public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[
                                                                                             i] is not None else None,
-                                description=getOptionalString(get_or_none(stop_descs, i)),
+                                description=[getOptionalString(get_or_none(stop_descs, i))],  # TODO: description list crazyness
                                 private_codes=PrivateCodes(
                                     private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
                                 parent_zone_ref=ZoneRefStructure(ref=zone_ids[i], version_ref="EXTERNAL") if zone_ids[
@@ -570,7 +577,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                             name=MultilingualString(value=stop_names[i]),
                                                             public_code=PublicCodeStructure(value=stop_codes[i]) if
                                                             stop_codes[i] is not None else None,
-                                                            description=getOptionalString(get_or_none(stop_descs, i)),
+                                                            description=[getOptionalString(get_or_none(stop_descs, i))],  # TODO: description list crazyness
                                                             private_codes=PrivateCodes(private_code=[
                                                                 PrivateCode(value=stop_ids[i], type_value="stop_id")]),
                                                             parent_zone_ref=ZoneRefStructure(ref=zone_ids[i],
@@ -611,7 +618,7 @@ class GtfsNeTexProfile(CallsProfile):
                     access_space = AccessSpace(id=getId(AccessSpace, self.codespace, stop_ids[i]),
                                                version=self.version.version,
                                                name=MultilingualString(value=stop_names[i]),
-                                               description=getOptionalString(get_or_none(stop_descs, i)),
+                                               description=[getOptionalString(get_or_none(stop_descs, i))],  # TODO: description list crazyness
                                                private_codes=PrivateCodes(
                                                    private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
                                                parent_zone_ref=ZoneRefStructure(ref=zone_ids[i],
@@ -642,13 +649,13 @@ class GtfsNeTexProfile(CallsProfile):
 
         return list(stop_places.values()), passenger_stop_assignments
 
-    def get_shape_id(self, shape_id):
+    def get_shape_id(self, shape_id: str) -> str:
         if ':Route:' in shape_id:
             return shape_id
         else:
             return getId(Route, self.codespace, shape_id)
 
-    def get_shape_id_lsp(self, shape_id):
+    def get_shape_id_lsp(self, shape_id: str) -> str:
         if ':Route:' in shape_id:
             return shape_id.replace(':Route:', ':LinkSequenceProjection:')
         else:
@@ -744,7 +751,7 @@ class GtfsNeTexProfile(CallsProfile):
                         route.private_code = PrivateCode(value=shape_ids[i], type_value="shape_id")
                         route.points_in_sequence = PointsOnRouteRelStructure()
                         if line_id:
-                            line = lines[get_route_id(line_id)]  # TODO: Validate
+                            line = lines[self.get_route_id(line_id)]  # TODO: Validate
                             route.line_ref = getRef(line, LineRef)
 
                         routes[route_id] = route
@@ -1210,14 +1217,14 @@ class GtfsNeTexProfile(CallsProfile):
         return (XmlTime(hour=hour_i % 24, minute=int(minute), second=int(second)), day_offset)
 
     @staticmethod
-    def directionToNeTEx(direction_id: int) -> DirectionTypeEnumeration | None:
+    def directionToNeTEx(direction_id: int) -> DirectionType | None:
         if direction_id is None:
             return None
 
         elif direction_id == 1:
-            return DirectionTypeEnumeration.INBOUND
+            return DirectiontType(DirectionTypeEnumeration.INBOUND)
 
-        return DirectionTypeEnumeration.OUTBOUND
+        return DirectionType(DirectionTypeEnumeration.OUTBOUND)
 
     @staticmethod
     def wheelchairToNeTEx(wheelchair_accessible: int) -> LimitationStatusEnumeration:
@@ -2406,7 +2413,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return publication_delivery
 
-    def full(self):
+    def full(self) -> None:
         with open('netex-output/out.xml', 'w', encoding='utf-8') as out:
             operators = self.getOperators()
             stop_areas = self.getStopAreas()
@@ -2426,7 +2433,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                               service_journeys, [], day_types, operating_periods,
                                                               day_type_assignments), self.ns_map)
 
-    def incremental(self):
+    def incremental(self) -> None:
         for line in self.lines:
             with open('netex-output/{}.xml'.format(line.id.replace(':', '_')), 'w', encoding='utf-8') as out:
                 operators = self.getOperators({
@@ -2457,7 +2464,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                                   service_journeys, day_types, operating_periods,
                                                                   day_type_assignments), self.ns_map)
 
-    def database(self, con):
+    def database(self, con: Database) -> None:
         con.insert_objects_on_queue(Line, self.lines)
 
         # This still sucks :-) shape is in every ServiceJourney now
@@ -2502,7 +2509,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         con.insert_objects_on_queue(InterchangeRule, self.getInterchangeRules())
 
-    def __init__(self, conn, serializer):
+    def __init__(self, conn: Database, serializer: XmlSerializer):
         self.conn = conn
         self.serializer = serializer
 
@@ -2527,7 +2534,7 @@ class GtfsNeTexProfile(CallsProfile):
         # self.time_demand_types = self.getTimeDemandTypes()
 
 
-def main(database_gtfs: str, database_netex: str):
+def main(database_gtfs: str, database_netex: str) -> None:
     serializer_config = SerializerConfig(ignore_default_attributes=True)
     serializer_config.pretty_print = True
     serializer_config.ignore_default_attributes = True

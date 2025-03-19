@@ -25,9 +25,8 @@ Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
 Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-def getRef(obj: Tid, klass: type[EntityStructure] | None = None) -> VersionOfObjectRefStructure | None:
-    if obj is None:
-        return None
+def getRef(obj: Tid, klass: type[VersionOfObjectRefStructure] | None = None) -> VersionOfObjectRefStructure:
+    assert obj is not None, "A reference must be made from an existing object."
 
     if klass is None:
         asobj = type(obj).__name__ + "Ref"  # Was: RefStructure
@@ -42,7 +41,7 @@ def getRef(obj: Tid, klass: type[EntityStructure] | None = None) -> VersionOfObj
         assert obj.ref is not None, "Object does not have a ref"
         instance = klass(ref=obj.ref)
     else:
-        return None
+        assert False, "Object does not have an id or ref"
 
     if hasattr(instance, "order") and hasattr(obj, "order"):
         instance.order = obj.order
@@ -84,15 +83,14 @@ def getClassFromRefClass(ref: Tref) -> Any:
     return globals()[klass]
 
 
-def getFakeRef(id: str, klass: type[Tref], version: str, version_ref: str | None = None) -> Tref | None:
+def getFakeRef(id: str, klass: type[Tref], version: str | None, version_ref: str | None = None) -> Tref:
+    assert id is not None, "A reference must start with a valid id"
     return (
         klass(
             ref=id,
             version=version if version_ref is None else None,
             version_ref=version_ref,
         )
-        if id is None
-        else None
     )
 
 
