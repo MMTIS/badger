@@ -6,12 +6,17 @@ from utils.aux_logging import prepare_logger, log_all
 import traceback
 from configuration import gtfs_validator
 
+def is_existing_path(path):
+    return os.path.exists(path)
 
 def main(gtfs_file: str, res_folder: str) -> None:
     # Build the shell command
     validator_path = gtfs_validator
     if os.path.exists(validator_path):
         command: str = f"java -jar {validator_path} -i {gtfs_file} -o {res_folder}"
+        if not is_existing_path(gtfs_file) or not is_existing_path(res_folder):
+            log_all(logging.ERROR,f"{gtfs_file} or  {res_folder} not valid. Stopping")
+            raise
         log_all(logging.INFO, command)
         # Execute the command in the shell
         subprocess.run(command, shell=True)
