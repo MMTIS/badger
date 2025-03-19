@@ -11,7 +11,8 @@
         {"step":5,"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.lmdb %%dir%%/05-netex-database.lmdb"},
         {"step":6,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.lmdb %%dir%%/epip_output.xml"},
         {"step":7,"script": "tools.xml_validator", "args": "%%dir%%/epip_output.xml ../schema/netex/xsd/NeTEx_publication.xsd"},
-        {"step":8,"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
+        {"step":8,"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"},
+        {"step":9,"script": "tools.netex_check_assertions", "args": "./assertions/general-assertions.txt %%dir%%/epip_output.xml"}
         ]
     },
            {
@@ -23,11 +24,13 @@
         {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
         {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
         {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-epip.xml.gz"},
-        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb True"},
-        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
-        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
-        {"step":9,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"step":10,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+        {"step":6,"script": "tools.netex_check_assertions", "args": "./assertions/general-assertions.txt %%dir%%/05-epip.xml.gz"},
+        {"step":7,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
+        {"step":9,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":10,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":11,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+
          ]
   },
     {
