@@ -50,32 +50,6 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 # TODO: For all load_ functions filter by id + version, not only id
 
 
-# TODO: This must be fixed, this is an incorrect implementation!!
-def load_embedded(
-    db: Database, clazz: type[Tid], filter_id: str
-) -> Iterable[tuple[str, str, str]]:
-    # TODO: maybe return something here, which includes *ALL* objects that are embedded within this object, so it does not have to be resolved anymore
-    objectname = get_object_name(clazz)
-
-    with db.env.begin(
-        db=db.env.open_db(b"_embedding"), buffers=True, write=False
-    ) as txn:
-        cursor = txn.cursor()
-        for key, value in cursor:
-            # parent_class, parent_id, parent_version, *_ = pickle.loads(key)
-            (
-                parent_class,
-                parent_id,
-                parent_version,
-                embedding_class,
-                embedding_id,
-                embedding_version,
-                *_,
-            ) = pickle.loads(value)
-            if embedding_id == filter_id and embedding_class == objectname:
-                yield parent_id, parent_version, parent_class
-
-
 def load_referencing(
     db: Database, clazz: type[Tid], filter_id: str
 ) -> Iterable[tuple[str, str, str]]:
@@ -262,7 +236,7 @@ def recursive_resolve(
                         )  # TODO: not only consider the first
                     else:
                         # print(obj.ref)
-                        resolved_parents = load_embedded(db, clazz, filter_id=obj.ref)
+                        resolved_parents = load_embedded_transparent_generator(db, clazz, filter=obj.ref)
                         for y in resolved_parents:
                             already_done = False
                             for x in resolved:
