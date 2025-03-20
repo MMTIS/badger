@@ -15,7 +15,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -36,7 +36,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -56,7 +56,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -78,7 +78,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -100,7 +100,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -121,7 +121,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -254,7 +254,7 @@
         {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.lmdb "},
         {"step":4,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"step":5,"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":7,"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.lmdb %%dir%%/07-netex-database.lmdb"},
         {"step":8,"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.lmdb %%dir%%/08-%%block%%-netex.xml.gz"},
         {"step":9,"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.lmdb "},
@@ -275,7 +275,7 @@
         {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.lmdb "},
         {"step":4,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"step":5,"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":7,"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.lmdb %%dir%%/07-netex-database.lmdb"},
         {"step":8,"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.lmdb %%dir%%/08-%%block%%-netex.xml.gz"},
         {"step":9,"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.lmdb "},

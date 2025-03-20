@@ -30,7 +30,7 @@ defaults["version"] = 1
 input_dir = "d:/input"  # the standard directory for files to load (depreciated)
 processing_data = "d:/aux_testing_processing"   #the root folder for processing
 list_scripts = "./tool_scripts/list_scripts.txt"  # place where the list processing scripts are stored
-gtfs_validator = "../tools/gtfs-validator-cli.jar"  # location of the gtfs validator.jar.
+gtfs_validator = "tools/gtfs-validator-cli.jar"  # location of the gtfs validator.jar.
 
 # ftp connection information for the ftp upload tool
 ftpconns = {
