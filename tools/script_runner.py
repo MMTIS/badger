@@ -294,7 +294,9 @@ def main(
         for script in scripts:
             step = step + 1
             if this_step==99999:
-                if step<begin_step:
+                if "download_urls" not in block.keys() and (
+                        step < begin_step
+                ):  # if it is a list we always begin with 1 the begin_step is then used within the list
                     continue
                 if step>end_step:
                     continue
@@ -303,10 +305,7 @@ def main(
                     continue
             if blockstop:
                 break
-            if "download_urls" not in block.keys() and (
-                step < begin_step
-            ):  # if it is a list we always begin with 1 the begin_step is then used within the list
-                continue
+
             if blockstop:
                 break
             start_time = time.time()
