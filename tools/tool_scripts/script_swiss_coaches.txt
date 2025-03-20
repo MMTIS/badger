@@ -43,7 +43,7 @@
         {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-epip.lmdb %%dir%%/epip_netex_fernbusse.xml.zip"},
         {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/epip_netex_fernbusse.xml.zip] %%dir%%/06-gtfs.lmdb "},
         {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
-        {"step":8,"script": "convgtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/gtfs_fernbusse.zip"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/gtfs_fernbusse.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/epip_netex_fernbusse.xml.zip"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_fernbusse.xml.zip"},
         {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip schema/netex-xsd/xsd/NeTEx_publication.xsd"},
