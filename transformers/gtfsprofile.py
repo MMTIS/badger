@@ -610,6 +610,9 @@ class GtfsProfile:
 
     @staticmethod
     def addDayOffset(time: datetime.time, day_offset: int | None) -> str:
+        if time is None:
+            return ''
+
         if day_offset is None:
             return str(time)
 
