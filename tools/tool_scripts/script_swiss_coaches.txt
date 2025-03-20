@@ -46,7 +46,7 @@
         {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/gtfs_fernbusse.zip"},
         {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/epip_netex_fernbusse.xml.zip"},
         {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_fernbusse.xml.zip"},
-        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip schema/netex-xsd/xsd/NeTEx_publication.xsd"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%"},
         {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%/13-%%block%%-map.html 1"},
         {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%/13-%%block%%-map.html 1"},
