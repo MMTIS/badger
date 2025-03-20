@@ -2,6 +2,7 @@ import hashlib
 import logging
 import sys
 import warnings
+from copy import deepcopy
 from datetime import timedelta, datetime, time
 from typing import Generator, TypeVar, Iterable, Any, Iterator
 import copy
@@ -230,9 +231,14 @@ def calendars_to_daytype(db_read: Database, sj: ServiceJourney) -> DayTypeRefsRe
         return ValidityConditionsRelStructure(choice=vcs2)
 
     elif sj.day_types is not None:
+        # TODO: check if can be removed
+
         if len(sj.day_types.day_type_ref) > 1:
+            full_day_types = copy.deepcopy(sj.day_types)
             ref = hashlib.md5((';'.join([dt.ref for dt in sj.day_types.day_type_ref])).encode('utf-8')).hexdigest()[0:5]
             sj.day_types.day_type_ref = [DayTypeRef(ref=ref, version=sj.version)]
+            return full_day_types
+
         # else:
         # This would be a no op, the DayType can be reused.
 
@@ -530,8 +536,60 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                         yield day_type, day_type_assignments, operating_periods
 
                 else:
-                    # TODO
-                    log_once(logging.WARN, "dt-1", "We cannot yet handle day type aggregation")
+                    log_once(logging.WARN, "dt-1", "Experimental: check aggregated calendar results!")
+
+                    # From content perspective, this does not aggregate (like property of day)
+                    id = hashlib.md5((';'.join([dt.ref for dt in option.day_type_ref])).encode('utf-8')).hexdigest()[0:5]
+                    aggregated_day_type = DayType(id=id, version=option.day_type_ref[0].version)
+                    aggregated_day_type_ref = getRef(aggregated_day_type)
+
+                    for day_type_ref in option.day_type_ref:
+                        day_type = load_local(db_read, DayType, limit=1, filter_id=day_type_ref.ref, embedding=True)[0]
+                        day_type_assignments = copy.deepcopy(dtas[day_type.id])
+                        uic_operating_periods = []
+                        operating_periods = []
+                        operating_days = []
+
+                        for dta in day_type_assignments:
+                            # dta = copy.deepcopy(dta_orig) # Because there might be a case where there is a non-aggregated variant
+                            dta.id += '_' + aggregated_day_type.id
+                            dta.day_type_ref = aggregated_day_type_ref
+                            ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
+
+                            # TODO: Fix this kind of pattern by abstracting the reference fetching
+                            if isinstance(ref, UicOperatingPeriodRef) or (
+                                    isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'):
+                                uic_operating_periods.append(
+                                    load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True,
+                                               embedding=True)[0])
+                            elif isinstance(ref, OperatingPeriodRef):
+                                r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True,
+                                               embedding=True)
+                                if len(r) > 0:
+                                    operating_periods.append(r[0])
+                                else:
+                                    # TODO: we must be able to query child classes directly.
+                                    r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True,
+                                                   embedding=True)
+                                    if len(r) > 0:
+                                        uic_operating_periods.append(r[0])
+                                    else:
+                                        log_all(logging.ERROR, f"{ref} cannot be found.")
+                            elif isinstance(ref, OperatingDayRef):
+                                operating_days.append(
+                                    load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True,
+                                               embedding=True)[0])
+
+                        if len(uic_operating_periods) > 0 or len(operating_days) > 0:
+                            day_type, day_type_assignments, operating_period = gtfs_day_type(
+                                aggregated_day_type, day_type_assignments, operating_days, uic_operating_periods, operating_periods
+                            )
+                            if operating_period is not None:
+                                operating_period = [operating_period]
+
+                            yield aggregated_day_type, day_type_assignments, operating_period
+                        else:
+                            yield aggregated_day_type, day_type_assignments, operating_periods
 
     log_all(logging.INFO, "Processing Calendars")
     for day_type, day_type_assignments, operating_periods in query_daytype(db_read, calendar_combinations):
@@ -726,23 +784,24 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
 
 
 def gtfs_calendar2(service_id: str, day_type: DayType, operating_period: OperatingPeriod) -> Iterable[tuple[dict[str, Any] | None, dict[str, Any]] | None]:
-    yield tuple(
-        (
-            {
-                'service_id': service_id,
-                'monday': int(DayOfWeekEnumeration.MONDAY in day_type.properties.property_of_day[0].days_of_week),
-                'tuesday': int(DayOfWeekEnumeration.TUESDAY in day_type.properties.property_of_day[0].days_of_week),
-                'wednesday': int(DayOfWeekEnumeration.WEDNESDAY in day_type.properties.property_of_day[0].days_of_week),
-                'thursday': int(DayOfWeekEnumeration.THURSDAY in day_type.properties.property_of_day[0].days_of_week),
-                'friday': int(DayOfWeekEnumeration.FRIDAY in day_type.properties.property_of_day[0].days_of_week),
-                'saturday': int(DayOfWeekEnumeration.SATURDAY in day_type.properties.property_of_day[0].days_of_week),
-                'sunday': int(DayOfWeekEnumeration.SUNDAY in day_type.properties.property_of_day[0].days_of_week),
-                'start_date': str(operating_period.from_operating_day_ref_or_from_date.to_datetime().date()).replace('-', ''),
-                'end_date': str(operating_period.to_operating_day_ref_or_to_date.to_datetime().date()).replace('-', ''),
-            },
-            None,
+    if day_type.properties:
+        yield tuple(
+            (
+                {
+                    'service_id': service_id,
+                    'monday': int(DayOfWeekEnumeration.MONDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'tuesday': int(DayOfWeekEnumeration.TUESDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'wednesday': int(DayOfWeekEnumeration.WEDNESDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'thursday': int(DayOfWeekEnumeration.THURSDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'friday': int(DayOfWeekEnumeration.FRIDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'saturday': int(DayOfWeekEnumeration.SATURDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'sunday': int(DayOfWeekEnumeration.SUNDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'start_date': str(operating_period.from_operating_day_ref_or_from_date.to_datetime().date()).replace('-', ''),
+                    'end_date': str(operating_period.to_operating_day_ref_or_to_date.to_datetime().date()).replace('-', ''),
+                },
+                None,
+            )
         )
-    )
 
 
 def gtfs_calendar(service_id: str, uic_operating_period: UicOperatingPeriod):
