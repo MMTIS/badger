@@ -415,8 +415,27 @@ class CallsProfile:
                 arrival=ArrivalStructure(day_offset=timetabled_passing_time.arrival_day_offset, time=timetabled_passing_time.arrival_time),
                 departure=DepartureStructure(day_offset=timetabled_passing_time.departure_day_offset, time=timetabled_passing_time.departure_time),
             )
+
+            # GTFS has strange requirements
+            if order == 1:
+                if call.arrival.time is None:
+                    call.arrival.day_offset = call.departure.day_offset
+                    call.arrival.time = call.departure.time
+                elif call.departure.time is None:
+                    call.departure.day_offset = call.arrival.day_offset
+                    call.departure.time = call.arrival.time
+
             order += 1
             calls.call.append(call)
+
+        # GTFS has strange requirements
+        if call.arrival.time is None:
+            call.arrival.day_offset = call.departure.day_offset
+            call.arrival.time = call.departure.time
+        elif call.departure.time is None:
+            call.departure.day_offset = call.arrival.day_offset
+            call.departure.time = call.arrival.time
+
         service_journey.calls = calls
 
     def getTimeDemandTypes(self):
