@@ -360,8 +360,6 @@ class Database:
             self._insert_embedding_on_queue(obj)
 
     def insert_one_object(self, object: Tid) -> None:
-        if object.id == 'SBB:DataSource:SBB':
-            pass
         return self.insert_objects_on_queue(object.__class__, [object])
 
     def insert_raw_on_queue(self, objects: Iterable[tuple[lmdb._Database, bytes, bytes]]) -> None:
