@@ -1,3 +1,4 @@
+import logging
 from typing import List
 
 from xsdata.models.datatype import XmlDuration, XmlTime
@@ -39,7 +40,7 @@ from netex import (
 )
 from utils.refs import setIdVersion, getRef, getIndex
 from utils.utils import project
-from utils.aux_logging import log_print
+from utils.aux_logging import log_print, log_once
 
 
 class CallsProfile:
@@ -382,6 +383,28 @@ class CallsProfile:
         calls = CallsRelStructure(call=[])
         order = 1
         for timetabled_passing_time in service_journey.passing_times.timetabled_passing_time:
+
+            # TODO: This should NOT be done here. It should be done in preprocessing.
+            if timetabled_passing_time.point_in_journey_pattern_ref is None:
+                log_once(
+                    logging.WARN,
+                    "timetabledpassingtime lacks pointinjourneypattern",
+                    "TimetabledPassingTime has no explicit reference to ServiceJourneyPattern",
+                )
+                if len(
+                    service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
+                ) != len(service_journey.passing_times.timetabled_passing_time):
+                    log_once(logging.WARN, "timetabledpassingtimes do not align", "TimetabledPassingTime do not align with ServiceJourneyPattern")
+                    # Last resort would be to filter on StopPointInJourneyPattern and see if that aligns...
+                else:
+                    pis = (
+                        service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern[
+                            order - 1
+                        ]
+                    )
+                    timetabled_passing_time.id = f"{service_journey.id.replace("ServiceJourney", "TimetabledPassingTime")}_{order}"
+                    timetabled_passing_time.point_in_journey_pattern_ref = getRef(pis)
+
             call = Call(
                 id=timetabled_passing_time.id.replace(":TimetabledPassingTime:", ":Call:"),
                 order=order,
