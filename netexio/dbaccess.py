@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable, IO, Any, Literal
+from typing import TYPE_CHECKING, IO, Any, Literal, Generator
 import inspect
 
 if TYPE_CHECKING:
@@ -52,7 +52,7 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 
 def load_referencing(
     db: Database, clazz: type[Tid], filter_id: str
-) -> Iterable[tuple[str, str, str]]:
+) -> Generator[tuple[str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as txn:
@@ -71,7 +71,7 @@ def load_referencing(
 
 def load_referencing_inwards(
     db: Database, clazz: type[Tid], filter_id: str
-) -> Iterable[tuple[str, str, str]]:
+) -> Generator[tuple[str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing_inwards, buffers=True, write=False) as txn:
@@ -274,7 +274,7 @@ def recursive_resolve(
 
 def fetch_references_classes_generator(
     db: Database, classes: list[type[Tid]]
-) -> Iterable[Tid]:
+) -> Generator[Tid, None, None]:
     list_classes = {get_object_name(clazz) for clazz in classes}
     processed = set()
 
@@ -444,7 +444,7 @@ def load_generator(
     embedding: bool = True,
     parent: bool = False,
     cache: bool = True,
-) -> Iterable[Tid]:
+) -> Generator[Tid, None, None]:
     if db.env and db.open_db(clazz) is not None:
         with db.env.begin(write=False, buffers=True, db=db.open_db(clazz)) as txn:
             cursor = txn.cursor()
@@ -486,7 +486,7 @@ def load_embedded_transparent_generator(
     filter: str | None = None,
     parent: bool = False,
     cache: bool = True,
-) -> Iterable[Tid]:
+) -> Generator[Tid, None, None]:
     # TODO: Expensive for classes that are not available, it will do a complete sequential scan and for each time it will depicle each individual object
 
     if db.env:
@@ -582,7 +582,7 @@ def get_local_name(element: type[Tid]) -> str:
 
 def update_embedded_referencing(
     serializer: Serializer, deserialized: Tid
-) -> Iterable[tuple[type[Tid], str, str, type[Tid], str, str, str | None]]:
+) -> Generator[tuple[type[Tid], str, str, type[Tid], str, str, str | None], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
@@ -864,7 +864,7 @@ def insert_database(
 
 def recursive_attributes(
     obj: Tid, depth: List[int | str]
-) -> Iterable[tuple[Any, list[int | str]]]:
+) -> Generator[tuple[Any, list[int | str]], None, None]:
     # qprint(obj.__class__.__name__)
 
     data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
@@ -921,7 +921,7 @@ def recursive_attributes(
                     mydepth.pop()
 
 
-def open_netex_file(filename: str) -> Iterable[IO[Any]]:
+def open_netex_file(filename: str) -> Generator[IO[Any], None, None]:
     if filename.endswith(".xml.gz"):
         yield igzip_threaded.open(filename, "rb", compresslevel=3, threads=3)  # type: ignore
     elif filename.endswith(".xml"):

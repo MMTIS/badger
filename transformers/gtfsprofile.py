@@ -2,7 +2,7 @@ import csv
 import datetime
 import warnings
 import zipfile
-from typing import List, Union, Any, Iterable, TypeVar, Literal
+from typing import List, Union, Any, TypeVar, Literal, Generator
 import io
 import logging
 from pyproj import Transformer
@@ -221,7 +221,7 @@ class GtfsProfile:
     #              }
 
     @staticmethod
-    def projectJourneyMeetingToTransfer(journey_meeting: JourneyMeeting) -> Iterable[dict[str, Any]]:
+    def projectJourneyMeetingToTransfer(journey_meeting: JourneyMeeting) -> Generator[dict[str, Any], None, None]:
         # TODO: Technically we need to take into AvailabityCondition
 
         for connecting_stop_point_ref in journey_meeting.connecting_stop_point_ref:
@@ -508,7 +508,7 @@ class GtfsProfile:
         return GtfsProfile.getOriginalGtfsId(day_type, 'service_id')
 
     @staticmethod
-    def getCalendarAndCalendarDates(service_id: str, availability_condition: AvailabilityCondition) -> Iterable[tuple[dict[str, Any] | Literal[None], dict[str, Any] | Literal[None]]]:
+    def getCalendarAndCalendarDates(service_id: str, availability_condition: AvailabilityCondition) -> Generator[tuple[dict[str, Any] | Literal[None], dict[str, Any] | Literal[None]], None, None]:
         if availability_condition.valid_day_bits is not None:
             assert availability_condition.from_date is not None, f"{availability_condition.id} must have a FromDate when ValidDayBits are used."
             operational_dates = [availability_condition.from_date.to_datetime() + datetime.timedelta(days=i) for i in range(0, len(availability_condition.valid_day_bits)) if availability_condition.valid_day_bits[i] == '1']
@@ -534,7 +534,7 @@ class GtfsProfile:
             warnings.warn("This availability condition does not match the GTFS profile")
 
     @staticmethod
-    def getCalendarDates(service_id: str, dates: List[datetime.datetime], is_available: bool = True) -> Iterable[dict[str, Any]]:
+    def getCalendarDates(service_id: str, dates: List[datetime.datetime], is_available: bool = True) -> Generator[dict[str, Any], None, None]:
         exception_type = 1 if is_available else 2
         for date in dates:
             yield {'service_id': service_id, 'date': str(date).replace('-', ''), 'exception_type': exception_type}
@@ -570,7 +570,7 @@ class GtfsProfile:
         return trip
 
     @staticmethod
-    def projectTemplateServiceJourneyToFrequency(template_service_journey: TemplateServiceJourney) -> Iterable[dict[str, Any]]:
+    def projectTemplateServiceJourneyToFrequency(template_service_journey: TemplateServiceJourney) -> Generator[dict[str, Any], None, None]:
         for frequency_group in template_service_journey.frequency_groups.headway_journey_group_ref_or_headway_journey_group_or_rhythmical_journey_group_ref_or_rhythmical_journey_group:
             if isinstance(frequency_group, HeadwayJourneyGroup):
                 first_day_offset = None
@@ -621,7 +621,7 @@ class GtfsProfile:
         return f"{h_i:02d}:{m}:{s}"
 
     @staticmethod
-    def projectServiceJourneyToStopTimes(service_journey: ServiceJourney | TemplateServiceJourney) -> Iterable[dict[str, Any]]:
+    def projectServiceJourneyToStopTimes(service_journey: ServiceJourney | TemplateServiceJourney) -> Generator[dict[str, Any], None, None]:
         for call in service_journey.calls.call:
             if call.arrival is None:
                 call.arrival = call.departure
@@ -706,7 +706,7 @@ class GtfsProfile:
         return stop
 
     @staticmethod
-    def projectQuayStop(stop_place: StopPlace, with_quays: bool = False, transformer: Transformer | None = None) -> Iterable[dict[str, Any]]:
+    def projectQuayStop(stop_place: StopPlace, with_quays: bool = False, transformer: Transformer | None = None) -> Generator[dict[str, Any], None, None]:
         # TODO: parent_station could be obtained from StopPlace or StopArea
         if transformer:
             latitude, longitude = transformer.transform(stop_place.centroid.location.pos.value[0], stop_place.centroid.location.pos.value[1])
@@ -768,7 +768,7 @@ class GtfsProfile:
         #    print(stop_place.id)
 
     @staticmethod
-    def projectRouteLinksToShapes(route: Route, route_links: List[RouteLink], transformer: Transformer | None = None) -> Iterable[dict[str, Any]]:
+    def projectRouteLinksToShapes(route: Route, route_links: List[RouteLink], transformer: Transformer | None = None) -> Generator[dict[str, Any], None, None]:
         sequence = 0
         distance: Decimal = Decimal(0)
         distance_keep: Decimal = Decimal(0)
@@ -825,7 +825,7 @@ class GtfsProfile:
             yield shape_point
 
     @staticmethod
-    def projectServiceLinksToShapes(service_journey_pattern: ServiceJourneyPattern, service_links: List[ServiceLink], transformer: Transformer | None = None) -> Iterable[dict[str, Any]]:
+    def projectServiceLinksToShapes(service_journey_pattern: ServiceJourneyPattern, service_links: List[ServiceLink], transformer: Transformer | None = None) -> Generator[dict[str, Any], None, None]:
         sequence = 0
         distance: Decimal = Decimal(0)
         distance_keep: Decimal = Decimal(0)

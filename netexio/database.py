@@ -9,7 +9,7 @@ import threading
 import queue
 import os
 import cloudpickle
-from typing import TypeVar, Iterable, Any, Optional, Type, Literal
+from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator
 from enum import IntEnum
 
 from netex import (
@@ -350,7 +350,7 @@ class Database:
             value = self.serializer.marshall(obj, obj.__class__)
             self.task_queue.put((LmdbActions.WRITE, self.db_metadata, key, value))
 
-    def get_metadata(self, id: str, version: str, klass: T) -> Iterable[T]:
+    def get_metadata(self, id: str, version: str, klass: T) -> Generator[T, None, None]:
         prefix = self.serializer.encode_key(id, version, klass, include_clazz=True)
         with self.env.begin(db=self.db_metadata, buffers=True, write=False) as txn:
             cursor = txn.cursor()

@@ -1,4 +1,4 @@
-from typing import Iterable, Dict, Any
+from typing import Generator, Dict, Any
 
 from netexio.database import Database
 from netexio.dbaccess import load_generator
@@ -19,7 +19,7 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: Database, db_write
         # TODO: The question here is can we just do something like a virtual table?
         return ssp
 
-    def query(db_read: Database) -> Iterable[ScheduledStopPoint]:
+    def query(db_read: Database) -> Generator[ScheduledStopPoint, None, None]:
         _load_generator = load_generator(db_read, ScheduledStopPoint)
         for ssp in _load_generator:
             new_ssp = process(ssp, generator_defaults)

@@ -732,7 +732,7 @@ def day_type_assignment_to_ac(
     return ac
 
 
-def service_calendar_to_availability_conditions(service_calendar: ServiceCalendar) -> Iterable[tuple[AvailabilityCondition, DayTypeRef]]:
+def service_calendar_to_availability_conditions(service_calendar: ServiceCalendar) -> Generator[tuple[AvailabilityCondition, DayTypeRef], None, None]:
     dtas = getIndexByGroup(service_calendar.day_type_assignments.day_type_assignment, 'day_type_ref') if service_calendar.day_type_assignments else {}
     ops = (
         getIndex(service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period)
@@ -749,7 +749,7 @@ def service_calendar_to_availability_conditions(service_calendar: ServiceCalenda
             yield ac, day_type_ref
 
 
-def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: Database) -> Iterable[AvailabilityCondition]:
+def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: Database) -> Generator[AvailabilityCondition, None, None]:
     def query_sc(mapping: dict):
         for service_calendar in load_generator(db_read, ServiceCalendar):
             for ac, day_type_ref in service_calendar_to_availability_conditions(service_calendar):
@@ -760,7 +760,7 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
 
                 yield ac
 
-    def query_sj(db_read: Database, mapping: dict, clazz: type[ServiceJourney | TemplateServiceJourney]) -> Iterable[ServiceJourney | TemplateServiceJourney]:
+    def query_sj(db_read: Database, mapping: dict, clazz: type[ServiceJourney | TemplateServiceJourney]) -> Generator[ServiceJourney | TemplateServiceJourney, None, None]:
         for service_journey in load_generator(db_read, clazz):
             if service_journey.day_types:
                 for day_type_ref in service_journey.day_types.day_type_ref:
@@ -783,7 +783,7 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
     db_write.insert_objects_on_queue(TemplateServiceJourney, query_sj(db_read, mapping, TemplateServiceJourney))
 
 
-def gtfs_calendar2(service_id: str, day_type: DayType, operating_period: OperatingPeriod) -> Iterable[tuple[dict[str, Any] | None, dict[str, Any]] | None]:
+def gtfs_calendar2(service_id: str, day_type: DayType, operating_period: OperatingPeriod) -> Generator[tuple[dict[str, Any] | None, dict[str, Any]] | None, None, None]:
     if day_type.properties:
         yield tuple(
             (
@@ -840,7 +840,7 @@ def netex_to_python_weekday(days_of_week: list[DayOfWeekEnumeration]) -> set[int
 
 def gtfs_calendar_and_dates2(
     db_read: Database, day_type: DayType, day_type_assignments: Iterable[DayTypeAssignment]
-) -> Iterable[tuple[dict[str, Any] | None, dict[str, Any] | None]]:
+) -> Generator[tuple[dict[str, Any] | None, dict[str, Any] | None], None, None]:
     if day_type.private_codes:
         service_ids = [private_code.value for private_code in day_type.private_codes.private_code if private_code.type_value == 'service_id']
         service_id = service_ids[0] if len(service_ids) > 0 else day_type.id

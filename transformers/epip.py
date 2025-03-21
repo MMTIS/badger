@@ -4,7 +4,7 @@ import warnings
 from datetime import datetime, date, timedelta
 from functools import partial
 from multiprocessing import Pool
-from typing import Generator, List, Set, Any, Iterable, TypeVar
+from typing import Generator, List, Set, Any, TypeVar, Generator
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY
@@ -713,7 +713,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
         # db_read.clean_cache()
         return sj
 
-    def query(db_read: Database) -> Iterable[ServiceJourney]:
+    def query(db_read: Database) -> Generator[ServiceJourney, None, None]:
         _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
         for sj in _load_generator:
             yield process(sj, db_read, db_write, generator_defaults)
@@ -947,22 +947,22 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 
         return deserialised
 
-    def query1(db_read: Database) -> Iterable[StopPlace]:
+    def query1(db_read: Database) -> Generator[StopPlace, None, None]:
         _load_generator = load_generator(db_read, StopPlace, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
 
-    def query2(db_read: Database) -> Iterable[ScheduledStopPoint]:
+    def query2(db_read: Database) -> Generator[ScheduledStopPoint, None, None]:
         _load_generator = load_generator(db_read, ScheduledStopPoint, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
 
-    def query3(db_read: Database) -> Iterable[ServiceJourneyPattern]:
+    def query3(db_read: Database) -> Generator[ServiceJourneyPattern, None, None]:
         _load_generator = load_generator(db_read, ServiceJourneyPattern, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
 
-    def query4(db_read: Database) -> Iterable[ServiceJourney]:
+    def query4(db_read: Database) -> Generator[ServiceJourney, None, None]:
         _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
@@ -1206,7 +1206,7 @@ def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
 def epip_service_journey_interchange(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
     print(sys._getframe().f_code.co_name)
 
-    def query1(db_read: Database) -> Iterable[ServiceJourneyInterchange]:
+    def query1(db_read: Database) -> Generator[ServiceJourneyInterchange, None, None]:
         # _load_generator = load_generator(db_read, InterchangeRule)
         # for interchange_rule in _load_generator:
         #     interchange_rule: InterchangeRule

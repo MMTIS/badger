@@ -1,4 +1,4 @@
-from typing import Dict, Any, Iterable
+from typing import Dict, Any, Iterable, Generator
 
 from netexio.database import Database
 from netexio.dbaccess import load_generator
@@ -26,7 +26,7 @@ def infer_directions_from_sjps_and_apply(db_read: Database, db_write: Database, 
 
         return None
 
-    def query(db_read: Database) -> Iterable[ServiceJourneyPattern]:
+    def query(db_read: Database) -> Generator[ServiceJourneyPattern, None, None]:
         _load_generator = load_generator(db_read, ServiceJourneyPattern)
         for sjp in _load_generator:
             new_sjp = process(sjp, generator_defaults)

@@ -2,7 +2,7 @@ import datetime
 import hashlib
 import math
 from _decimal import Decimal
-from typing import List, Generator, TypeVar, Any, Iterable
+from typing import List, Generator, TypeVar, Any, Iterable, Generator
 
 import duckdb
 import numpy
@@ -1097,7 +1097,7 @@ class GtfsNeTexProfile(CallsProfile):
 
     def getInterchangeRules(self, transfers_sql: dict[str, str]={
         'query': """select transfers.*, from_stop.location_type as from_stop_location_type, to_stop.location_type as to_stop_location_type from transfers join stops as from_stop on (from_stop_id = from_stop.stop_id) join stops as to_stop on (to_stop_id = to_stop.stop_id) order by from_route_id, to_route_id, from_trip_id, to_trip_id, from_stop_id, to_stop_id;"""}) -> \
-    Iterable[InterchangeRule]:
+    Generator[InterchangeRule, None, None]:
         # from_stop_id, to_stop_id, from_route_id, to_route_id, from_trip_id, to_trip_id, transfer_type, min_transfer_time:
         with self.conn.cursor() as cur:
             cur.execute(**transfers_sql)
@@ -1280,7 +1280,7 @@ class GtfsNeTexProfile(CallsProfile):
     def getServiceJourneys(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""},
                            stop_times_sql: dict[str, str]={'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
-    Iterable[ServiceJourney]:
+    Generator[ServiceJourney, None, None]:
         availability_conditions = getIndex(availability_conditions)
 
         service_journeys = {}
@@ -1459,7 +1459,7 @@ class GtfsNeTexProfile(CallsProfile):
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""},
                                   stop_times_sql: dict[str, str]={
                                       'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
-    Iterable[ServiceJourney]:
+    Generator[ServiceJourney, None, None]:
         service_journeys = {}
         shape_used = set([])
 
@@ -1794,7 +1794,7 @@ class GtfsNeTexProfile(CallsProfile):
 
     def getServiceJourneys2DayType(self, trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""}) -> \
-    Iterable[ServiceJourney]:
+    Generator[ServiceJourney, None, None]:
 
         shape_used = set([])
 

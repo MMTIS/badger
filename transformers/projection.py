@@ -2,7 +2,7 @@ import functools
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from itertools import chain
-from typing import Iterable, Any
+from typing import Any, Generator
 
 from pyproj import Transformer
 from pyproj.exceptions import CRSError
@@ -21,7 +21,7 @@ transformers: dict[str, Transformer] = {}
 
 GEO_CLASSES = {LocationStructure2, LineString, Polygon, MultiSurface}
 
-def get_all_geo_elements() -> Iterable[Any]:
+def get_all_geo_elements() -> Generator[Any, None, None]:
     classes = get_interesting_classes()
     clean_element_names, interesting_element_names, interesting_classes = classes
     for clazz_parent in interesting_classes:
