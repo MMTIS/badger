@@ -5,7 +5,6 @@ import inspect
 if TYPE_CHECKING:
     from netexio.database import Database
 
-import pickle
 import warnings
 from typing import TypeVar, List
 
