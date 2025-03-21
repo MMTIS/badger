@@ -112,6 +112,7 @@ class Database:
         self.db_embedding_inverse: lmdb._Database = self.env.open_db(b"_embedding_inverse", create=not self.readonly, dupsort=True)
         self.db_referencing: lmdb._Database = self.env.open_db(b"_referencing", create=not self.readonly, dupsort=True)
         self.db_referencing_inwards: lmdb._Database = self.env.open_db(b"_referencing_inwards", create=not self.readonly, dupsort=True)
+        self.db_metadata: lmdb._Database = self.env.open_db(b"_metadata", create=not self.readonly)
 
         return self
 
@@ -339,6 +340,27 @@ class Database:
                 ref_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version))
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value))
 
+    def insert_metadata_on_queue(self, objects: Iterable[str, str, Any]) -> None:
+        """Places metadata in the shared queue for writing, starting writer if needed."""
+        self._start_writer_if_needed()
+        assert self.task_queue is not None, "Task queue must not be none"
+
+        for id, version, obj in objects:
+            key = self.serializer.encode_key(id, version, obj.__class__, include_clazz=True)
+            value = self.serializer.marshall(obj, obj.__class__)
+            self.task_queue.put((LmdbActions.WRITE, self.db_metadata, key, value))
+
+    def get_metadata(self, id: str, version: str, klass: T) -> Iterable[T]:
+        prefix = self.serializer.encode_key(id, version, klass, include_clazz=True)
+        with self.env.begin(db=self.db_metadata, buffers=True, write=False) as txn:
+            cursor = txn.cursor()
+            if cursor.set_range(prefix):  # Position cursor at the first key >= prefix
+                for key, value in cursor:
+                    if not bytes(key).startswith(prefix):
+                        break  # Stop when keys no longer match the prefix
+
+                    yield self.serializer.unmarshall(value, klass)
+
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
         db_handle = self.open_db(klass)
@@ -553,6 +575,34 @@ class Database:
         _copy_db(self.db_referencing_inwards, target.db_referencing_inwards)
         _copy_db(self.db_embedding, target.db_embedding)
         _copy_db(self.db_embedding_inverse, target.db_embedding_inverse)
+
+    def copy_db_metadata(self, target: Database) -> None:
+        """
+        Copies '_referencing' and '_embedding' databases from `self.env` to `target.env` with high throughput.
+        """
+        if target.readonly:
+            return
+
+        target._start_writer_if_needed()
+        assert target.task_queue is not None, "Task queue must not be none"
+
+        def _copy_db(src_db: lmdb._Database, dst_db: lmdb._Database) -> None:
+            """Helper function to copy data between LMDB databases efficiently."""
+            if src_db is None:
+                return
+
+            if dst_db is None:
+                return
+
+            assert target.task_queue is not None, "Task queue must not be none"
+
+            with self.env.begin(write=False, buffers=True, db=src_db) as src_txn:
+                cursor = src_txn.cursor()
+                for key, value in src_txn.cursor():
+                    target.task_queue.put((LmdbActions.WRITE, dst_db, bytes(key), bytes(value)))
+
+        _copy_db(self.db_metadata, target.db_metadata)
+
 
     def clean_cache(self) -> None:
         self.cache.drop()

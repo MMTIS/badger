@@ -12,6 +12,7 @@ from netex import (
     Network,
     DestinationDisplay,
     VehicleType,
+    VersionFrameDefaultsStructure,
 )
 from netexio.database import Database
 from netexio.dbaccess import setup_database, copy_table, missing_class_update
@@ -57,6 +58,16 @@ def main(source_database_file: str, target_database_file: str) -> None:
         with Database(
             source_database_file, MyPickleSerializer(compression=True), readonly=True
         ) as source_db:
+
+            # TODO: make this more generic
+            default_codespace: Codespace | None = None
+            frame_defaults: VersionFrameDefaultsStructure
+            for frame_defaults in source_db.get_metadata(None, None, VersionFrameDefaultsStructure):
+                if default_codespace is None and frame_defaults.default_codespace_ref:
+                    default_codespace_ref = frame_defaults.default_codespace_ref
+                    default_codespace = source_db.get_single(Codespace, default_codespace_ref.ref, None)
+                    generator_defaults['codespace'] = default_codespace
+
             log_all(logging.INFO, "Copy all tables as-is ")
             copy_table(
                 source_db,

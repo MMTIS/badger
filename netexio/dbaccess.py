@@ -538,7 +538,8 @@ def copy_table(
     db_write: Database,
     classes: list[type[Tid]],
     clean: bool = False,
-    embedding: bool = False,
+    embedding: bool = True,
+    metadata: bool = True
 ) -> None:
     for klass in classes:
         # print(klass.__name__)
@@ -547,6 +548,8 @@ def copy_table(
     if embedding:
         db_read.copy_db_embedding(db_write, classes)
 
+    if metadata:
+        db_read.copy_db_metadata(db_write)
 
 def missing_class_update(source_db: Database, target_db: Database) -> None:
     # TODO: As written in #223 some of the objects have not been copied at this point, but are still referenced.
@@ -671,6 +674,7 @@ def insert_database(
 
     events = ("start", "end")
     context = etree.iterparse(f, events=events, remove_blank_text=True)
+    current_frame_id = None
     current_element_tag = None
     current_framedefaults = None
     current_datasource_ref = None
@@ -697,6 +701,7 @@ def insert_database(
                     skip_frame = True
 
             if localname in all_frames:
+                current_frame_id = (element.attrib['id'], element.attrib['version'])
                 frame_defaults_stack.append(None)
 
             elif localname == "Location":
@@ -724,6 +729,8 @@ def insert_database(
                     current_location_system = (
                         current_framedefaults.default_location_system
                     )
+
+                db.insert_metadata_on_queue([(current_frame_id[0], current_frame_id[1], frame_defaults)])
 
                 continue
 

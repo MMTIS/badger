@@ -2509,7 +2509,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         con.insert_objects_on_queue(InterchangeRule, self.getInterchangeRules())
 
-    def __init__(self, conn: Database, serializer: XmlSerializer):
+    def __init__(self, conn, serializer: XmlSerializer):
         self.conn = conn
         self.serializer = serializer
 
@@ -2544,6 +2544,7 @@ def main(database_gtfs: str, database_netex: str) -> None:
                             serializer=serializer)
 
     with Database(database_netex, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
+        db_write.insert_metadata_on_queue([("GTFS", gtfs.version.version, gtfs.frame_defaults)])
         gtfs.database(db_write)
 
 

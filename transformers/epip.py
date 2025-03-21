@@ -974,15 +974,26 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 
 
 def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
+    # Maybe generalize this for other profiles too
+    default_locale: Locale | None = None
+    default_codespace: Codespace | None = None
+    frame_defaults: VersionFrameDefaultsStructure
+    for frame_defaults in db_epip.get_metadata(None, None, VersionFrameDefaultsStructure):
+        if default_codespace is None and frame_defaults.default_codespace_ref:
+            default_codespace_ref = frame_defaults.default_codespace_ref
+            default_codespace = db_epip.get_single(Codespace, default_codespace_ref.ref, None)
+
+        if default_locale is None and frame_defaults.default_locale:
+            default_locale = frame_defaults.default_locale
+
+    if default_codespace is None:
+        default_codespace = Codespace(id="OPENOV", xmlns="OPENOV")
+
     codespace_ref_or_codespace = GeneratorTester(load_generator(db_epip, Codespace))
     data_source = GeneratorTester(load_generator(db_epip, DataSource))
     organisation_or_transport_organisation: list[Any] = load_local(db_epip, Authority) + load_local(db_epip, Operator)
     value_set = GeneratorTester(load_generator(db_epip, ValueSet))
     transport_administrative_zone = GeneratorTester(load_generator(db_epip, TransportAdministrativeZone))
-
-    all_locales = {org.locale for org in organisation_or_transport_organisation if org.locale is not None}
-    if len(all_locales) > 1:
-        log_print("TODO: Test case for multiple TimetableFrames!")
 
     transport_type_dummy_type_or_train_type = GeneratorTester(load_generator(db_epip, VehicleType))
     responsibility_set = GeneratorTester(load_generator(db_epip, ResponsibilitySet))
@@ -1042,11 +1053,17 @@ def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
 
     other_referenced_objects = GeneratorTester(fetch_references_classes_generator(db_epip, other_referenced_classes))
 
-    version = date.today().strftime("%Y%m%d")
+    if default_locale is None:
+        all_locales = {org.locale for org in organisation_or_transport_organisation if org.locale is not None}
+        if len(all_locales) > 1:
+            log_print("TODO: Test case for multiple TimetableFrames!")
 
-    default_locale: LocaleStructure = project(list(all_locales)[0], LocaleStructure) if len(all_locales) > 0 else None
+        default_locale: LocaleStructure = project(list(all_locales)[0], LocaleStructure) if len(all_locales) > 0 else None
+
     if default_locale is not None and default_locale.languages is not None and len(default_locale.languages.language_usage) == 1:
         default_locale.default_language = default_locale.languages.language_usage[0].language
+
+    version = date.today().strftime("%Y%m%d")
 
     publication_delivery = PublicationDelivery(
         version="ntx:1.1",
@@ -1164,7 +1181,7 @@ def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
                                 version=version,
                                 type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_CALENDAR', version_ref='1.0'),
                                 service_calendar=get_service_calendar(
-                                    db_epip, {'codespace': Codespace(xmlns=defaults['codespace']), 'version': version}
+                                    db_epip, {'codespace': default_codespace, 'version': version}
                                 ),  # TODO: do differently
                             ),
                             GeneralFrame(
