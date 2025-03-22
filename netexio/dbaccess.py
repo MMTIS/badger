@@ -1,6 +1,8 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, IO, Any, Literal, Generator
+from typing import TYPE_CHECKING, IO, Any, Literal, Generator, get_origin, Optional, get_args, Union
 import inspect
+from dataclasses import fields, is_dataclass
+from zoneinfo import ZoneInfo
 
 if TYPE_CHECKING:
     from netexio.database import Database
@@ -34,6 +36,15 @@ from utils.utils import get_object_name
 from utils.aux_logging import log_all
 import logging
 from lxml import etree
+
+from xsdata.models.datatype import XmlDateTime, XmlTime, XmlDate
+
+class XmlTimeZoned(XmlTime):
+    """Extended XmlTime with explicit timezone."""
+    def __new__(cls, hour, minute, second, fractional_second=0, offset=None, zoneinfo=None):
+        instance = super().__new__(cls, hour, minute, second, fractional_second, offset)
+        instance.zoneinfo = zoneinfo
+        return instance
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
@@ -621,6 +632,60 @@ def update_embedded_referencing(
             )
 
 
+def is_xml_time_type(t):
+    """Checks for the type XmlTime is, including Optional[XmlTime]."""
+    return t is XmlTime or (get_origin(t) is Union and XmlTime in get_args(t))
+
+def convert_xml_time(value: XmlTime, zoneinfo: ZoneInfo):
+    """Transform XmlTime to XmlTimeZone When applicable."""
+    if type(value) is  XmlTime:
+        return XmlTimeZoned(value.hour, value.minute, value.second, value.fractional_second, value.offset, zoneinfo)
+    return value
+
+def replace_xml_time_with_timezone(obj: Any, zoneinfo: ZoneInfo):
+    """Replace alle XmlTime instances by XmlTimeZone, recursive in dataclasses and lists."""
+    if not is_dataclass(obj):
+        return
+
+    for field in fields(obj):
+        value = getattr(obj, field.name)
+
+        # Algemene verwerking zonder duplicatie
+        if isinstance(value, (XmlTime, list, tuple)) or is_dataclass(value):
+            object.__setattr__(obj, field.name, recursive_replace(value, zoneinfo))
+
+def recursive_replace(value: Any, zoneinfo: ZoneInfo):
+    """Recursive replacement of XmlTime in lists, tuples and dataclasses."""
+    if type(value) is XmlTime:
+        return convert_xml_time(value, zoneinfo)
+
+    if type(value) is list:
+        return [recursive_replace(v, zoneinfo) for v in value]
+
+    if type(value) is tuple:
+        return tuple(recursive_replace(v, zoneinfo) for v in value)
+
+    if is_dataclass(value):
+        # Applies directly
+        replace_xml_time_with_timezone(value, zoneinfo)
+
+    return value
+
+def class_contains_xml_time(cls: type) -> bool:
+    """Recursieve functie om te bepalen of een dataclass ergens een XmlTime bevat."""
+    if not is_dataclass(cls):
+        return False
+
+    for field in fields(cls):
+        field_type = field.type
+        if is_xml_time_type(field_type):  # Direct een XmlTime of Optional[XmlTime]
+            return True
+        if get_origin(field_type) is list:  # Lijst met dataclass-objecten
+            field_type = get_args(field_type)[0]
+        if is_dataclass(field_type) and class_contains_xml_time(field_type):  # Recursief checken
+            return True
+    return False
+
 def insert_database(
     db: Database,
     classes: tuple[list[str], list[str], list[Any]],
@@ -661,6 +726,11 @@ def insert_database(
         if hasattr(x[1], "Meta") and hasattr(x[1], "srs_name")
     ]
 
+    all_classes_with_xml_time = [
+        get_local_name(x[1]) for x in clsmembers
+        if hasattr(x[1], "Meta") and is_dataclass(x[1]) and class_contains_xml_time(x[1])
+    ]
+
     frame_defaults_stack: list[VersionFrameDefaultsStructure | None] = []
     if f is None:
         return
@@ -679,6 +749,7 @@ def insert_database(
     current_datasource_ref = None
     current_responsibility_set_ref = None
     current_location_system = None
+    current_zoneinfo: ZoneInfo | None = None
     last_version = None
     skip_frame = False
 
@@ -728,6 +799,8 @@ def insert_database(
                     current_location_system = (
                         current_framedefaults.default_location_system
                     )
+                if current_framedefaults.default_locale and current_framedefaults.default_locale.time_zone:
+                    current_zoneinfo = ZoneInfo(current_framedefaults.default_locale.time_zone)
 
                 db.insert_metadata_on_queue([(current_frame_id[0], current_frame_id[1], frame_defaults)])
 
@@ -742,6 +815,7 @@ def insert_database(
                 current_datasource_ref = None
                 current_responsibility_set_ref = None
                 current_location_system = None
+                current_zoneinfo = None
                 for fd in reversed(filtered):
                     if current_datasource_ref is None:
                         if fd.default_data_source_ref is not None:
@@ -754,6 +828,10 @@ def insert_database(
                     if current_location_system is None:
                         if fd.default_location_system is not None:
                             current_location_system = fd.default_location_system
+                    if current_zoneinfo is None:
+                        if fd.default_locale and fd.default_locale.time_zone:
+                            current_zoneinfo = ZoneInfo(current_framedefaults.default_locale.time_zone)
+
                 last_version = None
 
                 skip_frame = False
@@ -812,6 +890,10 @@ def insert_database(
 
                 order = element.attrib.get("order", None)
                 object = xml_serializer.unmarshall(element, clazz)
+
+                if current_zoneinfo is not None:
+                    if localname in all_classes_with_xml_time:
+                        recursive_replace(object, current_zoneinfo)
 
                 if hasattr(clazz, "order"):
                     if order is None:
