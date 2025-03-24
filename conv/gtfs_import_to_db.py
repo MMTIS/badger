@@ -269,9 +269,7 @@ def handle_file(con: duckdb.DuckDBPyConnection, zip: zipfile.ZipFile, filename: 
 
             this_mapping_str = json.dumps(this_mapping)
 
-            sql_create_table = (
-                f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{filename}', delim=',', header=true, auto_detect=true, columns = {this_mapping_str});"""
-            )
+            sql_create_table = f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{filename}', delim=',', quote='"', header=true, auto_detect=true, columns = {this_mapping_str});"""
             # print(sql_create_table)
             cur.execute(sql_create_table)
 
