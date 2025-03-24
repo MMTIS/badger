@@ -33,6 +33,7 @@ def reversedate() -> str:
     formatted_date = current_date.strftime("%Y%m%d")
     return formatted_date
 
+
 def estimate_size_lmdb(file_name: str) -> int:
     # Check if the file exists
     if not os.path.isfile(file_name):
@@ -50,9 +51,10 @@ def estimate_size_lmdb(file_name: str) -> int:
         # Estimate size for XML files: 610
         return file_size * 12
 
-    log_all(logging.ERROR,f'file {file_name} cannot contain data')
+    log_all(logging.ERROR, f'file {file_name} cannot contain data')
     raise
     return 0
+
 
 def parse_command_line_arguments(input_string: str) -> list[str]:
     arguments = re.findall(r"\[.*?\]|\S+", input_string)
@@ -114,9 +116,7 @@ def load_and_run(file_name: str, args_string: str) -> Any:
 
 def replace_in_string(input: str, search: str, replace: str) -> str:
     if search in input and (replace == "" or replace == "NOT SET YET"):
-        raise ValueError(
-            f"Replace string cannot be empty when search string ({search})exists in input."
-        )
+        raise ValueError(f"Replace string cannot be empty when search string ({search})exists in input.")
     return input.replace(search, replace)
 
 
@@ -133,10 +133,7 @@ def clean_tmp(f: str) -> None:
         if os.path.isfile(item_path):
             # Remove file if it matches the extensions
             if (
-                item.endswith(".duckdb")
-                or item.endswith(".tmp")
-                or item.endswith("lmdb")
-                or item.endswith("mdb")
+                item.endswith(".duckdb") or item.endswith(".tmp") or item.endswith("lmdb") or item.endswith("mdb")
             ):  # logs are NOT cleaned (as at least one is already locked)
                 try:
                     os.remove(item_path)
@@ -178,9 +175,7 @@ def parse_key_value_pairs(string: str) -> dict[str, str]:
         key_value = pair.split("=")
         if len(key_value) == 2:
             key = key_value[0].strip()
-            value = (
-                key_value[1].strip().strip('"').strip("'")
-            )  # Remove surrounding quotes from value
+            value = key_value[1].strip().strip('"').strip("'")  # Remove surrounding quotes from value
             pairs[key] = value
     return pairs
 
@@ -202,9 +197,7 @@ def download(folder: str, url: str, forced: bool = False) -> str:
         # work around for swiss data, where it is "permalink"
         if filename == "permalink":
             filename = "swiss.zip"
-        if (
-            "?" in filename
-        ):  # for data from mobigo, that is fetched by an aspx script with parameters
+        if "?" in filename:  # for data from mobigo, that is fetched by an aspx script with parameters
             filename = "source.zip"
         if "Resource" in filename:  # for italian data
             filename = "source.xml.gz"
@@ -268,15 +261,7 @@ def main(
     # go through each block
     for block in data:
         if url:
-            processdir = (
-                processing_data
-                + "/"
-                + parent_block
-                + "-"
-                + todo_block
-                + "-"
-                + str(custom_hash(url))
-            )
+            processdir = processing_data + "/" + parent_block + "-" + todo_block + "-" + str(custom_hash(url))
         else:
             processdir = processing_data + "/" + block["block"]
         blockstop = False
@@ -293,12 +278,12 @@ def main(
         script_input_file_path = "NOT SET YET"
         for script in scripts:
             step = step + 1
-            if this_step==99999:
+            if this_step == 99999:
                 if "download_urls" not in block.keys() and (
-                        step < begin_step
+                    step < begin_step
                 ):  # if it is a list we always begin with 1 the begin_step is then used within the list
                     continue
-                if step>end_step:
+                if step > end_step:
                     continue
             else:
                 if step != this_step:
@@ -319,13 +304,9 @@ def main(
             # replace the placeholder for processdir with the correct values and also the other place holders
             script_args = replace_in_string(script_args, "%%dir%%", processdir)
             script_args = replace_in_string(script_args, "%%inputdir%%", input_dir)
-            script_args = replace_in_string(
-                script_args, "%%inputfilepath%%", script_input_file_path
-            )
+            script_args = replace_in_string(script_args, "%%inputfilepath%%", script_input_file_path)
             script_args = replace_in_string(script_args, "%%block%%", block["block"])
-            script_args = replace_in_string(
-                script_args, "%%log%%", block["block"] + "/" + log_file
-            )
+            script_args = replace_in_string(script_args, "%%log%%", block["block"] + "/" + log_file)
             script_args = replace_in_string(script_args, "%%date%%", reversedate())
 
             # if the processing dir doesn't exist, then we create it
@@ -354,9 +335,7 @@ def main(
                 # Execute the clean_tmp command
                 folder = script_args
                 clean_tmp(folder)
-                log_all(
-                    logging.INFO, f"Command 'clean_tmp' executed for folder: {folder}\n"
-                )
+                log_all(logging.INFO, f"Command 'clean_tmp' executed for folder: {folder}\n")
                 continue
             if script_name == "process_url_list":
                 for url in block.get("download_urls"):
@@ -376,9 +355,7 @@ def main(
                 # Execute the clean command
                 folder = script_args
                 clean(folder)
-                log_all(
-                    logging.INFO, f"Command 'clean' executed for folder: {folder}\n"
-                )
+                log_all(logging.INFO, f"Command 'clean' executed for folder: {folder}\n")
                 continue
             if script_name == "download_input_file":
                 # Execute the download command. The file under the download_url is copied to a folder
@@ -457,18 +434,14 @@ if __name__ == "__main__":
     parser.add_argument("script_file", type=str, help="the script file")
     parser.add_argument("log_file", type=str, help="name of the log file")
     parser.add_argument("blockname", type=str, help="Block name to do")
-    parser.add_argument(
-        "--begin_step", type=int, default=1, help="The begin step (default: 1)"
-    )
+    parser.add_argument("--begin_step", type=int, default=1, help="The begin step (default: 1)")
     parser.add_argument(
         "--end_step",
         type=int,
         default=999999,
         help="last step to execute. default not set.",
     )
-    parser.add_argument(
-        "--this_step", type=int, default=99999, help="not set. Only this step is done"
-    )
+    parser.add_argument("--this_step", type=int, default=99999, help="not set. Only this step is done")
     parser.add_argument(
         "--log_level",
         type=int,
