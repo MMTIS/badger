@@ -65,7 +65,7 @@ def getRef(
     if meta and hasattr(meta, "name"):
         meta_kname = meta.name
 
-    if not (kname.startswith(name) or meta_kname.startswith(name)):
+    if isinstance(klass, VersionOfObjectRefStructure) and not (kname.startswith(name) or meta_kname.startswith(name)):
         instance.name_of_ref_class = name
     return instance
 

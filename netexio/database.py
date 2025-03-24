@@ -340,7 +340,7 @@ class Database:
                 ref_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version))
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value))
 
-    def insert_metadata_on_queue(self, objects: Iterable[str, str, Any]) -> None:
+    def insert_metadata_on_queue(self, objects: Iterable[tuple[str, str, Any]]) -> None:
         """Places metadata in the shared queue for writing, starting writer if needed."""
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
@@ -350,7 +350,7 @@ class Database:
             value = self.serializer.marshall(obj, obj.__class__)
             self.task_queue.put((LmdbActions.WRITE, self.db_metadata, key, value))
 
-    def get_metadata(self, id: str, version: str, klass: T) -> Generator[T, None, None]:
+    def get_metadata(self, id: str, version: str, klass: type[Tid]) -> Generator[Tid, None, None]:
         prefix = self.serializer.encode_key(id, version, klass, include_clazz=True)
         with self.env.begin(db=self.db_metadata, buffers=True, write=False) as txn:
             cursor = txn.cursor()
@@ -597,12 +597,10 @@ class Database:
             assert target.task_queue is not None, "Task queue must not be none"
 
             with self.env.begin(write=False, buffers=True, db=src_db) as src_txn:
-                cursor = src_txn.cursor()
                 for key, value in src_txn.cursor():
                     target.task_queue.put((LmdbActions.WRITE, dst_db, bytes(key), bytes(value)))
 
         _copy_db(self.db_metadata, target.db_metadata)
-
 
     def clean_cache(self) -> None:
         self.cache.drop()

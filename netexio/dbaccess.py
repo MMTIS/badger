@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, IO, Any, Literal, Generator, get_origin, Optional, get_args, Union
+
+from typing import TYPE_CHECKING, IO, Any, Literal, Generator, get_origin, get_args, Union
 import inspect
 from dataclasses import fields, is_dataclass
 from zoneinfo import ZoneInfo
@@ -37,14 +38,43 @@ from utils.aux_logging import log_all
 import logging
 from lxml import etree
 
-from xsdata.models.datatype import XmlDateTime, XmlTime, XmlDate
+from xsdata.models.datatype import XmlDateTime, XmlTime
+
 
 class XmlTimeZoned(XmlTime):
     """Extended XmlTime with explicit timezone."""
-    def __new__(cls, hour, minute, second, fractional_second=0, offset=None, zoneinfo=None):
+
+    zoneinfo: ZoneInfo | None
+
+    def __new__(
+        cls, hour: int, minute: int, second: int, fractional_second: int = 0, offset: int | None = None, zoneinfo: ZoneInfo | None = None
+    ) -> XmlTimeZoned:
         instance = super().__new__(cls, hour, minute, second, fractional_second, offset)
         instance.zoneinfo = zoneinfo
         return instance
+
+
+class XmlDateTimeZoned(XmlDateTime):
+    """Extended XmlTime with explicit timezone."""
+
+    zoneinfo: ZoneInfo | None
+
+    def __new__(
+        cls,
+        year: int,
+        month: int,
+        day: int,
+        hour: int,
+        minute: int,
+        second: int,
+        fractional_second: int = 0,
+        offset: int | None = None,
+        zoneinfo: ZoneInfo | None = None,
+    ) -> XmlDateTimeZoned:
+        instance = super().__new__(cls, year, month, day, hour, minute, second, fractional_second, offset)
+        instance.zoneinfo = zoneinfo
+        return instance
+
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
@@ -60,9 +90,7 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 # TODO: For all load_ functions filter by id + version, not only id
 
 
-def load_referencing(
-    db: Database, clazz: type[Tid], filter_id: str
-) -> Generator[tuple[str, str, str], None, None]:
+def load_referencing(db: Database, clazz: type[Tid], filter_id: str) -> Generator[tuple[str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as txn:
@@ -72,16 +100,12 @@ def load_referencing(
                 if not bytes(key).startswith(prefix):
                     break  # Stop when keys no longer match the prefix
 
-                referencing_class, referencing_id, referencing_version = (
-                    cloudpickle.loads(value)
-                )
+                referencing_class, referencing_id, referencing_version = cloudpickle.loads(value)
 
                 yield referencing_id, referencing_version, referencing_class
 
 
-def load_referencing_inwards(
-    db: Database, clazz: type[Tid], filter_id: str
-) -> Generator[tuple[str, str, str], None, None]:
+def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str) -> Generator[tuple[str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing_inwards, buffers=True, write=False) as txn:
@@ -106,9 +130,7 @@ def load_local(
     embedded_parent: bool = False,
     cache: bool = True,
 ) -> list[Tid]:
-    return list(
-        load_generator(db, clazz, limit, filter_id, embedding, embedded_parent, cache)
-    )
+    return list(load_generator(db, clazz, limit, filter_id, embedding, embedded_parent, cache))
 
 
 def recursive_resolve(
@@ -128,13 +150,9 @@ def recursive_resolve(
 
     resolved.append(parent)
 
-    if inwards and (
-        filter is False or filter == parent.id or parent.__class__ in filter_class
-    ):
+    if inwards and (filter is False or filter == parent.id or parent.__class__ in filter_class):
         assert parent.id is not None, "Parent.id must not be none"
-        resolved_parents = load_referencing_inwards(
-            db, parent.__class__, filter_id=parent.id
-        )
+        resolved_parents = load_referencing_inwards(db, parent.__class__, filter_id=parent.id)
         for y in resolved_parents:
             already_done = False
             for x in resolved:
@@ -250,10 +268,7 @@ def recursive_resolve(
                         for y in resolved_parents:
                             already_done = False
                             for x in resolved:
-                                if (
-                                    y[0] == x.id
-                                    and db.get_class_by_name(y[2]) == x.__class__
-                                ):
+                                if y[0] == x.id and db.get_class_by_name(y[2]) == x.__class__:
                                     already_done = True
                                     break
 
@@ -282,9 +297,7 @@ def recursive_resolve(
                             )
 
 
-def fetch_references_classes_generator(
-    db: Database, classes: list[type[Tid]]
-) -> Generator[Tid, None, None]:
+def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -> Generator[Tid, None, None]:
     list_classes = {get_object_name(clazz) for clazz in classes}
     processed = set()
 
@@ -294,9 +307,7 @@ def fetch_references_classes_generator(
         cursor = src1_txn.cursor()
         for _key, value in cursor:
             clazz, ref, version, *_ = cloudpickle.loads(value)
-            existing_ids.add(
-                db.serializer.encode_key(ref, version, db.get_class_by_name(clazz))
-            )
+            existing_ids.add(db.serializer.encode_key(ref, version, db.get_class_by_name(clazz)))
 
     for clazz in classes:
         # print(clazz)
@@ -312,9 +323,7 @@ def fetch_references_classes_generator(
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as src3_txn:
         cursor = src3_txn.cursor()
         for _key, value in cursor:
-            ref_class, ref_id, ref_version = cloudpickle.loads(
-                value
-            )  # TODO: check if this goes right
+            ref_class, ref_id, ref_version = cloudpickle.loads(value)  # TODO: check if this goes right
             if ref_class not in list_classes:
                 results: list[Tid] = load_local(
                     db,
@@ -328,29 +337,19 @@ def fetch_references_classes_generator(
                 if len(results) > 0:
                     assert results[0].id is not None, "results[0].id must not be none"
                     needle = get_object_name(results[0].__class__) + "|" + results[0].id
-                    if (
-                        results[0].__class__ in classes
-                    ):  # Don't export classes, which are part of the main delivery
+                    if results[0].__class__ in classes:  # Don't export classes, which are part of the main delivery
                         pass
-                    elif (
-                        needle in processed
-                    ):  # Don't export classes which have been exported already, maybe this can be solved at the database layer
+                    elif needle in processed:  # Don't export classes which have been exported already, maybe this can be solved at the database layer
                         pass
                     else:
                         processed.add(needle)
 
-                        with db.env.begin(
-                            db=db.db_embedding, buffers=True, write=False
-                        ) as src_txn2:
+                        with db.env.begin(db=db.db_embedding, buffers=True, write=False) as src_txn2:
                             # TODO: Very expensive sequential scan Solved??
                             cursor2 = src_txn2.cursor()
 
-                            prefix = db.serializer.encode_key(
-                                ref_id, ref_version, db.get_class_by_name(ref_class)
-                            )
-                            if cursor2.set_range(
-                                prefix
-                            ):  # Position cursor at the first key >= prefix
+                            prefix = db.serializer.encode_key(ref_id, ref_version, db.get_class_by_name(ref_class))
+                            if cursor2.set_range(prefix):  # Position cursor at the first key >= prefix
                                 for key2, value2 in cursor2:
                                     if not bytes(key2).startswith(prefix):
                                         break  # Stop when keys no longer match the prefix
@@ -369,9 +368,7 @@ def fetch_references_classes_generator(
                                             db.get_class_by_name(embedding_class),
                                         ),
                                     ) in existing_ids:
-                                        replace_with_reference_inplace(
-                                            results[0], embedding_path
-                                        )
+                                        replace_with_reference_inplace(results[0], embedding_path)
 
                         yield results[0]
 
@@ -390,24 +387,16 @@ def fetch_references_classes_generator(
 
                         for resolve in resolved:
                             assert resolve.id is not None, "resolve.id must not be none"
-                            needle = (
-                                get_object_name(resolve.__class__) + "|" + resolve.id
-                            )
-                            if (
-                                resolve.__class__ in classes
-                            ):  # Don't export classes, which are part of the main delivery
+                            needle = get_object_name(resolve.__class__) + "|" + resolve.id
+                            if resolve.__class__ in classes:  # Don't export classes, which are part of the main delivery
                                 pass
-                            elif (
-                                needle in processed
-                            ):  # Don't export classes which have been exported already, maybe this can be solved at the database layer
+                            elif needle in processed:  # Don't export classes which have been exported already, maybe this can be solved at the database layer
                                 pass
                             else:
                                 processed.add(needle)
                                 # We can do two things here, query the database for embeddings, or recursively iterate over the object.
 
-                                with db.env.begin(
-                                    db=db.db_embedding, buffers=True, write=False
-                                ) as src_txn2:
+                                with db.env.begin(db=db.db_embedding, buffers=True, write=False) as src_txn2:
                                     # TODO: Very expensive sequential scan Solved??
                                     cursor2 = src_txn2.cursor()
 
@@ -416,9 +405,7 @@ def fetch_references_classes_generator(
                                         getattr(resolve, "version", None),
                                         resolve.__class__,
                                     )
-                                    if cursor2.set_range(
-                                        prefix
-                                    ):  # Position cursor at the first key >= prefix
+                                    if cursor2.set_range(prefix):  # Position cursor at the first key >= prefix
                                         for key2, value2 in cursor2:
                                             if not bytes(key2).startswith(prefix):
                                                 break  # Stop when keys no longer match the prefix
@@ -434,14 +421,10 @@ def fetch_references_classes_generator(
                                                 db.serializer.encode_key(
                                                     embedding_id,
                                                     embedding_version,
-                                                    db.get_class_by_name(
-                                                        embedding_class
-                                                    ),
+                                                    db.get_class_by_name(embedding_class),
                                                 ),
                                             ) in existing_ids:
-                                                replace_with_reference_inplace(
-                                                    resolve, embedding_path
-                                                )
+                                                replace_with_reference_inplace(resolve, embedding_path)
 
                                 yield resolve
 
@@ -460,9 +443,7 @@ def load_generator(
             cursor = txn.cursor()
             if filter_id:
                 prefix = db.serializer.encode_key(filter_id, None, clazz)
-                if cursor.set_range(
-                    prefix
-                ):  # Position cursor at the first key >= prefix
+                if cursor.set_range(prefix):  # Position cursor at the first key >= prefix
                     for key, value in cursor:
                         if not bytes(key).startswith(prefix):
                             break  # Stop when keys no longer match the prefix
@@ -484,9 +465,7 @@ def load_generator(
                     yield value
 
     if embedding:
-        yield from load_embedded_transparent_generator(
-            db, clazz, limit, filter_id, parent, cache
-        )
+        yield from load_embedded_transparent_generator(db, clazz, limit, filter_id, parent, cache)
 
 
 def load_embedded_transparent_generator(
@@ -515,14 +494,10 @@ def load_embedded_transparent_generator(
 
                     if limit is None or i < limit:
                         parent_clazz = db.get_class_by_name(parent_clazz)
-                        cache_key = db.serializer.encode_key(
-                            parent_id, parent_version, parent_clazz, True
-                        )
+                        cache_key = db.serializer.encode_key(parent_id, parent_version, parent_clazz, True)
                         obj = db.cache.get(
                             cache_key,
-                            lambda: db.get_single(
-                                parent_clazz, parent_id, parent_version
-                            ),
+                            lambda: db.get_single(parent_clazz, parent_id, parent_version),
                         )
 
                         if obj is not None:
@@ -543,14 +518,7 @@ def load_embedded_transparent_generator(
                         i += 1
 
 
-def copy_table(
-    db_read: Database,
-    db_write: Database,
-    classes: list[type[Tid]],
-    clean: bool = False,
-    embedding: bool = True,
-    metadata: bool = True
-) -> None:
+def copy_table(db_read: Database, db_write: Database, classes: list[type[Tid]], clean: bool = False, embedding: bool = True, metadata: bool = True) -> None:
     for klass in classes:
         # print(klass.__name__)
         db_read.copy_db(db_write, klass)
@@ -560,6 +528,7 @@ def copy_table(
 
     if metadata:
         db_read.copy_db_metadata(db_write)
+
 
 def missing_class_update(source_db: Database, target_db: Database) -> None:
     # TODO: As written in #223 some of the objects have not been copied at this point, but are still referenced.
@@ -572,9 +541,7 @@ def missing_class_update(source_db: Database, target_db: Database) -> None:
     copy_table(source_db, target_db, list(missing_classes))
 
 
-def setup_database(
-    db: Database, classes: tuple[list[str], list[str], list[Any]], clean: bool = False
-) -> None:
+def setup_database(db: Database, classes: tuple[list[str], list[str], list[Any]], clean: bool = False) -> None:
     clean_element_names, interesting_element_names, interesting_classes = classes
 
     if clean:
@@ -623,26 +590,35 @@ def update_embedded_referencing(
                 deserialized.id,
                 getattr(deserialized, "version", "any"),
                 # The object that contains the reference
-                serializer.name_object[
-                    obj.name_of_ref_class
-                ],  # The object that the reference is towards
+                serializer.name_object[obj.name_of_ref_class],  # The object that the reference is towards
                 obj.ref,
                 getattr(obj, "version", "any"),
                 None,
             )
 
 
-def is_xml_time_type(t):
+def is_xml_time_type(t: T) -> bool:
     """Checks for the type XmlTime is, including Optional[XmlTime]."""
     return t is XmlTime or (get_origin(t) is Union and XmlTime in get_args(t))
 
-def convert_xml_time(value: XmlTime, zoneinfo: ZoneInfo):
+
+def is_xml_date_time_type(t: T) -> bool:
+    """Checks for the type XmlTime is, including Optional[XmlTime]."""
+    return t is XmlTime or (get_origin(t) is Union and XmlTime in get_args(t))
+
+
+def convert_xml_time(value: XmlTime | XmlDateTime, zoneinfo: ZoneInfo) -> Any:
     """Transform XmlTime to XmlTimeZone When applicable."""
-    if type(value) is  XmlTime:
+    if type(value) is XmlTime:
         return XmlTimeZoned(value.hour, value.minute, value.second, value.fractional_second, value.offset, zoneinfo)
+
+    if type(value) is XmlDateTime:
+        return XmlDateTimeZoned(value.year, value.month, value.day, value.hour, value.minute, value.second, value.fractional_second, value.offset, zoneinfo)
+
     return value
 
-def replace_xml_time_with_timezone(obj: Any, zoneinfo: ZoneInfo):
+
+def replace_xml_time_with_timezone(obj: Any, zoneinfo: ZoneInfo) -> None:
     """Replace alle XmlTime instances by XmlTimeZone, recursive in dataclasses and lists."""
     if not is_dataclass(obj):
         return
@@ -651,12 +627,13 @@ def replace_xml_time_with_timezone(obj: Any, zoneinfo: ZoneInfo):
         value = getattr(obj, field.name)
 
         # Algemene verwerking zonder duplicatie
-        if isinstance(value, (XmlTime, list, tuple)) or is_dataclass(value):
+        if isinstance(value, (XmlTime, XmlDateTime, list, tuple)) or is_dataclass(value):
             object.__setattr__(obj, field.name, recursive_replace(value, zoneinfo))
 
-def recursive_replace(value: Any, zoneinfo: ZoneInfo):
+
+def recursive_replace(value: Any, zoneinfo: ZoneInfo) -> Any:
     """Recursive replacement of XmlTime in lists, tuples and dataclasses."""
-    if type(value) is XmlTime:
+    if type(value) in (XmlTime, XmlDateTime):
         return convert_xml_time(value, zoneinfo)
 
     if type(value) is list:
@@ -671,7 +648,8 @@ def recursive_replace(value: Any, zoneinfo: ZoneInfo):
 
     return value
 
-def class_contains_xml_time(cls: type) -> bool:
+
+def class_contains_xml_time(cls: Any) -> bool:
     """Recursieve functie om te bepalen of een dataclass ergens een XmlTime bevat."""
     if not is_dataclass(cls):
         return False
@@ -680,11 +658,14 @@ def class_contains_xml_time(cls: type) -> bool:
         field_type = field.type
         if is_xml_time_type(field_type):  # Direct een XmlTime of Optional[XmlTime]
             return True
+        if is_xml_date_time_type(field_type):  # Direct een XmlTime of Optional[XmlTime]
+            return True
         if get_origin(field_type) is list:  # Lijst met dataclass-objecten
             field_type = get_args(field_type)[0]
         if is_dataclass(field_type) and class_contains_xml_time(field_type):  # Recursief checken
             return True
     return False
+
 
 def insert_database(
     db: Database,
@@ -699,9 +680,7 @@ def insert_database(
     all_frames = [
         get_local_name(x[1])
         for x in clsmembers
-        if hasattr(x[1], "Meta")
-        and hasattr(x[1].Meta, "namespace")
-        and netex.VersionFrameVersionStructure in x[1].__mro__
+        if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.VersionFrameVersionStructure in x[1].__mro__
     ]
 
     # See: https://github.com/NeTEx-CEN/NeTEx/issues/788
@@ -709,27 +688,14 @@ def insert_database(
     all_datasource_refs = [
         get_local_name(x[1])
         for x in clsmembers
-        if hasattr(x[1], "Meta")
-        and hasattr(x[1].Meta, "namespace")
-        and netex.DataManagedObjectStructure in x[1].__mro__
+        if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.DataManagedObjectStructure in x[1].__mro__
     ]
     all_responsibility_set_refs = [
-        get_local_name(x[1])
-        for x in clsmembers
-        if hasattr(x[1], "Meta")
-        and hasattr(x[1].Meta, "namespace")
-        and netex.EntityInVersionStructure in x[1].__mro__
+        get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.EntityInVersionStructure in x[1].__mro__
     ]
-    all_srs_name = [
-        get_local_name(x[1])
-        for x in clsmembers
-        if hasattr(x[1], "Meta") and hasattr(x[1], "srs_name")
-    ]
+    all_srs_name = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1], "srs_name")]
 
-    all_classes_with_xml_time = [
-        get_local_name(x[1]) for x in clsmembers
-        if hasattr(x[1], "Meta") and is_dataclass(x[1]) and class_contains_xml_time(x[1])
-    ]
+    all_classes_with_xml_time = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and class_contains_xml_time(x[1])]
 
     frame_defaults_stack: list[VersionFrameDefaultsStructure | None] = []
     if f is None:
@@ -762,10 +728,7 @@ def insert_database(
                 current_element_tag = element.tag
 
             elif localname == "TypeOfFrameRef":
-                if (
-                    type_of_frame_filter is not None
-                    and element.attrib["ref"] not in type_of_frame_filter
-                ):
+                if type_of_frame_filter is not None and element.attrib["ref"] not in type_of_frame_filter:
                     # TODO: log a single warning that an unknown TypeOfFrame is found, and is not processed
                     print(f"{element.attrib['ref']} is not a known TypeOfFrame")
                     skip_frame = True
@@ -782,27 +745,20 @@ def insert_database(
             # current_element_tag = element.tag
             if localname == "FrameDefaults":
                 xml = etree.tostring(element, encoding="unicode")
-                frame_defaults: VersionFrameDefaultsStructure = parser.from_string(
-                    xml, VersionFrameDefaultsStructure
-                )
+                frame_defaults: VersionFrameDefaultsStructure = parser.from_string(xml, VersionFrameDefaultsStructure)
                 frame_defaults_stack[-1] = frame_defaults
                 current_framedefaults = frame_defaults
                 if current_framedefaults.default_data_source_ref is not None:
-                    current_datasource_ref = (
-                        current_framedefaults.default_data_source_ref.ref
-                    )
+                    current_datasource_ref = current_framedefaults.default_data_source_ref.ref
                 if current_framedefaults.default_responsibility_set_ref is not None:
-                    current_responsibility_set_ref = (
-                        current_framedefaults.default_responsibility_set_ref.ref
-                    )
+                    current_responsibility_set_ref = current_framedefaults.default_responsibility_set_ref.ref
                 if current_framedefaults.default_location_system is not None:
-                    current_location_system = (
-                        current_framedefaults.default_location_system
-                    )
+                    current_location_system = current_framedefaults.default_location_system
                 if current_framedefaults.default_locale and current_framedefaults.default_locale.time_zone:
                     current_zoneinfo = ZoneInfo(current_framedefaults.default_locale.time_zone)
 
-                db.insert_metadata_on_queue([(current_frame_id[0], current_frame_id[1], frame_defaults)])
+                if current_frame_id is not None:
+                    db.insert_metadata_on_queue([(current_frame_id[0], current_frame_id[1], frame_defaults)])
 
                 continue
 
@@ -822,15 +778,13 @@ def insert_database(
                             current_datasource_ref = fd.default_data_source_ref.ref
                     if current_responsibility_set_ref is None:
                         if fd.default_responsibility_set_ref is not None:
-                            current_responsibility_set_ref = (
-                                fd.default_responsibility_set_ref.ref
-                            )
+                            current_responsibility_set_ref = fd.default_responsibility_set_ref.ref
                     if current_location_system is None:
                         if fd.default_location_system is not None:
                             current_location_system = fd.default_location_system
                     if current_zoneinfo is None:
                         if fd.default_locale and fd.default_locale.time_zone:
-                            current_zoneinfo = ZoneInfo(current_framedefaults.default_locale.time_zone)
+                            current_zoneinfo = ZoneInfo(fd.default_locale.time_zone)
 
                 last_version = None
 
@@ -841,30 +795,18 @@ def insert_database(
                 continue
 
             if current_framedefaults is not None:
-                if (
-                    current_datasource_ref is not None
-                    and localname in all_datasource_refs
-                ):
+                if current_datasource_ref is not None and localname in all_datasource_refs:
                     if "dataSourceRef" not in element.attrib:
                         element.attrib["dataSourceRef"] = current_datasource_ref
 
-                if (
-                    current_responsibility_set_ref is not None
-                    and localname in all_responsibility_set_refs
-                ):
+                if current_responsibility_set_ref is not None and localname in all_responsibility_set_refs:
                     if "responsibilitySetRef" not in element.attrib:
-                        element.attrib["responsibilitySetRef"] = (
-                            current_responsibility_set_ref
-                        )
+                        element.attrib["responsibilitySetRef"] = current_responsibility_set_ref
 
                 if current_location_system is not None:
                     if localname in all_srs_name:
                         if "srsName" not in element.attrib:
-                            element.attrib["srsName"] = (
-                                location_srsName
-                                if location_srsName is not None
-                                else current_location_system
-                            )
+                            element.attrib["srsName"] = location_srsName if location_srsName is not None else current_location_system
 
                     if localname == "Location":
                         if "srsName" not in element.attrib:
@@ -891,24 +833,20 @@ def insert_database(
                 order = element.attrib.get("order", None)
                 object = xml_serializer.unmarshall(element, clazz)
 
-                if current_zoneinfo is not None:
+                if False and current_zoneinfo is not None:  # TODO: Fix this after we can do this in xsData
                     if localname in all_classes_with_xml_time:
                         recursive_replace(object, current_zoneinfo)
 
                 if hasattr(clazz, "order"):
                     if order is None:
-                        warnings.warn(
-                            f"{localname} {id} does not have a required order, setting it to 1."
-                        )
+                        warnings.warn(f"{localname} {id} does not have a required order, setting it to 1.")
                         order = 1
                         object.order = order
 
                     if version is None:
                         version = last_version
                         object.version = version
-                        warnings.warn(
-                            f"{localname} {id} does not have a required version, inheriting it {version}."
-                        )
+                        warnings.warn(f"{localname} {id} does not have a required version, inheriting it {version}.")
 
                     try:
                         db.insert_one_object(object)
@@ -921,9 +859,7 @@ def insert_database(
                     if version is None:
                         version = last_version
                         object.version = version
-                        warnings.warn(
-                            f"{localname} {id} does not have a required version, inheriting it {version}."
-                        )
+                        warnings.warn(f"{localname} {id} does not have a required version, inheriting it {version}.")
 
                     try:
                         db.insert_one_object(object)
@@ -943,24 +879,16 @@ def insert_database(
                 current_element_tag = None
 
 
-def recursive_attributes(
-    obj: Tid, depth: List[int | str]
-) -> Generator[tuple[Any, list[int | str]], None, None]:
+def recursive_attributes(obj: Tid, depth: List[int | str]) -> Generator[tuple[Any, list[int | str]], None, None]:
     # qprint(obj.__class__.__name__)
 
     data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
     if data_source_ref_attribute:
-        yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + [
-            "data_source_ref_attribute"
-        ]
+        yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + ["data_source_ref_attribute"]
 
-    responsibility_set_ref_attribute = getattr(
-        obj, "responsibility_set_ref_attribute", None
-    )
+    responsibility_set_ref_attribute = getattr(obj, "responsibility_set_ref_attribute", None)
     if responsibility_set_ref_attribute:
-        yield ResponsibilitySetRef(ref=responsibility_set_ref_attribute), depth + [
-            "responsibility_set_ref_attribute"
-        ]
+        yield ResponsibilitySetRef(ref=responsibility_set_ref_attribute), depth + ["responsibility_set_ref_attribute"]
 
     mydepth: list[int | str] = depth.copy()
     mydepth.append(0)
@@ -969,16 +897,11 @@ def recursive_attributes(
         v = getattr(obj, key, None)
         if v is not None:
             # print(v)
-            if issubclass(v.__class__, VersionOfObjectRef) or issubclass(
-                v.__class__, VersionOfObjectRefStructure
-            ):
+            if issubclass(v.__class__, VersionOfObjectRef) or issubclass(v.__class__, VersionOfObjectRefStructure):
                 yield v, mydepth
 
             else:
-                if (
-                    hasattr(v, "__dataclass_fields__")
-                    and v.__class__.__name__ in netex.set_all  # type: ignore
-                ):
+                if hasattr(v, "__dataclass_fields__") and v.__class__.__name__ in netex.set_all:  # type: ignore
                     if hasattr(v, "id"):
                         yield v, mydepth
                     yield from recursive_attributes(v, mydepth)
@@ -988,14 +911,9 @@ def recursive_attributes(
                         mydepth[-1] = j
                         x = v[j]
                         if x is not None:
-                            if issubclass(
-                                x.__class__, VersionOfObjectRef
-                            ) or issubclass(x.__class__, VersionOfObjectRefStructure):
+                            if issubclass(x.__class__, VersionOfObjectRef) or issubclass(x.__class__, VersionOfObjectRefStructure):
                                 yield x, mydepth  # TODO: mydepth result is incorrect when list() but not as iterator
-                            elif (
-                                hasattr(x, "__dataclass_fields__")
-                                and x.__class__.__name__ in netex.set_all  # type: ignore
-                            ):
+                            elif hasattr(x, "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
                                 if hasattr(x, "id"):
                                     yield x, mydepth
                                 yield from recursive_attributes(x, mydepth)
