@@ -608,11 +608,11 @@ class Database:
     def get_class_by_name(self, name: str) -> type[Tid]:
         return self.serializer.name_object[name]
 
-    def tables(self, exclusively: set[type[Tid]] | None = None) -> list[type[Tid]]:
+    def tables(self, exclusively: set[type[EntityStructure]] | None = None) -> list[type[EntityStructure]]:
         if exclusively is None:
             exclusively = set(self.serializer.interesting_classes)
 
-        tables: set[type[Tid]] = set([])
+        tables: set[type[EntityStructure]] = set([])
         with self.env.begin(buffers=True, write=False) as txn:
             cursor = txn.cursor()
             for key, _ in cursor:
