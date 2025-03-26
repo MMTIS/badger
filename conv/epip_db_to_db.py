@@ -66,7 +66,8 @@ def main(source_database_file: str, target_database_file: str) -> None:
                 if default_codespace is None and frame_defaults.default_codespace_ref:
                     default_codespace_ref = frame_defaults.default_codespace_ref
                     default_codespace = source_db.get_single(Codespace, default_codespace_ref.ref, None)
-                    generator_defaults['codespace'] = default_codespace
+                    if default_codespace:
+                        generator_defaults['codespace'] = default_codespace
 
             log_all(logging.INFO, "Copy all tables as-is ")
             copy_table(

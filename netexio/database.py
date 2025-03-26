@@ -350,7 +350,7 @@ class Database:
             value = self.serializer.marshall(obj, obj.__class__)
             self.task_queue.put((LmdbActions.WRITE, self.db_metadata, key, value))
 
-    def get_metadata(self, id: str, version: str, klass: type[Tid]) -> Generator[Tid, None, None]:
+    def get_metadata(self, id: str | None, version: str | None, klass: type[T]) -> Generator[T, None, None]:
         prefix = self.serializer.encode_key(id, version, klass, include_clazz=True)
         with self.env.begin(db=self.db_metadata, buffers=True, write=False) as txn:
             cursor = txn.cursor()
