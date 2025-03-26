@@ -16,6 +16,7 @@ dependencies = [
     "pyproj",
     "folium",
     "paramiko",
+    "types-paramiko",
     "xsdata[cli,soap,lxml]>=24.12",
 ]
 requires-python = ">=3.12"
