@@ -24,18 +24,14 @@ class Serializer:
         ) = get_interesting_classes()
         for i in range(0, len(self.interesting_element_names)):
             # TODO: Validate duplicates, below will only make sure we overwrite with first order members
-            self.name_object[self.interesting_element_names[i]] = (
-                self.interesting_classes[i]
-            )
+            self.name_object[self.interesting_element_names[i]] = self.interesting_classes[i]
 
     @staticmethod
     @abstractmethod
-    def encode_key(
-        id: str | None, version: str | None, clazz: type[Tid], include_clazz: bool = False
-    ) -> Any: ...
+    def encode_key(id: str | None, version: str | None, clazz: type[T], include_clazz: bool = False) -> Any: ...
 
     @abstractmethod
-    def marshall(self, xml: Any, clazz: type[Tid]) -> Any: ...
+    def marshall(self, xml: Any, clazz: type[T]) -> Any: ...
 
     @abstractmethod
-    def unmarshall(self, obj: Any, clazz: type[Tid]) -> Tid: ...
+    def unmarshall(self, obj: Any, clazz: type[T]) -> T: ...

@@ -29,24 +29,18 @@ class MyXmlSerializer(Serializer):
         Serializer.__init__(self)
         context = XmlContext()
         config = ParserConfig(fail_on_unknown_properties=False)
-        self.parser = XmlParser(
-            context=context, config=config, handler=LxmlEventHandler
-        )
+        self.parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 
-        serializer_config = SerializerConfig(
-            encoding="utf-8", ignore_default_attributes=True, xml_declaration=False
-        )
+        serializer_config = SerializerConfig(encoding="utf-8", ignore_default_attributes=True, xml_declaration=False)
         serializer_config.indent = None
         serializer_config.ignore_default_attributes = True
         self.serializer = XmlSerializer(config=serializer_config)
 
     @staticmethod
-    def encode_key(
-        id: str | None, version: str | None, clazz: type[Tid], include_clazz: bool = False
-    ) -> bytes:
+    def encode_key(id: str | None, version: str | None, clazz: type[T], include_clazz: bool = False) -> bytes:
         return ((id or '') + "-" + (version or 'any')).encode("utf-8")
 
-    def marshall(self, obj: Any, clazz: type[Tid]) -> str:
+    def marshall(self, obj: Any, clazz: type[T]) -> str:
         if isinstance(obj, str):
             return obj
         elif isinstance(obj, etree._Element):
@@ -54,7 +48,7 @@ class MyXmlSerializer(Serializer):
         else:
             return self.serializer.render(obj, self.ns_map).replace("\n", "")
 
-    def unmarshall(self, obj: Any, clazz: type[Tid]) -> Tid:
+    def unmarshall(self, obj: Any, clazz: type[T]) -> T:
         if isinstance(obj, etree._Element):
             return self.parser.parse(obj, clazz)
 

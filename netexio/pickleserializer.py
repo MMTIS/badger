@@ -21,9 +21,7 @@ class MyPickleSerializer(Serializer):
         self.compression = compression
 
     @staticmethod
-    def encode_key(
-        id: str | None, version: str | None, clazz: type[Tid], include_clazz: bool = False
-    ) -> bytes:
+    def encode_key(id: str | None, version: str | None, clazz: type[T], include_clazz: bool = False) -> bytes:
         SEPARATOR = ord("-")
         SPECIAL_CHAR = ord("*")
         WORD_MASK = "#"
@@ -32,16 +30,7 @@ class MyPickleSerializer(Serializer):
             """Encodes a string by replacing special characters and masking the object name."""
             if mask:
                 value = re.sub(rf"\b{re.escape(obj_name)}\b", WORD_MASK, value.upper())
-            return bytes(
-                (
-                    ord(char)
-                    if char in string.ascii_uppercase
-                    or char in string.digits
-                    or char == WORD_MASK
-                    else SPECIAL_CHAR
-                )
-                for char in value
-            )
+            return bytes((ord(char) if char in string.ascii_uppercase or char in string.digits or char == WORD_MASK else SPECIAL_CHAR) for char in value)
 
         obj_name = get_object_name(clazz).upper()
         encoded_bytes = bytearray()
@@ -59,10 +48,8 @@ class MyPickleSerializer(Serializer):
 
         return bytes(encoded_bytes)
 
-    def marshall(self, obj: Any, clazz: type[Tid]) -> bytes:
-        if not getattr(obj, "__module__").startswith(
-            "netex."
-        ):  # TODO: can we just get the parent?
+    def marshall(self, obj: Any, clazz: type[T]) -> bytes:
+        if not getattr(obj, "__module__").startswith("netex."):  # TODO: can we just get the parent?
             obj = self.xmlserializer.unmarshall(obj, clazz)
 
         if self.compression:
@@ -70,8 +57,8 @@ class MyPickleSerializer(Serializer):
         else:
             return cast(bytes, cloudpickle.dumps(obj))
 
-    def unmarshall(self, obj: bytes, clazz: type[Tid]) -> Tid:
+    def unmarshall(self, obj: bytes, clazz: type[T]) -> T:
         if self.compression:
-            return cast(Tid, cloudpickle.loads(lz4.frame.decompress(obj)))
+            return cast(T, cloudpickle.loads(lz4.frame.decompress(obj)))
         else:
-            return cast(Tid, cloudpickle.loads(obj))
+            return cast(T, cloudpickle.loads(obj))
