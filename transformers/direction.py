@@ -1,4 +1,4 @@
-from typing import Dict, Any, Iterable, Generator
+from typing import Dict, Any, Generator, cast
 
 from netexio.database import Database
 from netexio.dbaccess import load_generator
@@ -15,12 +15,14 @@ def infer_directions_from_sjps_and_apply(db_read: Database, db_write: Database, 
             key = str(sjp.direction_type.value)
             direction: Direction | None = directions.get(key, None)
             if direction is None:
-                direction = Direction(id=getId(Direction, generator_defaults['codespace'], key),
-                                      version='any',
-                                      name=MultilingualString(value=key),
-                                      direction_type=DirectionType(value=sjp.direction_type))
+                direction = Direction(
+                    id=getId(Direction, generator_defaults['codespace'], key),
+                    version='any',
+                    name=MultilingualString(value=key),
+                    direction_type=DirectionType(value=sjp.direction_type),
+                )
                 directions[key] = direction
-                direction_refs[key] = getRef(direction)
+                direction_refs[key] = cast(DirectionRef, getRef(direction))
             sjp.direction_ref_or_direction_view = direction_refs[key]
             return sjp
 
