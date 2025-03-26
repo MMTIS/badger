@@ -1,3 +1,5 @@
+from typing import cast
+
 from transformers.callsprofile import CallsProfile
 from netex import (
     ServiceJourney,
@@ -351,7 +353,7 @@ class TimetablePassingTimesProfile:
                             sjps[spijp_hash] = service_journey_pattern
                             existing_sjps[service_journey_pattern.id] = service_journey_pattern
 
-                        sj.journey_pattern_ref = getRef(service_journey_pattern, ServiceJourneyPatternRef)
+                        sj.journey_pattern_ref = cast(ServiceJourneyPatternRef, getRef(service_journey_pattern, ServiceJourneyPatternRef))
 
                 if not service_journey_pattern:
                     if sj.journey_pattern_ref:

@@ -94,12 +94,16 @@ class CallsProfile:
 
     @staticmethod
     def getRunTime(departure: DepartureStructure, arrival: ArrivalStructure) -> int:
+        assert departure.time is not None
+        assert arrival.time is not None
         return ((arrival.day_offset or 0) * 86400 + arrival.time.hour * 3600 + arrival.time.minute * 60 + arrival.time.second) - (
             (departure.day_offset or 0) * 86400 + departure.time.hour * 3600 + departure.time.minute * 60 + departure.time.second
         )
 
     @staticmethod
     def getWaitTime(arrival: ArrivalStructure, departure: DepartureStructure) -> int:
+        assert departure.time is not None
+        assert arrival.time is not None
         return ((departure.day_offset or 0) * 86400 + departure.time.hour * 3600 + departure.time.minute * 60 + departure.time.second) - (
             (arrival.day_offset or 0) * 86400 + arrival.time.hour * 3600 + arrival.time.minute * 60 + arrival.time.second
         )
@@ -246,7 +250,7 @@ class CallsProfile:
         service_journey.calls = calls
 
     @staticmethod
-    def getPassingTimesFromTimeDemandType(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, time_demand_type: TimeDemandType):
+    def getPassingTimesFromTimeDemandType(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, time_demand_type: TimeDemandType) -> None:
         # If calls are present, we don't have to do anything
         if service_journey.passing_times is not None:
             return

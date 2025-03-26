@@ -1,6 +1,6 @@
 import sys
 from functools import partial
-from typing import Generator, Dict
+from typing import Generator, Dict, Any
 
 from netexio.database import Database
 from netexio.dbaccess import load_generator, load_local
@@ -14,14 +14,14 @@ from transformers.projection import project_location
 import time
 
 
-def dutch_scheduled_stop_point_generator(db_read: Database, db_write: Database, generator_defaults: dict, pool: Pool):
+def dutch_scheduled_stop_point_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool):
     print(sys._getframe().f_code.co_name)
 
-    def process(ssp: ScheduledStopPoint, generator_defaults: dict):
-        project_location(ssp.location, "EPSG:28992", generator_defaults, quantize='1.0')
+    def process(ssp: ScheduledStopPoint):
+        project_location(ssp.location, "EPSG:28992", quantize='1.0')
         return ssp
 
-    def query(db_read: Database) -> Generator:
+    def query(db_read: Database, generator_defaults: dict[str, Any]) -> Generator:
         _load_generator = load_generator(db_read, ScheduledStopPoint)
         for ssp in pool.imap_unordered(partial(process, generator_defaults=generator_defaults), _load_generator, chunksize=100):
             yield ssp
@@ -29,7 +29,7 @@ def dutch_scheduled_stop_point_generator(db_read: Database, db_write: Database, 
     db_write.insert_objects_on_queue(ScheduledStopPoint, query(db_read), True)
 
 
-def dutch_scheduled_stop_point_memory(db_read: Database, db_write: Database, generator_defaults: dict):
+def dutch_scheduled_stop_point_memory(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
     print(sys._getframe().f_code.co_name)
 
     scheduled_stop_points = load_local(db_read, ScheduledStopPoint)
@@ -37,14 +37,14 @@ def dutch_scheduled_stop_point_memory(db_read: Database, db_write: Database, gen
         ssp: ScheduledStopPoint
         ssp.stop_areas = None
         if ssp.location is not None:
-            project_location(ssp.location, "EPSG:28992", generator_defaults, quantize='1.0')
+            project_location(ssp.location, "EPSG:28992", quantize='1.0')
         else:
             print(f"ScheduledStopPoint {ssp.id} does not have a location.")
 
     db_write.insert_objects_on_queue(ScheduledStopPoint, scheduled_stop_points, True)
 
 
-def dutch_service_journey_pattern_time_demand_type_memory(db_read: Database, db_write: Database, generator_defaults: dict):
+def dutch_service_journey_pattern_time_demand_type_memory(db_read: Database, db_write: Database):
     print(sys._getframe().f_code.co_name)
 
     codespaces = load_local(db_read, Codespace, 1)
