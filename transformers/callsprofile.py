@@ -58,7 +58,7 @@ class CallsProfile:
         )
 
     @staticmethod
-    def getArrivalTime(arrival: int, offset: int = 0) -> (XmlTime, int):
+    def getArrivalTime(arrival: int, offset: int = 0) -> tuple[XmlTime, int]:
         day_offset = arrival // 86400
         hour = (arrival % 86400) // 3600
         minute = (arrival % 3600) // 60
@@ -85,7 +85,7 @@ class CallsProfile:
         )
 
     @staticmethod
-    def getDepartureTimeOffset(departure: int, offset: int = 0) -> (XmlTime, int):
+    def getDepartureTimeOffset(departure: int, offset: int = 0) -> tuple[XmlTime, int]:
         day_offset = departure // 86400
         hour = (departure % 86400) // 3600
         minute = (departure % 3600) // 60
@@ -110,6 +110,7 @@ class CallsProfile:
 
     @staticmethod
     def getDepartureTime(service_journey: ServiceJourney) -> int:
+        assert service_journey.departure_time is not None
         return (
             (service_journey.departure_day_offset or 0) * 86400
             + service_journey.departure_time.hour * 3600
@@ -118,7 +119,7 @@ class CallsProfile:
         )
 
     @staticmethod
-    def getWaitTimesFromPointInJourneyPattern(wait_time_or_wait_times, time_demand_type: TimeDemandType = None):
+    def getWaitTimesFromPointInJourneyPattern(wait_time_or_wait_times, time_demand_type: TimeDemandType = None) -> XmlDuration | None:
         if isinstance(wait_time_or_wait_times, XmlDuration):
             return wait_time_or_wait_times
 
@@ -137,7 +138,7 @@ class CallsProfile:
         return None
 
     @staticmethod
-    def getCallsFromTimeDemandType(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, time_demand_type: TimeDemandType):
+    def getCallsFromTimeDemandType(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, time_demand_type: TimeDemandType) -> None:
         # If calls are present, we don't have to do anything
         if service_journey.calls is not None:
             return
@@ -423,9 +424,11 @@ class CallsProfile:
             # GTFS has strange requirements
             if order == 1:
                 if call.arrival.time is None:
+                    assert call.departure.time is not None
                     call.arrival.day_offset = call.departure.day_offset
                     call.arrival.time = call.departure.time
                 elif call.departure.time is None:
+                    assert call.arrival.time is not None
                     call.departure.day_offset = call.arrival.day_offset
                     call.departure.time = call.arrival.time
 
@@ -470,9 +473,9 @@ class CallsProfile:
                     part += 1
 
                 if len(run_times) == 0:
-                    run_times = None
+                    jounrney_run_times = None
                 else:
-                    run_times = JourneyRunTimesRelStructure(journey_run_time=run_times)
+                    jounrney_run_times = JourneyRunTimesRelStructure(journey_run_time=run_times)
 
                 wait_times = []
                 part = 0
@@ -486,11 +489,11 @@ class CallsProfile:
                         part += 1
 
                 if len(wait_times) == 0:
-                    wait_times = None
+                    journey_wait_times = None
                 else:
-                    wait_times = JourneyWaitTimesRelStructure(journey_wait_time=wait_times)
+                    journey_wait_times = JourneyWaitTimesRelStructure(journey_wait_time=wait_times)
 
-                tdt = TimeDemandType(run_times=run_times, wait_times=wait_times)
+                tdt = TimeDemandType(run_times=jounrney_run_times, wait_times=journey_wait_times)
                 setIdVersion(tdt, self.codespace, tdt_hash % 65449, self.version)
                 tdts[tdt_hash] = tdt
 

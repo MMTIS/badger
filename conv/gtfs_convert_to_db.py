@@ -2,9 +2,10 @@ import datetime
 import hashlib
 import math
 from _decimal import Decimal
-from typing import List, Generator, TypeVar, Any, Iterable, Generator
+from typing import List, Generator, TypeVar, Any, Iterable, Generator, cast, Union
 
 import duckdb
+import lmdb
 import numpy
 from pandas._libs.missing import NAType
 from xsdata.formats.dataclass.serializers import XmlSerializer
@@ -42,7 +43,11 @@ from netex import Codespace, DataSource, MultilingualString, Version, VersionFra
     LineInDirectionRef, EmptyType2, StopPlaceRef, ServiceJourneyRefStructure, PrivateCodes, DayTypeAssignment, \
     DayTypeRefsRelStructure, ServiceCalendarFrame, DayTypesInFrameRelStructure, \
     OperatingPeriodsInFrameRelStructure, DayTypeAssignmentsInFrameRelStructure, DayTypeRef, OperatingPeriod, \
-    PublicCodeStructure, GeneralFrame, DirectionType
+    PublicCodeStructure, GeneralFrame, DirectionType, HeadwayJourneyGroupRef, RhythmicalJourneyGroupRef, \
+    RhythmicalJourneyGroup, FlexibleLine, RetailConsortium, ServicedOrganisation, GeneralOrganisation, ManagementAgent, \
+    TravelAgent, OtherOrganisation, OnlineServiceOperator, Authority, ValidityRuleParameterRef, ValidityTriggerRef, \
+    ValidityConditionRef, ValidBetween, SimpleAvailabilityCondition, ValidDuring, ValidityRuleParameter, \
+    ValidityTrigger, ValidityCondition
 
 from utils.refs import getRef, getIndex, getBitString2, getFakeRef, getOptionalString, getId
 from utils.aux_logging import log_all, prepare_logger
@@ -119,8 +124,8 @@ class GtfsNeTexProfile(CallsProfile):
                                      description=MultilingualString(value=df['feed_publisher_name'][0]))
 
             frame_defaults = VersionFrameDefaultsStructure(
-                default_codespace_ref=getRef(codespace, CodespaceRefStructure),
-                default_data_source_ref=getRef(data_source, DataSourceRefStructure),
+                default_codespace_ref=cast(CodespaceRefStructure, getRef(codespace, CodespaceRefStructure)),
+                default_data_source_ref=cast(DataSourceRefStructure, getRef(data_source, DataSourceRefStructure)),
                 default_locale=LocaleStructure(default_language=df['feed_lang'][0]),
                 default_location_system="urn:ogc:def:crs:EPSG::4326",
                 default_system_of_units=SystemOfUnits.SI_METRES
@@ -133,7 +138,7 @@ class GtfsNeTexProfile(CallsProfile):
         resource_frame.data_sources = DataSourcesInFrameRelStructure(data_source=[self.data_source])
         # resource_frame.zones = ZonesInFrameRelStructure(transport_administrative_zone=[transport_administrative_zone])
         resource_frame.organisations = OrganisationsInFrameRelStructure(
-            organisation_or_transport_organisation=operators)
+            organisation_or_transport_organisation=cast(list[RetailConsortium | ServicedOrganisation | GeneralOrganisation | ManagementAgent | TravelAgent | OtherOrganisation | OnlineServiceOperator | Authority | Operator], operators))
         resource_frame.operational_contexts = OperationalContextsInFrameRelStructure(
             operational_context=self.getOperationalContexts())
         # resource_frame.vehicle_types = VehicleTypesInFrameRelStructure(compound_train_or_train_or_vehicle_type=getVehicleTypes(codespace))
@@ -166,14 +171,14 @@ class GtfsNeTexProfile(CallsProfile):
                                     private_codes=PrivateCodes(private_code=[
                                         PrivateCode(value=agency_ids[i], type_value="agency_id")]),
                                     version=self.version.version,
-                                    name=MultilingualString(value=get_or_none(agency_names, i)),
-                                    locale=Locale(time_zone=get_or_none(agency_timezones, i),
+                                    name=MultilingualString(value=agency_names[i]),
+                                    locale=Locale(time_zone=agency_timezones[i],
                                                   languages=LocaleStructure.Languages(language_usage=[
                                                       LanguageUsageStructure(language=get_or_none(agency_langs, i),
                                                                              language_use=[
                                                                                  LanguageUseEnumeration.NORMALLY_USED])]) if get_or_none(
                                                       agency_langs, i) is not None else None),
-                                    customer_service_contact_details=ContactStructure(url=get_or_none(agency_urls, i),
+                                    customer_service_contact_details=ContactStructure(url=agency_urls[i],
                                                                                       phone=get_or_none(agency_phones,
                                                                                                         i),
                                                                                       email=get_or_none(agency_emails,
@@ -271,7 +276,7 @@ class GtfsNeTexProfile(CallsProfile):
                             public_code=PublicCodeStructure(value=route_short_names[i]) if route_short_names[
                                                                                                i] is not None else None,
                             private_codes=PrivateCodes(
-                                private_code=[PrivateCode(value=get_or_none(route_ids, i), type_value="route_id")])
+                                private_code=[PrivateCode(value=route_ids[i], type_value="route_id")])
                             )
                 lines.append(line)
 
@@ -334,13 +339,13 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(ScheduledStopPoint, self.codespace, stop_id)
 
-    def getScheduledStopPoints(self, stop_areas: Iterable[StopArea], scheduled_stop_points_sql: dict[str, str]={
+    def getScheduledStopPoints(self, stop_areas_input: Iterable[StopArea], scheduled_stop_points_sql: dict[str, str]={
         'query': """select distinct * from stops where location_type = 0 or location_type is null order by stop_id;"""}) -> \
     list[ScheduledStopPoint]:
-        stop_areas = getIndex(stop_areas)
+        stop_areas: dict[str, StopArea] = getIndex(stop_areas_input)
 
-        scheduled_stop_points = []
-        passenger_stop_assignments = []
+        scheduled_stop_points: list[ScheduledStopPoint] = []
+        passenger_stop_assignments: list[PassengerStopAssignment] = []
 
         with self.conn.cursor() as cur:
             cur.execute(**scheduled_stop_points_sql)
@@ -774,7 +779,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         return (list(routes.values()), route_points, route_links)
 
-    def getLineStrings(self, shape_sql: dict[str, str]={
+    def getLineStrings(self, shape_sql: dict[str, Any]={
         'query': """select shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled from shapes order by shape_id, shape_pt_sequence, shape_dist_traveled;"""}) -> \
     List[LinkSequenceProjection]:
         link_sequence_projection = []
@@ -844,7 +849,7 @@ class GtfsNeTexProfile(CallsProfile):
         service_frame = ServiceFrame(id=getId(ServiceFrame, self.codespace, id), version=self.version.version)
         # service_frame.prerequisites.resource_frame_ref
         # setIdVersion(service_frame, self.codespace, "ServiceFrame", self.version)
-        service_frame.lines = LinesInFrameRelStructure(line=lines)
+        service_frame.lines = LinesInFrameRelStructure(line=cast(list[FlexibleLine | Line], lines))
 
         stop_areas = sorted(stop_areas, key=lambda x: x.id)
         if stop_areas:
@@ -934,7 +939,7 @@ class GtfsNeTexProfile(CallsProfile):
         with self.conn.cursor() as cur:
             cur.execute(**exceptions_sql)
             exceptions_df = cur.df()
-            exceptions = {}
+            exceptions: dict[str, list[AvailabilityCondition]] = {}
 
             service_ids = exceptions_df.get('service_id')
             for i in range(0, len(service_ids)):
@@ -996,9 +1001,7 @@ class GtfsNeTexProfile(CallsProfile):
                                               DayType(id=self.get_service_id_dt(service_ids[i]),
                                                       version=self.version.version,
                                                       properties=PropertiesOfDayRelStructure(property_of_day=[
-                                                          PropertyOfDay(tides=None, weeks_of_month=None,
-                                                                        holiday_types=None, seasons=None,
-                                                                        days_of_week=days_of_week)]))])))
+                                                          PropertyOfDay(days_of_week=days_of_week)]))])))
 
         return availability_conditions
 
@@ -1217,7 +1220,7 @@ class GtfsNeTexProfile(CallsProfile):
         return (XmlTime(hour=hour_i % 24, minute=int(minute), second=int(second)), day_offset)
 
     @staticmethod
-    def directionToNeTEx(direction_id: int) -> DirectionType | None:
+    def directionToNeTEx(direction_id: int | None) -> DirectionType | None:
         if direction_id is None:
             return None
 
@@ -1239,10 +1242,10 @@ class GtfsNeTexProfile(CallsProfile):
     @staticmethod
     def bicyclesToNeTEx(bikes_allowed: int) -> LuggageCarriageEnumeration:
         if bikes_allowed == 1:
-            return LuggageCarriageEnumeration.TRUE
+            return LuggageCarriageEnumeration.CYCLES_ALLOWED
 
         elif bikes_allowed == 2:
-            return LuggageCarriageEnumeration.FALSE
+            return LuggageCarriageEnumeration.NO_CYCLES
 
         return LuggageCarriageEnumeration.UNKNOWN
 
@@ -1277,11 +1280,11 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(Call, self.codespace, trip_id) + '_' + str(sequence)
 
-    def getServiceJourneys(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
+    def getServiceJourneys(self, availability_conditions_input: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""},
                            stop_times_sql: dict[str, str]={'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
     Generator[ServiceJourney, None, None]:
-        availability_conditions = getIndex(availability_conditions)
+        availability_conditions = getIndex(availability_conditions_input)
 
         service_journeys = {}
         shape_used = set([])
@@ -1431,7 +1434,7 @@ class GtfsNeTexProfile(CallsProfile):
                 shape_dist_traveled = get_or_none(shape_dist_traveleds, i)
                 if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
                     distance = shape_dist_traveled - prev_shape_traveled
-                    prev_call.onward_service_link_view = OnwardServiceLinkView(distance=distance)
+                    prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
 
                 call = Call(id=self.get_trip_id_call(trip_ids[i], stop_sequences[i]), version=self.version.version,
                             fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view=getFakeRef(
@@ -1445,6 +1448,7 @@ class GtfsNeTexProfile(CallsProfile):
                                               drop_off_types[i] == 3),
                             order=prev_order)  # stop_sequence is non-negative integer
 
+                assert service_journey.calls is not None
                 service_journey.calls.call.append(call)
 
                 prev_call = call
@@ -1460,6 +1464,7 @@ class GtfsNeTexProfile(CallsProfile):
                                   stop_times_sql: dict[str, str]={
                                       'query': """select * from stop_times order by trip_id, stop_sequence;"""}) -> \
     Generator[ServiceJourney, None, None]:
+        service_journey: ServiceJourney
         service_journeys = {}
         shape_used = set([])
 
@@ -1579,7 +1584,6 @@ class GtfsNeTexProfile(CallsProfile):
                 if trip_ids[i] != trip_id:
                     if trip_id is not None:
                         yield service_journey
-                        service_journey.calls = None  # Free memory
 
                     trip_id = trip_ids[i]
                     service_journey = service_journeys[trip_id]
@@ -1602,7 +1606,7 @@ class GtfsNeTexProfile(CallsProfile):
                 shape_dist_traveled = get_or_none(shape_dist_traveleds, i)
                 if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
                     distance = shape_dist_traveled - prev_shape_traveled
-                    prev_call.onward_service_link_view = OnwardServiceLinkView(distance=distance)
+                    prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
 
                 call = Call(id=self.get_trip_id_call(trip_ids[i], stop_sequences[i]), version=self.version.version,
                             fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view=getFakeRef(
@@ -1616,6 +1620,7 @@ class GtfsNeTexProfile(CallsProfile):
                                               drop_off_types[i] == 3),
                             order=prev_order)  # stop_sequence is non-negative integer
 
+                assert service_journey.calls is not None
                 service_journey.calls.call.append(call)
 
                 prev_call = call
@@ -1625,10 +1630,10 @@ class GtfsNeTexProfile(CallsProfile):
             if trip_id is not None:
                 yield service_journey
 
-    def getServiceJourneys2(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
+    def getServiceJourneys2(self, availability_conditions_input: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips where trip_id not in (select trip_id from frequencies) order by trip_id;"""}) -> \
     Generator[ServiceJourney, None, None]:
-        availability_conditions = getIndex(availability_conditions)
+        availability_conditions = getIndex(availability_conditions_input)
 
         shape_used = set([])
 
@@ -1747,7 +1752,7 @@ class GtfsNeTexProfile(CallsProfile):
                         shape_dist_traveled = get_or_none(shape_dist_traveleds, index_j)
                         if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
                             distance = shape_dist_traveled - prev_shape_traveled
-                            prev_call.onward_service_link_view = OnwardServiceLinkView(distance=distance)
+                            prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
 
                         call = Call(id=self.get_trip_id_call(trip_ids[i], stop_sequences[index_j]),
                                     version=self.version.version,
@@ -1764,6 +1769,7 @@ class GtfsNeTexProfile(CallsProfile):
                                         drop_off_types[index_j] == 3),
                                     order=prev_order)  # stop_sequence is non-negative integer
 
+                        assert calls is not None
                         calls.call.append(call)
 
                         prev_call = call
@@ -1779,8 +1785,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                      PrivateCode(value=trip_ids[i], type_value="trip_id")]),
                                                  short_name=getOptionalString(get_or_none(trip_short_names, i)),
                                                  validity_conditions_or_valid_between=[ValidityConditionsRelStructure(
-                                                     choice=[getRef(x, AvailabilityConditionRef) for x in
-                                                             availability_conditions_journey if x is not None])],
+                                                     choice=cast(list[Union[AvailabilityConditionRef, ValidityRuleParameterRef, ValidityTriggerRef, ValidityConditionRef, ValidBetween, SimpleAvailabilityCondition, ValidDuring, AvailabilityCondition, ValidityRuleParameter, ValidityTrigger, ValidityCondition]], [getRef(x, AvailabilityConditionRef) for x in availability_conditions_journey if x is not None]))],
                                                  journey_pattern_view=journey_pattern_view,
                                                  direction_type=self.directionToNeTEx(get_or_none(direction_ids, i)),
                                                  block_ref=block_ref,
@@ -1961,10 +1966,10 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(TemplateServiceJourney, self.codespace, trip_id)
 
-    def getTemplateServiceJourneys(self, availability_conditions: list[AvailabilityCondition], trips_sql: dict[str, str]={
+    def getTemplateServiceJourneys(self, availability_conditions_input: list[AvailabilityCondition], trips_sql: dict[str, str]={
         'query': """select * from trips WHERE trip_id IN (SELECT trip_id FROM frequencies) order by trip_id;"""}) -> \
     Generator[TemplateServiceJourney, None, None]:
-        availability_conditions = getIndex(availability_conditions)
+        availability_conditions = getIndex(availability_conditions_input)
 
         shape_used = set([])
 
@@ -2083,7 +2088,7 @@ class GtfsNeTexProfile(CallsProfile):
                         shape_dist_traveled = get_or_none(shape_dist_traveleds, index_j)
                         if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
                             distance = shape_dist_traveled - prev_shape_traveled
-                            prev_call.onward_service_link_view = OnwardServiceLinkView(distance=distance)
+                            prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
 
                         call = Call(id=self.get_trip_id_call(trip_ids[i], stop_sequences[index_j]),
                                     version=self.version.version,
@@ -2130,7 +2135,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                                  trip_ids[i] + '_' + start_times[index_j].replace(':',
                                                                                                                   '')),
                                                         first_departure_time=start_time,
-                                                        first_day_offset_or_last_departure_time_or_last_day_offset_or_first_arrival_time_or_last_arrival_time=l,
+                                                        first_day_offset_or_last_departure_time_or_last_day_offset_or_first_arrival_time_or_last_arrival_time=cast(list[Union["JourneyFrequencyGroupVersionStructure.FirstDayOffset", "JourneyFrequencyGroupVersionStructure.LastDepartureTime", "JourneyFrequencyGroupVersionStructure.LastDayOffset", "JourneyFrequencyGroupVersionStructure.FirstArrivalTime", "JourneyFrequencyGroupVersionStructure.LastArrivalTime"]], l),
                                                         scheduled_headway_interval=XmlDuration(
                                                             value=f'PT{headway_secs[index_j]}S') if exact_times[
                                                                                                         index_j] == 1 else None,
@@ -2157,7 +2162,7 @@ class GtfsNeTexProfile(CallsProfile):
                     link_sequence_projection_ref_or_link_sequence_projection=lsp,
                     calls=calls,
                     frequency_groups=FrequencyGroupsRelStructure(
-                        headway_journey_group_ref_or_headway_journey_group_or_rhythmical_journey_group_ref_or_rhythmical_journey_group=hjgs)
+                        headway_journey_group_ref_or_headway_journey_group_or_rhythmical_journey_group_ref_or_rhythmical_journey_group=cast(list[Union[HeadwayJourneyGroupRef, HeadwayJourneyGroup, RhythmicalJourneyGroupRef, RhythmicalJourneyGroup]], hjgs))
                     )
                 yield template_service_journey
 
@@ -2245,7 +2250,7 @@ class GtfsNeTexProfile(CallsProfile):
                                     'parameters': (trip_ids[i],)})
                     trip_id = None
                     service_journey = None
-                    prev_call = None
+                    prev_call: Call | None = None
                     prev_shape_traveled = 0
                     prev_order = 1
 
@@ -2275,7 +2280,7 @@ class GtfsNeTexProfile(CallsProfile):
                         shape_dist_traveled = get_or_none(shape_dist_traveleds, index_j)
                         if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
                             distance = shape_dist_traveled - prev_shape_traveled
-                            prev_call.onward_service_link_view = OnwardServiceLinkView(distance=distance)
+                            prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
 
                         call = Call(id=self.get_trip_id_call(trip_ids[i], stop_sequences[index_j]),
                                     version=self.version.version,
@@ -2322,7 +2327,7 @@ class GtfsNeTexProfile(CallsProfile):
                                                                  trip_ids[i] + '_' + start_times[index_j].replace(':',
                                                                                                                   '')),
                                                         first_departure_time=start_time,
-                                                        first_day_offset_or_last_departure_time_or_last_day_offset_or_first_arrival_time_or_last_arrival_time=l,
+                                                        first_day_offset_or_last_departure_time_or_last_day_offset_or_first_arrival_time_or_last_arrival_time=cast(list[Union["JourneyFrequencyGroupVersionStructure.FirstDayOffset", "JourneyFrequencyGroupVersionStructure.LastDepartureTime", "JourneyFrequencyGroupVersionStructure.LastDayOffset", "JourneyFrequencyGroupVersionStructure.FirstArrivalTime", "JourneyFrequencyGroupVersionStructure.LastArrivalTime"]], l),
                                                         scheduled_headway_interval=XmlDuration(
                                                             value=f'PT{headway_secs[index_j]}S') if exact_times[
                                                                                                         index_j] == 1 else None,
@@ -2350,119 +2355,9 @@ class GtfsNeTexProfile(CallsProfile):
                     link_sequence_projection_ref_or_link_sequence_projection=lsp,
                     calls=calls,
                     frequency_groups=FrequencyGroupsRelStructure(
-                        headway_journey_group_ref_or_headway_journey_group_or_rhythmical_journey_group_ref_or_rhythmical_journey_group=hjgs)
+                        headway_journey_group_ref_or_headway_journey_group_or_rhythmical_journey_group_ref_or_rhythmical_journey_group=cast(list[Union[HeadwayJourneyGroupRef, HeadwayJourneyGroup, RhythmicalJourneyGroupRef, RhythmicalJourneyGroup]], hjgs))
                     )
                 yield template_service_journey
-
-    def getTimetableFrame(self, availability_conditions: list[AvailabilityCondition], service_journeys: list[ServiceJourney], id: str="TimetableFrame") -> TimetableFrame:
-        timetable_frame = TimetableFrame(id=getId(TimetableFrame, self.codespace, id), version=self.version.version)
-
-        timetable_frame.vehicle_journeys = JourneysInFrameRelStructure(
-            vehicle_journey_or_dated_vehicle_journey_or_normal_dated_vehicle_journey_or_service_journey_or_dated_service_journey_or_dead_run_or_special_service_or_template_service_journey=service_journeys)
-        timetable_frame.content_validity_conditions = ValidityConditionsRelStructure(
-            choice=availability_conditions) if availability_conditions is not None and len(
-            availability_conditions) > 0 else None
-
-        return timetable_frame
-
-    def getServiceCalendarFrame(self, day_types: list[DayType], operating_periods: list[OperatingPeriod], day_type_assignments: list[DayTypeAssignment],
-                                id: str="ServiceCalendarFrame") -> ServiceCalendarFrame:
-        service_calendar_frame = ServiceCalendarFrame(id=getId(ServiceCalendarFrame, self.codespace, id),
-                                                      version=self.version.version)
-
-        service_calendar_frame.day_types = DayTypesInFrameRelStructure(day_type=day_types) if len(
-            day_types) > 0 else None
-        service_calendar_frame.operating_periods = OperatingPeriodsInFrameRelStructure(
-            operating_period_or_uic_operating_period=operating_periods) if len(operating_periods) > 0 else None
-        service_calendar_frame.day_type_assignments = DayTypeAssignmentsInFrameRelStructure(
-            day_type_assignment=day_type_assignments) if len(day_type_assignments) > 0 else None
-
-        return service_calendar_frame
-
-    def getCompositeFrame(self, operators, lines, stop_areas, scheduled_stop_points, service_journeys,
-                          availability_conditions, day_types, operating_periods,
-                          day_type_assignments) -> CompositeFrame:
-        composite_frame = CompositeFrame(id=getId(CompositeFrame, self.codespace, self.data_source.short_name.value),
-                                         version=self.version.version)
-        composite_frame.frame_defaults = self.frame_defaults
-        composite_frame.codespaces = CodespacesRelStructure(codespace_ref_or_codespace=[self.codespace])
-        composite_frame.versions = VersionsRelStructure(version_ref_or_version=[self.version])
-        composite_frame.frames = FramesRelStructure(common_frame=[self.getResourceFrame(operators)] + [
-            self.getServiceFrame(lines, stop_areas, scheduled_stop_points)] + [
-                                                                     self.getTimetableFrame(availability_conditions,
-                                                                                            service_journeys)] + [
-                                                                     self.getServiceCalendarFrame(day_types,
-                                                                                                  operating_periods,
-                                                                                                  day_type_assignments)])
-        return composite_frame
-
-    def getPublicationDelivery(self, operators, lines, stop_areas, scheduled_stop_points, service_journeys,
-                               availability_conditions, day_types, operating_periods,
-                               day_type_assignments) -> PublicationDelivery:
-        composite_frame = self.getCompositeFrame(operators, lines, stop_areas, scheduled_stop_points, service_journeys,
-                                                 availability_conditions, day_types, operating_periods,
-                                                 day_type_assignments)
-
-        publication_delivery = PublicationDelivery(
-            publication_timestamp=XmlDateTime.from_datetime(datetime.datetime.now()),
-            version="ntx:1.1",
-            participant_ref=ParticipantRef(value="NDOV"),
-            description=MultilingualString(value="NeTEx export")
-        )
-        publication_delivery.data_objects = DataObjectsRelStructure(choice=[composite_frame])
-
-        return publication_delivery
-
-    def full(self) -> None:
-        with open('netex-output/out.xml', 'w', encoding='utf-8') as out:
-            operators = self.getOperators()
-            stop_areas = self.getStopAreas()
-            scheduled_stop_points = self.getScheduledStopPoints(stop_areas)
-            day_types, day_type_assignments, operating_periods = self.getDayTypes()
-            service_journeys = self.getServiceJourneys(day_types)
-
-            self.serializer.write(out,
-                                  self.getPublicationDelivery(operators, self.lines, stop_areas, scheduled_stop_points,
-                                                              service_journeys, [], day_types, operating_periods,
-                                                              day_type_assignments),
-                                  self.ns_map)
-
-        with open('netex-output/out.xml', 'w', encoding='utf-8') as out:
-            self.serializer.write(out,
-                                  self.getPublicationDelivery(operators, self.lines, stop_areas, scheduled_stop_points,
-                                                              service_journeys, [], day_types, operating_periods,
-                                                              day_type_assignments), self.ns_map)
-
-    def incremental(self) -> None:
-        for line in self.lines:
-            with open('netex-output/{}.xml'.format(line.id.replace(':', '_')), 'w', encoding='utf-8') as out:
-                operators = self.getOperators({
-                                                  'query': """select distinct agency.* from agency join routes using (agency_id) where route_id = ? ;""",
-                                                  'parameters': (line.private_code.value,)})
-                stop_areas = self.getStopAreas({
-                                                   'query': """select distinct stops.* from stops where stop_id in (select distinct stops.parent_station from trips join stop_times using (trip_id) join stops using (stop_id) where (location_type = 0 or location_type is null) and parent_station is not null and route_id = ?) order by stop_id;""",
-                                                   'parameters': (line.private_code.value,)})
-                scheduled_stop_points = self.getScheduledStopPoints(stop_areas, {
-                    'query': """select distinct stops.* from trips join stop_times using (trip_id) join stops using (stop_id) where (location_type = 0 or location_type is null) and route_id = ? order by stop_id;""",
-                    'parameters': (line.private_code.value,)})
-
-                day_types, operating_periods, day_type_assignments = self.getDayTypes(day_type_sql={
-                    'query': """select distinct calendar.* from trips join calendar using (service_id) where route_id = ? order by service_id;""",
-                    'parameters': (line.private_code.value,)}, exceptions_sql={
-                    'query': """select service_id, exception_type, array_agg(date order by date) as dates from (select calendar_dates.* from trips join calendar_dates using (service_id) where route_id = ?) as x group by service_id, exception_type;""",
-                    'parameters': (line.private_code.value,)})
-
-                service_journeys = self.getServiceJourneysDayTypes(day_types, {
-                    'query': """select * from trips where route_id = ? order by trip_id;""",
-                    'parameters': (line.private_code.value,)},
-                                                                   {
-                                                                       'query': """select stop_times.* from trips join stop_times using (trip_id) where route_id = ? order by trip_id, stop_sequence;""",
-                                                                       'parameters': (line.private_code.value,)})
-
-                self.serializer.write(out,
-                                      self.getPublicationDelivery(operators, [line], stop_areas, scheduled_stop_points,
-                                                                  service_journeys, day_types, operating_periods,
-                                                                  day_type_assignments), self.ns_map)
 
     def database(self, con: Database) -> None:
         con.insert_objects_on_queue(Line, self.lines)
@@ -2489,12 +2384,13 @@ class GtfsNeTexProfile(CallsProfile):
         stop_areas = self.getStopAreas()
         con.insert_objects_on_queue(StopArea, stop_areas)
         con.insert_objects_on_queue(ScheduledStopPoint, self.getScheduledStopPoints(stop_areas))
-        stop_areas = None
+        del stop_areas
 
         stop_places, passenger_stop_assignments = self.getStopPlaces()
         con.insert_objects_on_queue(StopPlace, stop_places)
         con.insert_objects_on_queue(PassengerStopAssignment, passenger_stop_assignments)
-        stop_places = stop_passenger_stop_assignments = None
+        del stop_places
+        del passenger_stop_assignments
 
         day_types, day_type_assignments, operating_periods = self.getDayTypes()
         con.insert_objects_on_queue(DayType, day_types)
@@ -2509,29 +2405,18 @@ class GtfsNeTexProfile(CallsProfile):
 
         con.insert_objects_on_queue(InterchangeRule, self.getInterchangeRules())
 
-    def __init__(self, conn, serializer: XmlSerializer):
+    codespace: Codespace
+    data_source: DataSource
+    version: Version
+    frame_defaults: VersionFrameDefaultsStructure
+
+    def __init__(self, conn: Any, serializer: XmlSerializer):
         self.conn = conn
         self.serializer = serializer
 
         self.ns_map = {'': 'http://www.netex.org.uk/netex', 'gml': 'http://www.opengis.net/gml/3.2'}
         self.codespace, self.data_source, self.version, self.frame_defaults = self.getCodespaceAndDataSource()
         self.lines = self.getLines()
-        # self.stop_areas = self.getStopAreas()
-        # self.scheduled_stop_points = self.getScheduledStopPoints()
-        # self.availability_conditions = self.getAvailabilityConditions()
-
-        # if full:
-        #     self.full()
-        # else:
-        #     self.incremental()
-
-        # print('.')
-        # self.routes, self.route_points, self.route_links = self.getRoutes()
-
-        #
-        # self.service_journeys = self.getServiceJourneys()
-        # self.service_journey_patterns, self.timing_links = self.getServiceJourneyPatterns()
-        # self.time_demand_types = self.getTimeDemandTypes()
 
 
 def main(database_gtfs: str, database_netex: str) -> None:
@@ -2544,6 +2429,7 @@ def main(database_gtfs: str, database_netex: str) -> None:
                             serializer=serializer)
 
     with Database(database_netex, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
+        assert gtfs.version.version is not None
         db_write.insert_metadata_on_queue([("GTFS", gtfs.version.version, gtfs.frame_defaults)])
         gtfs.database(db_write)
 
