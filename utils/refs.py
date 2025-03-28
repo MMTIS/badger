@@ -1,6 +1,6 @@
 from operator import attrgetter
 from itertools import groupby
-from typing import Optional, List, TypeVar, Any, cast
+from typing import Optional, TypeVar, Any, cast, Iterable
 
 from netex import (
     MultilingualString,
@@ -102,7 +102,7 @@ def getIdByRef(obj: object, codespace: Codespace, ref: str) -> str:
     return "{}:{}:{}".format(codespace.xmlns, name, str(ref).replace(":", "-"))
 
 
-def getIndex(objects: List[Tid], attr: str | None = None) -> dict[object, Tid]:
+def getIndex(objects: Iterable[Tid], attr: str | None = None) -> dict[object, Tid]:
     if not attr:
         return {x.id: x for x in objects}
 
@@ -110,7 +110,7 @@ def getIndex(objects: List[Tid], attr: str | None = None) -> dict[object, Tid]:
     return {f(x): x for x in objects}
 
 
-def getIndexByGroup(objects: List[T], attr: str) -> dict[object, list[T]]:
+def getIndexByGroup(objects: Iterable[T], attr: str) -> dict[object, list[T]]:
     f = attrgetter(attr)  # TODO: change with our own attrgetter that understands lists
     return {i: list(j) for i, j in groupby(objects, lambda x: f(x))}
 
@@ -155,5 +155,18 @@ def getBitString2(
     return out
 
 
-def getOptionalString(name: str | None) -> MultilingualString | None:
-    return MultilingualString(value=name) if name else None
+def getOptionalString(name: str | None, default: str | None = None) -> MultilingualString | None:
+    if name is not None:
+        return MultilingualString(value=name)
+    elif default is not None:
+        return MultilingualString(value=default)
+
+    return None
+
+
+def getRequiredString(name: str | None, default: str) -> MultilingualString:
+    if name is not None:
+        return MultilingualString(value=name)
+
+    assert default is not None
+    return MultilingualString(value=default)
