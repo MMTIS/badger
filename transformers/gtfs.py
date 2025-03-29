@@ -2,7 +2,6 @@ import hashlib
 import logging
 import sys
 import warnings
-from copy import deepcopy
 from datetime import timedelta, datetime, time
 from typing import Generator, TypeVar, Iterable, Any, Iterator
 import copy
@@ -57,26 +56,6 @@ from utils.aux_logging import log_all, log_once
 import utils.netex_monkeypatching  # noqa: F401
 
 T = TypeVar("T")
-
-GTFS_CLASSES = {
-    "Codespace",
-    "StopPlace",
-    "ScheduledStopPoint",
-    "Authority",
-    "Operator",
-    "Line",
-    "DestinationDisplay",
-    "ServiceJourney",
-    "ServiceJourneyPattern",
-    "PassengerStopAssignment",
-    "AvailabilityCondition",
-    "DayTypeAssignment",
-    "UicOperatingPeriod",
-    "TemplateServiceJourney",
-    "Branding",
-    "InterchangeRule",
-    "ServiceJourneyInterchange, JourneyMeeting",
-}
 
 
 def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
@@ -558,27 +537,24 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
                             # TODO: Fix this kind of pattern by abstracting the reference fetching
                             if isinstance(ref, UicOperatingPeriodRef) or (
-                                    isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'):
+                                isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'
+                            ):
                                 uic_operating_periods.append(
-                                    load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True,
-                                               embedding=True)[0])
+                                    load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0]
+                                )
                             elif isinstance(ref, OperatingPeriodRef):
-                                r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True,
-                                               embedding=True)
+                                r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
                                 if len(r) > 0:
                                     operating_periods.append(r[0])
                                 else:
                                     # TODO: we must be able to query child classes directly.
-                                    r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True,
-                                                   embedding=True)
+                                    r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
                                     if len(r) > 0:
                                         uic_operating_periods.append(r[0])
                                     else:
                                         log_all(logging.ERROR, f"{ref} cannot be found.")
                             elif isinstance(ref, OperatingDayRef):
-                                operating_days.append(
-                                    load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True,
-                                               embedding=True)[0])
+                                operating_days.append(load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
 
                         if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                             day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -760,7 +736,9 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
 
                 yield ac
 
-    def query_sj(db_read: Database, mapping: dict, clazz: type[ServiceJourney | TemplateServiceJourney]) -> Generator[ServiceJourney | TemplateServiceJourney, None, None]:
+    def query_sj(
+        db_read: Database, mapping: dict, clazz: type[ServiceJourney | TemplateServiceJourney]
+    ) -> Generator[ServiceJourney | TemplateServiceJourney, None, None]:
         for service_journey in load_generator(db_read, clazz):
             if service_journey.day_types:
                 for day_type_ref in service_journey.day_types.day_type_ref:
@@ -783,7 +761,9 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
     db_write.insert_objects_on_queue(TemplateServiceJourney, query_sj(db_read, mapping, TemplateServiceJourney))
 
 
-def gtfs_calendar2(service_id: str, day_type: DayType, operating_period: OperatingPeriod) -> Generator[tuple[dict[str, Any] | None, dict[str, Any]] | None, None, None]:
+def gtfs_calendar2(
+    service_id: str, day_type: DayType, operating_period: OperatingPeriod
+) -> Generator[tuple[dict[str, Any] | None, dict[str, Any]] | None, None, None]:
     if day_type.properties:
         yield tuple(
             (
@@ -856,8 +836,8 @@ def gtfs_calendar_and_dates2(
                     None,
                     {
                         'service_id': service_id,
-                        'date': str(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.to_date()).replace(
-                            '-', ''
+                        'date': (
+                            str(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.to_date()).replace('-', '')
                         ),
                         'exception_type': 2 if day_type_assignment.is_available is not None and day_type_assignment.is_available is False else 1,
                     },

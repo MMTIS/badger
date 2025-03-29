@@ -1,16 +1,13 @@
 import logging
 from typing import Any, IO
 import sys
+
 from netexio.database import Database
 from netexio.dbaccess import open_netex_file, setup_database, insert_database
 from utils.utils import get_interesting_classes
 from netexio.pickleserializer import MyPickleSerializer
-import utils.netex_monkeypatching
 from utils.aux_logging import log_all, prepare_logger
-
-SWISS_CLASSES = {"Codespace", "StopPlace", "ScheduledStopPoint", "Operator", "VehicleType", "Line", "Direction",
-                 "DestinationDisplay", "ServiceJourney", "TemplateServiceJourney", "ServiceCalendar",
-                 "PassengerStopAssignment", "AvailabilityCondition", "TopographicPlace", "ResponsibilitySet"}
+from utils.profiles import SWISS_CLASSES
 
 
 def main(swiss_zip_file: str, database: str, clean_database: bool = True) -> None:
@@ -20,8 +17,7 @@ def main(swiss_zip_file: str, database: str, clean_database: bool = True) -> Non
                 print("File names do not fit Swiss data:. So no Swiss data")
                 sys.exit(2)
 
-    with Database(database, MyPickleSerializer(compression=True), readonly=False,
-                  logger=logging.getLogger("script_runner")) as db:
+    with Database(database, MyPickleSerializer(compression=True), readonly=False, logger=logging.getLogger("script_runner")) as db:
         classes = get_interesting_classes(SWISS_CLASSES)
 
         setup_database(db, classes, clean_database)

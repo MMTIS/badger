@@ -35,7 +35,7 @@ from transformers.epip import (
     epip_service_calendar,
 )
 
-from transformers.epip import EPIP_CLASSES
+from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
 from configuration import defaults
 
@@ -55,9 +55,7 @@ def main(source_database_file: str, target_database_file: str) -> None:
     ) as target_db:
         setup_database(target_db, classes, True)
 
-        with Database(
-            source_database_file, MyPickleSerializer(compression=True), readonly=True
-        ) as source_db:
+        with Database(source_database_file, MyPickleSerializer(compression=True), readonly=True) as source_db:
 
             # TODO: make this more generic
             default_codespace: Codespace | None = None
@@ -98,9 +96,7 @@ def main(source_database_file: str, target_database_file: str) -> None:
             source_db.clean_cache()
 
             log_all(logging.INFO, "Fix Quay / StopPlace locations ")
-            infer_locations_from_quay_or_stopplace_and_apply(
-                source_db, target_db, generator_defaults
-            )
+            infer_locations_from_quay_or_stopplace_and_apply(source_db, target_db, generator_defaults)
             source_db.clean_cache()
             # # epip_scheduled_stop_point_memory(target_db, target_db, generator_defaults)
 
@@ -109,9 +105,7 @@ def main(source_database_file: str, target_database_file: str) -> None:
             source_db.clean_cache()
 
             log_all(logging.INFO, "Service journeys ")
-            epip_service_journey_generator(
-                source_db, target_db, generator_defaults, None, cache=False
-            )
+            epip_service_journey_generator(source_db, target_db, generator_defaults, None, cache=False)
             source_db.clean_cache()
 
             log_all(logging.INFO, "Calendars ")
@@ -128,12 +122,8 @@ def main(source_database_file: str, target_database_file: str) -> None:
 
             target_db.block_until_done()
 
-            log_all(
-                logging.INFO, "Infer directions from ServiceJourneyPatterns, and apply "
-            )
-            infer_directions_from_sjps_and_apply(
-                target_db, target_db, generator_defaults
-            )
+            log_all(logging.INFO, "Infer directions from ServiceJourneyPatterns, and apply ")
+            infer_directions_from_sjps_and_apply(target_db, target_db, generator_defaults)
             source_db.clean_cache()
             # TODO: epip_noticeassignment(source_db, target_db, generator_defaults)
 
@@ -150,12 +140,8 @@ if __name__ == "__main__":
     import argparse
     import traceback
 
-    parser = argparse.ArgumentParser(
-        description="Transform the input into mandatory objects for the export of EPIP"
-    )
-    parser.add_argument(
-        "source", type=str, help="lmdb file to use as input of the transformation."
-    )
+    parser = argparse.ArgumentParser(description="Transform the input into mandatory objects for the export of EPIP")
+    parser.add_argument("source", type=str, help="lmdb file to use as input of the transformation.")
     parser.add_argument(
         "target",
         type=str,

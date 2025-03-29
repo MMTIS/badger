@@ -4,7 +4,7 @@ import warnings
 from datetime import datetime, date, timedelta
 from functools import partial
 from multiprocessing import Pool
-from typing import Generator, List, Set, Any, TypeVar, Generator
+from typing import List, Set, Any, TypeVar, Generator
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY
@@ -117,6 +117,7 @@ from netex import (
     OperatingDay,
     DayTypeRef,
     EntityStructure,
+    Locale,
 )
 
 from netexio.database import Database
@@ -127,26 +128,6 @@ from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
 from transformers.projection import project_location_4326
 from transformers.timetabled_passing_time import infer_id_and_order_and_apply
-
-EPIP_CLASSES = {
-    "Codespace",
-    "StopPlace",
-    "RoutePoint",
-    "RouteLink",
-    "Routes",
-    "ScheduledStopPoint",
-    "Operator",
-    "VehicleType",
-    "Line",
-    "Direction",
-    "DestinationDisplay",
-    "ServiceJourney",
-    "ServiceJourneyPattern",
-    "PassengerStopAssignment",
-    "Notice",
-    "NoticeAssignment",
-    "AvailabilityCondition",
-}
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
@@ -1180,9 +1161,7 @@ def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
                                 id="EU_PI_CALENDAR",
                                 version=version,
                                 type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_CALENDAR', version_ref='1.0'),
-                                service_calendar=get_service_calendar(
-                                    db_epip, {'codespace': default_codespace, 'version': version}
-                                ),  # TODO: do differently
+                                service_calendar=get_service_calendar(db_epip, {'codespace': default_codespace, 'version': version}),  # TODO: do differently
                             ),
                             GeneralFrame(
                                 id="OTHER_REFERENCED",
