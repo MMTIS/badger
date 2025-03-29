@@ -90,7 +90,7 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 # TODO: For all load_ functions filter by id + version, not only id
 
 
-def load_referencing(db: Database, clazz: type[Tid], filter_id: str) -> Generator[tuple[str, str, str], None, None]:
+def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as txn:
@@ -105,7 +105,7 @@ def load_referencing(db: Database, clazz: type[Tid], filter_id: str) -> Generato
                 yield referencing_id, referencing_version, referencing_class
 
 
-def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str) -> Generator[tuple[str, str, str], None, None]:
+def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing_inwards, buffers=True, write=False) as txn:

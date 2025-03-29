@@ -3,8 +3,9 @@ from typing import TypeVar, Any
 
 from netex import Route, ServiceJourneyPattern, Line, PassengerStopAssignment, ScheduledStopPoint, EntityStructure
 from netexio.database import Database
-from netexio.dbaccess import recursive_resolve, load_local
+from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
 from netexio.pickleserializer import MyPickleSerializer
+from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
 
 Tid = TypeVar("Tid", bound=EntityStructure)
@@ -27,7 +28,19 @@ def main(source_database_file: str, target_database_file: str, object_type: str,
             for obj in resolved:
                 db_write.insert_one_object(obj)
 
-            db_write.block_until_done()
+    # TODO: It would be interesting to take the objects not being in the EPIP classes, remove the references from the objects that reference them.
+    with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
+        # TODO: For now EPIP
+        removable_classes = db_read.tables() - EPIP_CLASSES
+        for removable_class in removable_classes:
+            for parent_id, parent_version, parent_class in load_referencing_inwards(db_read, removable_class):
+                klass: type[Any] = db_read.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
+                if klass in EPIP_CLASSES:
+                    print(parent_id, parent_version, parent_class, "references", removable_class)
+
+                    # TODO: Implement the storage path of the reference, like we do with the embedding, this allows us to remove the reference from the attribute
+
+                    # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
 
 
 if __name__ == "__main__":
