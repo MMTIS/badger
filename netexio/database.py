@@ -299,6 +299,7 @@ class Database:
         path: str | None
 
         for (
+            embedding,
             parent_class,
             parent_id,
             parent_version,
@@ -307,7 +308,7 @@ class Database:
             object_version,
             path,
         ) in update_embedded_referencing(self.serializer, obj):
-            if path is not None:
+            if embedding:
                 embedding_inverse_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
                 embedding_inverse_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
                 self.task_queue.put(
@@ -335,11 +336,11 @@ class Database:
                 # self.task_queue.put((LmdbActions.DELETE_PREFIX, self.db_referencing, key_prefix))
 
                 ref_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
-                ref_value = cloudpickle.dumps((get_object_name(object_class), object_id, object_version))
+                ref_value = cloudpickle.dumps((get_object_name(object_class), object_id, object_version, path))
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing, ref_key, ref_value))
 
                 ref_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
-                ref_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version))
+                ref_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value))
 
     def insert_metadata_on_queue(self, objects: Iterable[tuple[str, str, Any]]) -> None:

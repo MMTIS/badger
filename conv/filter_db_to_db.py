@@ -38,8 +38,6 @@ def main(source_database_file: str, target_database_file: str, object_type: str,
                 if klass in EPIP_CLASSES:
                     print(parent_id, parent_version, parent_class, "references", removable_class)
 
-                    # TODO: Implement the storage path of the reference, like we do with the embedding, this allows us to remove the reference from the attribute
-
                     # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
 
 

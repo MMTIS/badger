@@ -100,7 +100,7 @@ def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = Non
                 if not bytes(key).startswith(prefix):
                     break  # Stop when keys no longer match the prefix
 
-                referencing_class, referencing_id, referencing_version = cloudpickle.loads(value)
+                referencing_class, referencing_id, referencing_version, path = cloudpickle.loads(value)
 
                 yield referencing_id, referencing_version, referencing_class
 
@@ -115,7 +115,7 @@ def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str | No
                 if not bytes(key).startswith(prefix):
                     break  # Stop when keys no longer match the prefix
 
-                parent_class, parent_id, parent_version = cloudpickle.loads(value)
+                parent_class, parent_id, parent_version, path = cloudpickle.loads(value)
 
                 yield parent_id, parent_version, parent_class
 
@@ -325,7 +325,7 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as src3_txn:
         cursor = src3_txn.cursor()
         for _key, value in cursor:
-            ref_class, ref_id, ref_version = cloudpickle.loads(value)  # TODO: check if this goes right
+            ref_class, ref_id, ref_version, path = cloudpickle.loads(value)  # TODO: check if this goes right
             if ref_class not in list_classes:
                 results: list[Tid] = load_local(
                     db,
@@ -559,9 +559,7 @@ def get_local_name(element: type[Tid]) -> str:
     return element.__name__
 
 
-def update_embedded_referencing(
-    serializer: Serializer, deserialized: Tid
-) -> Generator[tuple[type[Tid], str, str, type[Tid], str, str, str | None], None, None]:
+def update_embedded_referencing(serializer: Serializer, deserialized: Tid) -> Generator[tuple[bool, type[Tid], str, str, type[Tid], str, str, str], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
@@ -569,6 +567,7 @@ def update_embedded_referencing(
             if obj.__class__ in serializer.interesting_classes:
                 assert obj.id is not None, "Object.id must not be none"
                 yield (
+                    True,
                     deserialized.__class__,
                     deserialized.id,
                     getattr(deserialized, "version", "any"),
@@ -588,6 +587,7 @@ def update_embedded_referencing(
                     obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
             yield (
+                False,
                 deserialized.__class__,
                 deserialized.id,
                 getattr(deserialized, "version", "any"),
@@ -595,7 +595,7 @@ def update_embedded_referencing(
                 serializer.name_object[obj.name_of_ref_class],  # The object that the reference is towards
                 obj.ref,
                 getattr(obj, "version", "any"),
-                None,
+                ".".join([str(s) for s in path]),
             )
 
 
