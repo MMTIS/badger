@@ -157,7 +157,9 @@ def recursive_resolve(
             already_done = False
             for x in resolved:
                 y_class: type[Tid] = db.get_class_by_name(y[2])
-                if (y[0] == x.id and y_class == x.__class__) or y_class in filter_class:
+                if (
+                    y[0] == x.id and y_class == x.__class__
+                ):  #  or y_class in filter_class: This seems to be an issue to get the inward relationships to work, starting from Line
                     already_done = True
                     break
 
