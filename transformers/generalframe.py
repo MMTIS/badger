@@ -12,7 +12,8 @@ from utils.utils import chain
 
 def export_to_general_frame(db: Database) -> PublicationDelivery:
     # TODO: This is not the correct way of loading a module by name
-    iterables = [load_generator(db, clazz, embedding=False) for clazz in db.tables()]  # type: list[Generator[EntityStructure, None, None]]
+    tables = sorted(list(db.tables()), key=lambda v: v.__name__)  # To ensure predictable order
+    iterables = [load_generator(db, clazz, embedding=False) for clazz in tables]  # type: list[Generator[EntityStructure, None, None]]
 
     publication_delivery = PublicationDelivery(
         version="ntx:1.1",

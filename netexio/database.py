@@ -610,7 +610,7 @@ class Database:
     def get_class_by_name(self, name: str) -> type[Tid]:
         return self.serializer.name_object[name]
 
-    def tables(self, exclusively: set[type[EntityStructure]] | None = None) -> list[type[EntityStructure]]:
+    def tables(self, exclusively: set[type[EntityStructure]] | None = None) -> set[type[EntityStructure]]:
         if exclusively is None:
             exclusively = set(self.serializer.interesting_classes)
 
@@ -622,7 +622,7 @@ class Database:
                 if name[0] != "_":
                     tables.add(self.get_class_by_name(name))
 
-        return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
+        return tables.intersection(exclusively)
 
     def stats(self) -> None:
         print("stats:")

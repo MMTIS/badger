@@ -534,7 +534,7 @@ def copy_table(db_read: Database, db_write: Database, classes: list[type[Tid]], 
 
 def missing_class_update(source_db: Database, target_db: Database) -> None:
     # TODO: As written in #223 some of the objects have not been copied at this point, but are still referenced.
-    target_classes: set[type[EntityStructure]] = set(target_db.tables())
+    target_classes: set[type[EntityStructure]] = target_db.tables()
     referencing_classes: set[type[EntityStructure]] = set(target_db.referencing())
     embedded_classes: set[type[EntityStructure]] = set(target_db.embedded())
     missing_classes: set[type[EntityStructure]] = referencing_classes - (
