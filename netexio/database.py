@@ -17,6 +17,8 @@ from netex import (
     EntityInVersionStructure,
     VersionOfObjectRefStructure,
 )
+import utils.netex_monkeypatching  # noqa: F401
+
 from netexio.activelrucache import ActiveLRUCache
 from netexio.dbaccess import update_embedded_referencing
 from netexio.serializer import Serializer
