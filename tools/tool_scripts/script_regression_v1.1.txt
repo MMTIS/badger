@@ -213,7 +213,7 @@
         {"step":11,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/10-netex-database.lmdb %%dir%%/11-netex-database.lmdb"},
         {"step":12,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.lmdb %%dir%%/12-%%block%%-gtfs.zip"},
         {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
-        {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 10"}
+        {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 1"}
 
          ]
   },
