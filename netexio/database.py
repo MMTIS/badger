@@ -568,11 +568,10 @@ class Database:
                 cursor = src_txn.cursor()
                 for prefix in classes_name:
                     if cursor.set_range(prefix):
-                        key = bytes(cursor.key())
-                        while key.startswith(prefix):
-                            target.task_queue.put((LmdbActions.WRITE, dst_db, key, bytes(cursor.value())))
-                            if not cursor.next():
-                                break
+                        for key, value in cursor:
+                            if not bytes(key).startswith(prefix):
+                                break  # Stop when keys no longer
+                            target.task_queue.put((LmdbActions.WRITE, dst_db, bytes(cursor.key()), bytes(cursor.value())))
 
         # Copy both databases
         _copy_db(self.db_referencing, target.db_referencing)
