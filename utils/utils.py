@@ -127,7 +127,7 @@ def get_interesting_classes(
 
     # Specifically we are interested in classes that are derived from "EntityInVersion", to find them, we exclude embedded child objects called "VersionedChild"
     entitiesinversion: list[tuple[str, type[Any]]] = [
-        x for x in interesting_members if netex.VersionedChildStructure not in x[1].__mro__ and netex.EntityInVersionStructure in x[1].__mro__
+        x for x in interesting_members if netex.VersionedChildStructure in x[1].__mro__ or netex.EntityInVersionStructure in x[1].__mro__
     ]
 
     # Obviously we want to have the VersionedChild too
