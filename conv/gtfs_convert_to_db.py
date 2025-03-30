@@ -7,6 +7,7 @@ from typing import List, TypeVar, Any, Iterable, Generator, cast, Union
 import duckdb
 import numpy
 from pandas._libs.missing import NAType
+import pandas as pd
 from xsdata.formats.dataclass.serializers import XmlSerializer
 from xsdata.formats.dataclass.serializers.config import SerializerConfig
 from xsdata.models.datatype import XmlDateTime, XmlTime, XmlDate, XmlDuration
@@ -2094,7 +2095,7 @@ class GtfsNeTexProfile(CallsProfile):
 
         shape_used = set([])
 
-        with self.conn.cursor() as cur:
+        with (self.conn.cursor() as cur):
             cur.execute(**trips_sql)
 
             df = cur.df()
@@ -2212,7 +2213,8 @@ class GtfsNeTexProfile(CallsProfile):
                         if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
                             distance = shape_dist_traveled - prev_shape_traveled
                             prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
-
+                        pickup = 0 if pd.isna(pickup_types[index_j]) else pickup_types[index_j]
+                        drop_off= 0 if pd.isna(drop_off_types[index_j]) else drop_off_types[index_j]
                         call = Call(
                             id=self.get_trip_id_call(trip_ids[i], stop_sequences[index_j]),
                             version=self.version.version,
@@ -2220,11 +2222,9 @@ class GtfsNeTexProfile(CallsProfile):
                                 from_point_ref, ScheduledStopPointRef, self.version.version
                             ),
                             destination_display_ref_or_destination_display_view=destination_display_view,
-                            arrival=ArrivalStructure(time=arrival_time, day_offset=arrival_dayoffset, for_alighting=bool(drop_off_types[index_j] != 1)),
-                            departure=DepartureStructure(time=departure_time, day_offset=departure_dayoffset, for_boarding=bool(pickup_types[index_j] != 1)),
-                            request_stop=bool(
-                                pickup_types[index_j] == 2 or pickup_types[index_j] == 3 or drop_off_types[index_j] == 2 or drop_off_types[index_j] == 3
-                            ),
+                            arrival=ArrivalStructure(time=arrival_time, day_offset=arrival_dayoffset, for_alighting=bool(drop_off != 1)),
+                            departure=DepartureStructure(time=departure_time, day_offset=departure_dayoffset, for_boarding=bool(pickup != 1)),
+                            request_stop=bool( pickup == 2 or pickup == 3 or drop_off == 2 or drop_off == 3   ),
                             order=prev_order,
                         )  # stop_sequence is non-negative integer
 
