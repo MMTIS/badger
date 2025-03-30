@@ -2,7 +2,17 @@ import logging
 from collections import defaultdict
 from typing import TypeVar, Any
 
-from netex import Route, ServiceJourneyPattern, Line, PassengerStopAssignment, ScheduledStopPoint, EntityStructure, DayTypeAssignment
+from netex import (
+    Route,
+    ServiceJourneyPattern,
+    Line,
+    PassengerStopAssignment,
+    ScheduledStopPoint,
+    EntityStructure,
+    DayTypeAssignment,
+    DayType,
+    UicOperatingPeriod,
+)
 from netexio.attributes import update_attr
 from netexio.database import Database
 from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
@@ -16,7 +26,7 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 
 def main(source_database_file: str, target_database_file: str, object_type: str, object_filter: str) -> None:
     with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
-        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayTypeAssignment}
+        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, DayTypeAssignment, UicOperatingPeriod}
         filter_set.add(db_read.get_class_by_name(object_type))
 
         objs: list[Any] = load_local(db_read, db_read.get_class_by_name(object_type), filter_id=object_filter)
@@ -53,6 +63,7 @@ def main(source_database_file: str, target_database_file: str, object_type: str,
                 split = split_path(path)
                 update_attr(obj, split, None)
             db_write.insert_one_object(obj)
+            # TODO: db_write.delete_embedding
 
 
 if __name__ == "__main__":
