@@ -4,7 +4,7 @@ import warnings
 from datetime import datetime, date, timedelta
 from functools import partial
 from multiprocessing import Pool
-from typing import List, Set, Any, TypeVar, Generator
+from typing import List, Set, Any, TypeVar, Generator, cast
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY
@@ -486,8 +486,8 @@ def service_journey_ac_to_day_type(
             order=1,
             derived_from_object_ref=acs[0].id,
             derived_from_version_ref_attribute=acs[0].version,
-            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=getRef(uic_operating_period, OperatingPeriodRef),
-            day_type_ref=getRef(day_type),
+            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=cast(OperatingPeriodRef, getRef(uic_operating_period, OperatingPeriodRef)),
+            day_type_ref=cast(DayTypeRef, getRef(day_type)),
         )
         day_type_assignments_ids.add(day_type_assignment.id)
         db_write.insert_one_object(day_type_assignment)
@@ -878,7 +878,7 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
                     res_dta.order = 1
                     res_dta.is_available = True
                     res_dta.day_type_ref = day_type_ref
-                    res_dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(uic_operating_period)
+                    res_dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(uic_operating_period, OperatingPeriodRef)
 
                     result_day_type_assignments.append(res_dta)
                     result_uic_operating_periods.append(uic_operating_period)
