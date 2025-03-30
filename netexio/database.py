@@ -248,6 +248,7 @@ class Database:
 
     def _start_writer_if_needed(self) -> None:
         """Starts the writer thread if it's not already running."""
+        assert self.readonly is False, "Database is in read only mode"
         with self.lock:
             if self.task_queue is None:
                 self.task_queue = queue.Queue(maxsize=1000)  # Shared queue

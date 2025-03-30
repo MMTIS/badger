@@ -1,10 +1,13 @@
 import logging
+from collections import defaultdict
 from typing import TypeVar, Any
 
-from netex import Route, ServiceJourneyPattern, Line, PassengerStopAssignment, ScheduledStopPoint, EntityStructure
+from netex import Route, ServiceJourneyPattern, Line, PassengerStopAssignment, ScheduledStopPoint, EntityStructure, DayTypeAssignment
+from netexio.attributes import update_attr
 from netexio.database import Database
 from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
 from netexio.pickleserializer import MyPickleSerializer
+from transformers.references import split_path
 from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
 
@@ -13,7 +16,7 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 
 def main(source_database_file: str, target_database_file: str, object_type: str, object_filter: str) -> None:
     with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
-        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment}
+        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayTypeAssignment}
         filter_set.add(db_read.get_class_by_name(object_type))
 
         objs: list[Any] = load_local(db_read, db_read.get_class_by_name(object_type), filter_id=object_filter)
@@ -29,16 +32,27 @@ def main(source_database_file: str, target_database_file: str, object_type: str,
                 db_write.insert_one_object(obj)
 
     # TODO: It would be interesting to take the objects not being in the EPIP classes, remove the references from the objects that reference them.
-    with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
-        # TODO: For now EPIP
-        removable_classes = db_read.tables() - EPIP_CLASSES
-        for removable_class in removable_classes:
-            for parent_id, parent_version, parent_class in load_referencing_inwards(db_read, removable_class):
-                klass: type[Any] = db_read.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
-                if klass in EPIP_CLASSES:
-                    print(parent_id, parent_version, parent_class, "references", removable_class)
+    with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
+        result: dict[tuple[str, str, Any], list[str]] = defaultdict(list)
 
-                    # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
+        # TODO: For now EPIP
+        removable_classes = db_write.tables() - EPIP_CLASSES
+        for removable_class in removable_classes:
+            for parent_id, parent_version, parent_class, path in load_referencing_inwards(db_write, removable_class):
+                parent_klass: type[Any] = db_write.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
+                if parent_klass in EPIP_CLASSES:
+                    # Aggregate all parent_ids, so we prevent concurrency issues, and the cost of deserialisation and serialisation
+                    key = (parent_id, parent_version, parent_klass)
+                    result[key].append(path)
+
+        # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
+        for (parent_id, parent_version, parent_klass), paths in result.items():
+            print(parent_klass, parent_id, parent_version, path)
+            obj = db_write.get_single(parent_klass, parent_id, parent_version)
+            for path in paths:
+                split = split_path(path)
+                update_attr(obj, split, None)
+            db_write.insert_one_object(obj)
 
 
 if __name__ == "__main__":

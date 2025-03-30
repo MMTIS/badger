@@ -90,7 +90,7 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 # TODO: For all load_ functions filter by id + version, not only id
 
 
-def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str], None, None]:
+def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as txn:
@@ -102,10 +102,10 @@ def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = Non
 
                 referencing_class, referencing_id, referencing_version, path = cloudpickle.loads(value)
 
-                yield referencing_id, referencing_version, referencing_class
+                yield referencing_id, referencing_version, referencing_class, path
 
 
-def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str], None, None]:
+def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str, str], None, None]:
     prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing_inwards, buffers=True, write=False) as txn:
@@ -117,7 +117,7 @@ def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str | No
 
                 parent_class, parent_id, parent_version, path = cloudpickle.loads(value)
 
-                yield parent_id, parent_version, parent_class
+                yield parent_id, parent_version, parent_class, path
 
 
 def load_local(
@@ -152,7 +152,7 @@ def recursive_resolve(
 
     if inwards and (filter is False or filter == parent.id or parent.__class__ in filter_class):
         assert parent.id is not None, "Parent.id must not be none"
-        resolved_parents = load_referencing_inwards(db, parent.__class__, filter_id=parent.id)
+        resolved_parents = load_referencing_inwards(db, parent.__class__, filter_id=parent.id)  # TODO: replace resolved_parents with named attributes
         for y in resolved_parents:
             already_done = False
             for x in resolved:
