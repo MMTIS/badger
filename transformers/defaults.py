@@ -7,7 +7,7 @@ T = TypeVar("T")
 _dataclass_defaults_cache: dict[type[Any], dict[str, Any]] = {}
 
 
-def get_dataclass_defaults(cls: type[T]) -> dict[str, Any]:
+def get_dataclass_defaults(cls: type[Any]) -> dict[str, Any]:
     """Haalt een dictionary op met standaardwaarden van een dataclass."""
     if cls not in _dataclass_defaults_cache:
         _dataclass_defaults_cache[cls] = {

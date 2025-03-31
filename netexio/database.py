@@ -12,6 +12,8 @@ import cloudpickle
 from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator
 from enum import IntEnum
 
+from lmdb import Transaction
+
 from netex import (
     EntityStructure,
     EntityInVersionStructure,
@@ -36,6 +38,7 @@ class LmdbActions(IntEnum):
     DELETE_PREFIX = 2
     CLEAR = 3
     DROP = 4
+    DELETE_EMBEDDING_REFERENCES = 5
 
 
 class Embedding:
@@ -164,6 +167,7 @@ class Database:
             delete_tasks: list[tuple[lmdb._Database, Any]] = []
             drop_tasks: list[lmdb._Database] = []
             clear_tasks: list[lmdb._Database] = []
+            delete_embedding_task: list[str] = []
 
             total_size = 0
 
@@ -188,6 +192,10 @@ class Database:
                         case LmdbActions.DROP:
                             drop_tasks.append(database)
 
+                        case LmdbActions.DELETE_EMBEDDING_REFERENCES:
+                            assert key is not None, "Key must not be none"
+                            delete_embedding_task.append(key)
+
                         case LmdbActions.STOP:
                             break
 
@@ -197,8 +205,8 @@ class Database:
             except queue.Empty:
                 pass
 
-            if batch or delete_tasks or clear_tasks or drop_tasks:
-                self._process_batch(batch, delete_tasks, clear_tasks, drop_tasks, total_size)
+            if batch or delete_tasks or clear_tasks or drop_tasks or delete_embedding_task:
+                self._process_batch(batch, delete_tasks, clear_tasks, drop_tasks, delete_embedding_task, total_size)
 
             if action == LmdbActions.STOP:
                 break
@@ -214,6 +222,7 @@ class Database:
         delete_tasks: list[tuple[lmdb._Database, Any]],
         clear_task: list[lmdb._Database],
         drop_task: list[lmdb._Database],
+        delete_embedding_task: list[str],
         total_size: int,
     ) -> None:
         """Processes a batch of writes and deletions, retrying if needed."""
@@ -237,6 +246,9 @@ class Database:
                                 if not cursor.next():
                                     break
 
+                    for global_key in delete_embedding_task:
+                        self.delete_all_references_and_embeddings(txn, global_key)
+
                     # Process insertions
                     for db_handle1, key, value in batch:
                         txn.put(key, value, db=db_handle1)
@@ -255,7 +267,7 @@ class Database:
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
-    def open_db(self, klass: type[Tid], delete: bool = False) -> lmdb._Database:
+    def open_db(self, klass: type[Tid], delete: bool = False) -> lmdb._Database | None:
         name: str = get_object_name(klass)
 
         if name in self.dbs:
@@ -267,7 +279,7 @@ class Database:
                 db = self.env.open_db(name_bytes, create=False)
             except lmdb.Error as e:
                 if self.readonly or delete:
-                    return
+                    return None
                 if "MDB_NOTFOUND" in str(e):
                     print(f"Database {name} does not exist, creating it.")
                     db = self.env.open_db(name_bytes, create=True)
@@ -298,6 +310,9 @@ class Database:
         object_id: str
         object_version: str
         path: str | None
+
+        key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+        self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, None))
 
         for (
             embedding,
@@ -382,6 +397,7 @@ class Database:
             version = obj.version if hasattr(obj, "version") else None
             key = self.serializer.encode_key(obj.id, version, klass)
             value = self.serializer.marshall(obj, klass)
+
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
             self._insert_embedding_on_queue(obj)
 
@@ -409,6 +425,47 @@ class Database:
                 return
 
             self.task_queue.put((LmdbActions.CLEAR, db_handle, None, None))
+
+    def delete_all_references_and_embeddings(self, txn: Transaction, key: str) -> None:
+        with txn.cursor(self.db_embedding_inverse) as cursor_embedding_inverse, txn.cursor(self.db_embedding) as cursor_embedding:
+            if cursor_embedding.set_key(key):
+                for value in cursor_embedding.iternext_dup():
+                    clazz, ref, version, path = cloudpickle.loads(value)
+                    check_class: type[Any] = self.get_class_by_name(clazz)
+                    # print("resolve", key, clazz, ref, version, path)
+
+                    inv_key = self.serializer.encode_key(ref, version, check_class, True)
+                    if cursor_embedding_inverse.set_range(inv_key):
+                        for inv_value in cursor_embedding_inverse.iternext_dup():
+                            parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
+                            parent_class: type[Any] = self.get_class_by_name(parent_clazz)
+
+                            check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
+                            if check_key == key:
+                                # print("inv", inv_key, parent_clazz, parent_id, parent_version, embedding_path)
+                                cursor_embedding_inverse.delete()
+
+                    cursor_embedding.delete()
+
+        with txn.cursor(self.db_referencing_inwards) as cursor_referencing_inwards, txn.cursor(self.db_referencing) as cursor_referencing:
+            if cursor_referencing.set_key(key):
+                for value in cursor_referencing.iternext_dup():
+                    clazz, ref, version, path = cloudpickle.loads(value)
+                    check_class = self.get_class_by_name(clazz)
+                    # print("resolve", key, clazz, ref, version, path)
+
+                    inv_key = self.serializer.encode_key(ref, version, check_class, True)
+                    if cursor_referencing_inwards.set_range(inv_key):
+                        for inv_value in cursor_referencing_inwards.iternext_dup():
+                            parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
+                            parent_class = self.get_class_by_name(parent_clazz)
+
+                            check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
+                            if check_key == key:
+                                # print("inv", inv_key, parent_clazz, parent_id, parent_version, embedding_path)
+                                cursor_referencing_inwards.delete()
+
+                    cursor_referencing.delete()
 
     def drop(self, classes: list[type[Tid]], embedding: bool = False) -> None:
         if self.readonly:
