@@ -8,7 +8,7 @@ from pyproj.exceptions import CRSError
 
 from utils.aux_logging import log_once
 from utils.mro_attributes import list_attributes
-from netex import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, EntityStructure, LinearRing
+from netex import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, EntityStructure, LinearRing, SimplePointVersionStructure
 from netexio.database import Database
 from netexio.dbaccess import recursive_attributes
 from utils.utils import get_interesting_classes
@@ -17,7 +17,7 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 
 transformers: dict[str, Transformer] = {}
 
-GEO_CLASSES = {LocationStructure2, LineString, Polygon, MultiSurface}
+GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
 
 
 def get_all_geo_elements() -> Generator[Any, None, None]:
@@ -28,7 +28,7 @@ def get_all_geo_elements() -> Generator[Any, None, None]:
         for attr in attrs:
             clazz = attr[3].type
             if clazz is not None and hasattr(clazz, '_name'):
-                if clazz._name == 'Optional' and not isinstance(clazz, str):
+                if (clazz._name == 'Optional' or clazz._name == 'Union') and not isinstance(clazz, str):
                     clazz_resolved = [x for x in clazz.__args__ if x is not None][0]
                 else:
                     clazz_resolved = clazz
@@ -85,7 +85,6 @@ def reprojection_update(db: Database, crs_to: str) -> None:
         if not src_db:
             continue
 
-        src_db = db.open_db(clazz)
         with db.env.begin(db=src_db, buffers=True, write=False) as src_txn:
             cursor = src_txn.cursor()
 
