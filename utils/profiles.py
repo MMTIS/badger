@@ -27,6 +27,7 @@ from netex import (
     TopographicPlace,
     TransportAdministrativeZone,
     UicOperatingPeriod,
+    ValueSet,
     VehicleType,
 )
 
@@ -91,5 +92,6 @@ EPIP_CLASSES = {
     StopPlace,
     TransportAdministrativeZone,
     UicOperatingPeriod,
+    ValueSet,
     VehicleType,
 }

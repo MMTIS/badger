@@ -11,6 +11,8 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: Database, db_write
 
     def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, str]) -> ScheduledStopPoint:
         assert ssp.id is not None, f"ScheduledStopPoint without id"
+        ssp.projections = None # TODO: Somewhere else
+        ssp.stop_areas = None # TODO: Somewhere else
         if ssp.location is None:
             location: LocationStructure2 | None = ssp_location.get(ssp.id, None)
             if location is not None:

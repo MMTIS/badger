@@ -7,12 +7,13 @@ from netexio.database import Database
 from netexio.pickleserializer import MyPickleSerializer
 from utils.debug import print_embedding, print_embedding_inverse, print_referencing, print_referencing_inwards
 
-with Database("/tmp/wsf-epip-line-wsf.lmdb", MyPickleSerializer(compression=True), readonly=True) as db_read:
+with Database("/storage/compressed/doeksen-epip-split_DOEKSEN_Line_HT.lmdb", MyPickleSerializer(compression=True), readonly=True) as db_read:
     print_embedding(db_read)
     print_embedding_inverse(db_read)
     print_referencing(db_read)
     print_referencing_inwards(db_read)
 
+    """
     # This would be a very unusual way, because it would also require to update the base object.
     with db_read.env.begin(write=False) as txn:
         with txn.cursor(db_read.db_embedding_inverse) as cursor_embedding_inverse, txn.cursor(db_read.db_embedding) as cursor_embedding:
@@ -76,3 +77,4 @@ with Database("/tmp/wsf-epip-line-wsf.lmdb", MyPickleSerializer(compression=True
                                 # cursor_referencing_inwards.delete()
 
                     # cursor_embedding.delete()
+    """

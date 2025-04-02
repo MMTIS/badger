@@ -152,7 +152,7 @@ def recursive_resolve(
 
     if inwards and (filter is False or filter == parent.id or parent.__class__ in filter_class):
         assert parent.id is not None, "Parent.id must not be none"
-        resolved_parents = load_referencing_inwards(db, parent.__class__, filter_id=parent.id)  # TODO: replace resolved_parents with named attributes
+        resolved_parents = list(load_referencing_inwards(db, parent.__class__, filter_id=parent.id))  # TODO: replace resolved_parents with named attributes
         for y in resolved_parents:
             already_done = False
             for x in resolved:
@@ -172,6 +172,7 @@ def recursive_resolve(
                     embedded_parent=True,
                 )
                 if len(resolved_objs) > 0:
+                    print(resolved_objs[0].id)
                     recursive_resolve(
                         db,
                         resolved_objs[0],

@@ -530,10 +530,12 @@ def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any])
     to_date: datetime = datetime.min
     for uic in load_generator(db_write, UicOperatingPeriod):
         dt = uic.from_operating_day_ref_or_from_date.to_datetime()
+        dt = dt.replace(tzinfo=None)
         if from_date > dt:
             from_date = dt
 
         dt = uic.to_operating_day_ref_or_to_date.to_datetime()
+        dt = dt.replace(tzinfo=None)
         if to_date < dt:
             to_date = dt
 

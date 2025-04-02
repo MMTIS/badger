@@ -19,6 +19,7 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
         classes = get_interesting_classes()
 
         if clean_database:
+            print("Is cleaned!")
             setup_database(db, classes, clean_database)
 
         for filename in filenames:

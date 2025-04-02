@@ -28,7 +28,8 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 
 def main(source_database_file: str, target_database_file: str, object_type: str) -> None:
     with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
-        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, DayTypeAssignment, UicOperatingPeriod}
+        # filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, UicOperatingPeriod}
+        filter_set = set({ServiceJourneyPattern, PassengerStopAssignment, DayType})
         filter_set.add(db_read.get_class_by_name(object_type))
 
         split_by: Tid
@@ -53,6 +54,7 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
                 db_write.block_until_done()
 
                 # TODO: For now EPIP
+                # TODO: It seems that the ValueSet for some reason removes BISON:TypeOfResponsibilityRole:financing
                 removable_classes = db_write.tables() - EPIP_CLASSES
                 for removable_class in removable_classes:
                     for parent_id, parent_version, parent_class, path in load_referencing_inwards(db_write, removable_class):
@@ -61,22 +63,26 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
                             # Aggregate all parent_ids, so we prevent concurrency issues, and the cost of deserialisation and serialisation
                             key = (parent_id, parent_version, parent_klass)
                             result[key].append(path)
-                            print(removable_class, key, path)
+                            # print(removable_class, key, path)
 
                 # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
                 for key, paths in result.items():
                     parent_id, parent_version, parent_klass = key
                     obj = db_write.get_single(parent_klass, parent_id, parent_version)
-                    for path in paths:
-                        split = split_path(path)
-                        update_attr(obj, split, None)
+                    if obj:
+                        for path in paths:
+                            split = split_path(path)
+                            update_attr(obj, split, None)
 
-                    db_write.insert_one_object(obj)
+                        db_write.insert_one_object(obj, delete_embedding=True)
 
                 db_write.block_until_done()
 
                 publication_delivery: PublicationDelivery = export_epip_network_offer(db_write, composite_frame_id=split_by.id, type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_LINE_OFFER', version_ref='1.0'))
                 export_publication_delivery_xml(publication_delivery, new_xml_file)
+                print(new_xml_file)
+
+                break
 
 
 if __name__ == "__main__":

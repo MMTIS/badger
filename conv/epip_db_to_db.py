@@ -1,3 +1,5 @@
+from typing import Generator
+
 from netex import (
     Codespace,
     ScheduledStopPoint,
@@ -15,8 +17,9 @@ from netex import (
     VersionFrameDefaultsStructure,
 )
 from netexio.database import Database
-from netexio.dbaccess import setup_database, copy_table, missing_class_update
+from netexio.dbaccess import setup_database, copy_table, missing_class_update, load_generator
 from netexio.pickleserializer import MyPickleSerializer
+from test.reprojection_stopplace import db_write
 from utils.utils import get_interesting_classes
 import logging
 
@@ -84,7 +87,6 @@ def main(source_database_file: str, target_database_file: str) -> None:
                     TopographicPlace,
                     Network,
                     DestinationDisplay,
-                    ScheduledStopPoint,
                 ],
                 clean=True,
                 embedding=True,

@@ -90,7 +90,7 @@ class Database:
 
     def __enter__(self) -> Database:
         if self.readonly:
-            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly)
+            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024)
 
         else:
             self.initial_size = self.initial_size
@@ -297,7 +297,7 @@ class Database:
             name_bytes = name.encode("utf-8")
             self.dbs[name] = self.env.open_db(name_bytes)
 
-    def _insert_embedding_on_queue(self, obj: Tid) -> None:
+    def _insert_embedding_on_queue(self, obj: Tid, delete_embedding: bool) -> None:
         assert obj.id is not None, "Object must have an id"
         assert self.task_queue is not None, "Task queue must not be none"
 
@@ -310,7 +310,9 @@ class Database:
         path: str | None
 
         key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
-        self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, None))
+
+        if delete_embedding:
+            self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, None))
 
         for (
             embedding,
@@ -378,7 +380,7 @@ class Database:
 
                     yield self.serializer.unmarshall(value, klass)
 
-    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
+    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
         db_handle = self.open_db(klass)
         if db_handle is None:
@@ -397,10 +399,10 @@ class Database:
             value = self.serializer.marshall(obj, klass)
 
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
-            self._insert_embedding_on_queue(obj)
+            self._insert_embedding_on_queue(obj, delete_embedding)
 
-    def insert_one_object(self, object: Tid) -> None:
-        return self.insert_objects_on_queue(object.__class__, [object])
+    def insert_one_object(self, object: Tid, delete_embedding=False) -> None:
+        return self.insert_objects_on_queue(object.__class__, [object], delete_embedding)
 
     def insert_raw_on_queue(self, objects: Iterable[tuple[lmdb._Database, bytes, bytes]]) -> None:
         """Places a hybrid list of encoded pairs in the shared queue for writing, starting writer if needed."""
@@ -661,8 +663,8 @@ class Database:
     def clean_cache(self) -> None:
         self.cache.drop()
 
-    def get_class_by_name(self, name: str) -> type[Tid]:
-        return self.serializer.name_object[name]
+    def get_class_by_name(self, name: str) -> type[Tid] | None:
+        return self.serializer.name_object.get(name, None)
 
     def tables(self, exclusively: set[type[EntityStructure]] | None = None) -> set[type[EntityStructure]]:
         if exclusively is None:
@@ -674,7 +676,11 @@ class Database:
             for key, _ in cursor:
                 name = bytes(key).decode("utf-8")
                 if name[0] != "_":
-                    tables.add(self.get_class_by_name(name))
+                    clazz = self.get_class_by_name(name)
+                    if clazz:
+                        tables.add(clazz)
+                    else:
+                        print(f"Class {name} missing!")
 
         return tables.intersection(exclusively)
 
