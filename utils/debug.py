@@ -18,7 +18,7 @@ def print_embedding(db: Database) -> None:
         with txn.cursor() as cursor:
             for key, value in cursor:
                 clazz, ref, version, path = cloudpickle.loads(value)
-                print(key, clazz, ref, version, path)
+                print("embedding", key, clazz, ref, version, path)
 
 
 def print_referencing_inwards(db: Database) -> None:
@@ -27,7 +27,7 @@ def print_referencing_inwards(db: Database) -> None:
         with txn.cursor() as cursor:
             for key, value in cursor:
                 parent_class, parent_id, parent_version, path = cloudpickle.loads(value)
-                print(key, parent_class, parent_id, parent_version, path)
+                print("referencing_inwards", key, parent_class, parent_id, parent_version, path)
 
 
 def print_referencing(db: Database) -> None:
@@ -36,4 +36,4 @@ def print_referencing(db: Database) -> None:
         with txn.cursor() as cursor:
             for key, value in cursor:
                 referencing_class, referencing_id, referencing_version, path = cloudpickle.loads(value)
-                print(key, referencing_class, referencing_id, referencing_version, path)
+                print("referencing", key, referencing_class, referencing_id, referencing_version, path)

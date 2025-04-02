@@ -305,11 +305,14 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
 
     # Find all embeddings and objects the target profile, elements must not be added directly later, but referenced.
     existing_ids = set()
+    existing_global_ids = set()
     with db.env.begin(db=db.db_embedding, buffers=True, write=False) as src1_txn:
         cursor = src1_txn.cursor()
         for _key, value in cursor:
             clazz, ref, version, *_ = cloudpickle.loads(value)
             existing_ids.add(db.serializer.encode_key(ref, version, db.get_class_by_name(clazz)))
+
+    del clazz, ref, version
 
     for clazz in classes:
         # print(clazz)
@@ -320,11 +323,15 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
         with db.env.begin(db=db_name, buffers=True, write=False) as src2_txn:
             cursor = src2_txn.cursor()
             for key, _value in cursor:
-                existing_ids.add(key)
+                existing_ids.add(bytes(key))
+                existing_global_ids.add(clazz.__name__.upper().encode('utf-8') + b"-" + bytes(key))  # TODO: This is a hack
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as src3_txn:
         cursor = src3_txn.cursor()
-        for _key, value in cursor:
+        for key, value in cursor:
+            if key not in existing_global_ids:
+                continue
+
             ref_class, ref_id, ref_version, path = cloudpickle.loads(value)  # TODO: check if this goes right
             if ref_class not in list_classes:
                 results: list[Tid] = load_local(

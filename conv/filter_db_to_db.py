@@ -54,16 +54,18 @@ def main(source_database_file: str, target_database_file: str, object_type: str,
                     # Aggregate all parent_ids, so we prevent concurrency issues, and the cost of deserialisation and serialisation
                     key = (parent_id, parent_version, parent_klass)
                     result[key].append(path)
+                    print(removable_class, key, path)
 
         # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
-        for (parent_id, parent_version, parent_klass), paths in result.items():
-            print(parent_klass, parent_id, parent_version, path)
+        for key, paths in result.items():
+            parent_id, parent_version, parent_klass = key
+            print("1", parent_klass, parent_id, parent_version, path)
             obj = db_write.get_single(parent_klass, parent_id, parent_version)
             for path in paths:
                 split = split_path(path)
                 update_attr(obj, split, None)
+
             db_write.insert_one_object(obj)
-            # TODO: db_write.delete_embedding
 
 
 if __name__ == "__main__":

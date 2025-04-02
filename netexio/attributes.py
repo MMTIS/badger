@@ -21,8 +21,9 @@ def update_attr(obj: Any, attr: list[str | int], value: Any | None) -> Any:
         if isinstance(name, int):
             obj = obj[name]
         else:
-            parent = obj
-            parent_name = name
+            if not obj.__class__.__name__.endswith("RelStructure"):  # TODO: Figure out how to skip empty objects
+                parent = obj
+                parent_name = name
             obj = getattr(obj, name)
 
     name = attr[-1]

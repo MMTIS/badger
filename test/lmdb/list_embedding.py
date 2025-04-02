@@ -7,7 +7,7 @@ from netexio.database import Database
 from netexio.pickleserializer import MyPickleSerializer
 from utils.debug import print_embedding, print_embedding_inverse, print_referencing, print_referencing_inwards
 
-with Database("/tmp/wsf-epip.lmdb", MyPickleSerializer(compression=True), readonly=True) as db_read:
+with Database("/tmp/wsf-epip-line-wsf.lmdb", MyPickleSerializer(compression=True), readonly=True) as db_read:
     print_embedding(db_read)
     print_embedding_inverse(db_read)
     print_referencing(db_read)
@@ -57,7 +57,7 @@ with Database("/tmp/wsf-epip.lmdb", MyPickleSerializer(compression=True), readon
 
     with db_read.env.begin(write=False) as txn:
         with txn.cursor(db_read.db_referencing_inwards) as cursor_referencing_inwards, txn.cursor(db_read.db_referencing) as cursor_referencing:
-            key = b'TIMINGLINK-WSF*#*B*V-20250328'
+            key = b'SCHEDULEDSTOPPOINT-WSF*#*B-20250328'
             if cursor_referencing.set_key(key):
                 for value in cursor_referencing.iternext_dup():
                     clazz, ref, version, path = cloudpickle.loads(value)

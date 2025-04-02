@@ -129,11 +129,13 @@ def main(source_database_file: str, target_database_file: str) -> None:
 
             target_db.block_until_done()
 
-            log_all(logging.INFO, "Reprojection Update ")
-            reprojection_update(target_db, "urn:ogc:def:crs:EPSG::4326")
-
             log_all(logging.INFO, "Copy remaining classes ")
             missing_class_update(source_db, target_db)
+
+            target_db.block_until_done()
+
+            log_all(logging.INFO, "Reprojection Update ")
+            reprojection_update(target_db, "urn:ogc:def:crs:EPSG::4326")
 
 
 if __name__ == "__main__":
