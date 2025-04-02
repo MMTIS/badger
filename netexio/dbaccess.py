@@ -141,6 +141,7 @@ def recursive_resolve(
     filter_class: set[type[Tid]] = set([]),
     inwards: bool = True,
     outwards: bool = True,
+    filter_set_assignment: dict[type[Tid]: set[type[Tid]]] = {}
 ) -> None:
     resolved_objs: list[Any]
 
@@ -150,20 +151,23 @@ def recursive_resolve(
 
     resolved.append(parent)
 
-    if inwards and (filter is False or filter == parent.id or parent.__class__ in filter_class):
+    if inwards and parent.__class__ in filter_class:
         assert parent.id is not None, "Parent.id must not be none"
+        # print("INWARDS", parent.id)
         resolved_parents = list(load_referencing_inwards(db, parent.__class__, filter_id=parent.id))  # TODO: replace resolved_parents with named attributes
         for y in resolved_parents:
+            y_class: type[Tid] = db.get_class_by_name(y[2])
             already_done = False
             for x in resolved:
-                y_class: type[Tid] = db.get_class_by_name(y[2])
                 if (
                     y[0] == x.id and y_class == x.__class__
                 ):  #  or y_class in filter_class: This seems to be an issue to get the inward relationships to work, starting from Line
                     already_done = True
                     break
 
-            if not already_done:
+            my_filterset = filter_set_assignment.get(parent.__class__, None)
+
+            if not already_done and (y_class in my_filterset if my_filterset is not None else True):
                 resolved_objs = load_local(
                     db,
                     db.get_class_by_name(y[2]),
@@ -172,7 +176,6 @@ def recursive_resolve(
                     embedded_parent=True,
                 )
                 if len(resolved_objs) > 0:
-                    print(resolved_objs[0].id)
                     recursive_resolve(
                         db,
                         resolved_objs[0],
@@ -181,11 +184,13 @@ def recursive_resolve(
                         filter_class,
                         inwards,
                         outwards,
+                        filter_set_assignment=filter_set_assignment
                     )  # TODO: not only consider the first
 
     # In principle this would already take care of everything recursive_attributes could find, but now does it inwards.
     if outwards:
         assert parent.id is not None, "parent.id must not be none"
+        # print("OUTWARDS", parent.id)
         resolved_parents = load_referencing(db, parent.__class__, filter_id=parent.id)
         for y in resolved_parents:
             already_done = False
@@ -211,6 +216,7 @@ def recursive_resolve(
                         filter_class,
                         inwards,
                         outwards,
+                        filter_set_assignment=filter_set_assignment
                     )  # TODO: not only consider the first
 
         for obj, path in recursive_attributes(parent, []):
@@ -264,6 +270,7 @@ def recursive_resolve(
                             filter_class,
                             inwards,
                             outwards,
+                            filter_set_assignment=filter_set_assignment
                         )  # TODO: not only consider the first
                     else:
                         # print(obj.ref)
@@ -292,6 +299,7 @@ def recursive_resolve(
                                         filter_class,
                                         inwards,
                                         outwards,
+                                        filter_set_assignment=filter_set_assignment
                                     )  # TODO: not only consider the first
                         else:
                             log_all(
@@ -317,7 +325,7 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
 
     for clazz in classes:
         # print(clazz)
-        db_name = db.open_db(clazz)
+        db_name = db.open_db(clazz, readonly=True)
         if not db_name:
             continue
 
@@ -448,8 +456,8 @@ def load_generator(
     parent: bool = False,
     cache: bool = True,
 ) -> Generator[Tid, None, None]:
-    if db.env and db.open_db(clazz) is not None:
-        with db.env.begin(write=False, buffers=True, db=db.open_db(clazz)) as txn:
+    if db.env and db.open_db(clazz, readonly=True) is not None:
+        with db.env.begin(write=False, buffers=True, db=db.open_db(clazz, readonly=True)) as txn:
             cursor = txn.cursor()
             if filter_id:
                 prefix = db.serializer.encode_key(filter_id, None, clazz)

@@ -9,7 +9,7 @@ def print_embedding_inverse(db: Database) -> None:
         with txn.cursor() as cursor:
             for key, value in cursor:
                 parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(value)
-                print(key, parent_clazz, parent_id, parent_version, embedding_path)
+                print("embedding_inverse", key, parent_clazz, parent_id, parent_version, embedding_path)
 
 
 def print_embedding(db: Database) -> None:

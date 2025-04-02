@@ -11,17 +11,18 @@ from netex import (
     EntityStructure,
     DayTypeAssignment,
     DayType,
-    UicOperatingPeriod, PublicationDelivery, TypeOfFrameRef,
+    UicOperatingPeriod, PublicationDelivery, TypeOfFrameRef, ResponsibilitySet,
 )
 from netexio.attributes import update_attr
 from netexio.database import Database
-from netexio.dbaccess import recursive_resolve, load_referencing_inwards, load_generator
+from netexio.dbaccess import recursive_resolve, load_referencing_inwards, load_generator, setup_database
 from netexio.pickleserializer import MyPickleSerializer
 from netexio.xml import export_publication_delivery_xml
 from transformers.epip import export_epip_network_offer
 from transformers.references import split_path
 from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
+from utils.utils import get_interesting_classes
 
 Tid = TypeVar("Tid", bound=EntityStructure)
 
@@ -29,8 +30,9 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 def main(source_database_file: str, target_database_file: str, object_type: str) -> None:
     with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
         # filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, UicOperatingPeriod}
-        filter_set = set({ServiceJourneyPattern, PassengerStopAssignment, DayType})
-        filter_set.add(db_read.get_class_by_name(object_type))
+        filter_set = {Line, ServiceJourneyPattern, DayType, ScheduledStopPoint}
+        filter_set_assignment = {DayType: {DayTypeAssignment}, ScheduledStopPoint: {PassengerStopAssignment}}
+        # filter_set.add(db_read.get_class_by_name(object_type))
 
         split_by: Tid
         for split_by in load_generator(db_read, db_read.get_class_by_name(object_type)):
@@ -41,10 +43,11 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
             new_xml_file = a + '_' + split_by.id.replace(':', '_') + '.xml.gz'
 
             with Database(new_target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
+                setup_database(db_write, classes=get_interesting_classes(EPIP_CLASSES), clean=True)
 
                 # TODO: This is memory intensive, ideally we only keep what we have resolved and yield the objects to write them into the database
                 resolved: list[Any] = []
-                recursive_resolve(db_read, split_by, resolved, split_by.id, filter_set)
+                recursive_resolve(db_read, split_by, resolved, split_by.id, filter_set, filter_set_assignment=filter_set_assignment)
 
                 for obj in resolved:
                     db_write.insert_one_object(obj)
@@ -74,15 +77,25 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
                             split = split_path(path)
                             update_attr(obj, split, None)
 
+                        # print("REMOVED", obj.id, paths)
+
                         db_write.insert_one_object(obj, delete_embedding=True)
+
+                        # print("SHOULD REMOVE", parent_klass, parent_id, parent_version, paths)
+
+                    else:
+                        print("MISSING", parent_klass, parent_id, parent_version, paths)
+
+                db_write.block_until_done()
+
+                rs: ResponsibilitySet = db_write.get_single(ResponsibilitySet, "RET:ResponsibilitySet:Partition_ALL")
+                rs.roles.responsibility_role_assignment[0].responsible_area_ref.version = rs.version
 
                 db_write.block_until_done()
 
                 publication_delivery: PublicationDelivery = export_epip_network_offer(db_write, composite_frame_id=split_by.id, type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_LINE_OFFER', version_ref='1.0'))
                 export_publication_delivery_xml(publication_delivery, new_xml_file)
                 print(new_xml_file)
-
-                break
 
 
 if __name__ == "__main__":

@@ -265,7 +265,7 @@ class Database:
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
-    def open_db(self, klass: type[Tid], delete: bool = False) -> lmdb._Database | None:
+    def open_db(self, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
         name: str = get_object_name(klass)
 
         if name in self.dbs:
@@ -276,7 +276,7 @@ class Database:
                 # Try opening in read-only mode first to isolate the issue
                 db = self.env.open_db(name_bytes, create=False)
             except lmdb.Error as e:
-                if self.readonly or delete:
+                if self.readonly or delete or readonly:
                     return None
                 if "MDB_NOTFOUND" in str(e):
                     print(f"Database {name} does not exist, creating it.")
@@ -402,7 +402,7 @@ class Database:
             self._insert_embedding_on_queue(obj, delete_embedding)
 
     def insert_one_object(self, object: Tid, delete_embedding=False) -> None:
-        return self.insert_objects_on_queue(object.__class__, [object], delete_embedding)
+        return self.insert_objects_on_queue(object.__class__, [object], delete_embedding=delete_embedding)
 
     def insert_raw_on_queue(self, objects: Iterable[tuple[lmdb._Database, bytes, bytes]]) -> None:
         """Places a hybrid list of encoded pairs in the shared queue for writing, starting writer if needed."""

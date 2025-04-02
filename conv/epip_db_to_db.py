@@ -19,7 +19,6 @@ from netex import (
 from netexio.database import Database
 from netexio.dbaccess import setup_database, copy_table, missing_class_update, load_generator
 from netexio.pickleserializer import MyPickleSerializer
-from test.reprojection_stopplace import db_write
 from utils.utils import get_interesting_classes
 import logging
 

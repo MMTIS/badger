@@ -81,7 +81,7 @@ def reprojection_update(db: Database, crs_to: str) -> None:
     db.guard_free_space(0.10)
 
     for clazz in db.tables(exclusively=set(get_all_geo_elements())):
-        src_db = db.open_db(clazz)
+        src_db = db.open_db(clazz, readonly=True)
         if not src_db:
             continue
 

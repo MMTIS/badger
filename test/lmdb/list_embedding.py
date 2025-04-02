@@ -7,7 +7,7 @@ from netexio.database import Database
 from netexio.pickleserializer import MyPickleSerializer
 from utils.debug import print_embedding, print_embedding_inverse, print_referencing, print_referencing_inwards
 
-with Database("/storage/compressed/doeksen-epip-split_DOEKSEN_Line_HT.lmdb", MyPickleSerializer(compression=True), readonly=True) as db_read:
+with Database("/mnt/storage/compressed/ret-epip.lmdb", MyPickleSerializer(compression=True), readonly=True) as db_read:
     print_embedding(db_read)
     print_embedding_inverse(db_read)
     print_referencing(db_read)
