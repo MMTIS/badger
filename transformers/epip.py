@@ -954,7 +954,7 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
     db_write.insert_objects_on_queue(ServiceJourney, query4(db_read))
 
 
-def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
+def export_epip_network_offer(db_epip: Database, composite_frame_id: str="EU_NETWORK_OFFER", type_of_frame_ref: TypeOfFrameRef=TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0')) -> PublicationDelivery:
     # Maybe generalize this for other profiles too
     default_locale: Locale | None = None
     default_codespace: Codespace | None = None
@@ -1055,9 +1055,9 @@ def export_epip_network_offer(db_epip: Database) -> PublicationDelivery:
         data_objects=DataObjectsRelStructure(
             choice=[
                 CompositeFrame(
-                    id="EU_PI_NETWORK_OFFER",
+                    id=composite_frame_id,
                     version=version,
-                    type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0'),
+                    type_of_frame_ref=type_of_frame_ref,
                     frame_defaults=VersionFrameDefaultsStructure(
                         default_location_system="urn:ogc:def:crs:EPSG::4326", default_system_of_units=SystemOfUnits.SI_METRES, default_locale=default_locale
                     ),
