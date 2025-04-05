@@ -73,6 +73,7 @@ class Database:
         max_size: int = 36 * 1024**3,
         batch_size: int = 10_000,
         max_mem: int = 4 * 1024**3,
+        multithreaded: bool = False,
     ):
         self.path = path
         self.logger = logger
@@ -85,11 +86,15 @@ class Database:
         self.max_mem = max_mem
         self.serializer = serializer
         self.max_dbs = len(self.serializer.name_object) + 2
+        self.multithreaded = multithreaded
 
         self.cache = ActiveLRUCache(100)
 
     def __enter__(self) -> Database:
-        if self.readonly:
+        if self.multithreaded:
+            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024, lock = False, readahead = False)
+
+        elif self.readonly:
             self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024)
 
         else:
