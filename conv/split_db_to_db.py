@@ -11,7 +11,7 @@ from netex import (
     EntityStructure,
     DayTypeAssignment,
     DayType,
-    UicOperatingPeriod, PublicationDelivery, TypeOfFrameRef, ResponsibilitySet,
+    UicOperatingPeriod, PublicationDelivery, TypeOfFrameRef, ResponsibilitySet, StopPointInJourneyPattern,
 )
 from netexio.attributes import update_attr
 from netexio.database import Database
@@ -29,6 +29,7 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 
 def main(source_database_file: str, target_database_file: str, object_type: str) -> None:
     with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
+        db_read.stats()
         # filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, UicOperatingPeriod}
         filter_set = {Line, ServiceJourneyPattern, DayType, ScheduledStopPoint}
         filter_set_assignment = {DayType: {DayTypeAssignment}, ScheduledStopPoint: {PassengerStopAssignment}}
@@ -43,6 +44,7 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
             new_xml_file = a + '_' + split_by.id.replace(':', '_') + '.xml.gz'
 
             with Database(new_target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
+
                 setup_database(db_write, classes=get_interesting_classes(EPIP_CLASSES), clean=True)
 
                 # TODO: This is memory intensive, ideally we only keep what we have resolved and yield the objects to write them into the database
@@ -77,7 +79,7 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
                             split = split_path(path)
                             update_attr(obj, split, None)
 
-                        # print("REMOVED", obj.id, paths)
+                        print("REMOVED", obj.id, paths)
 
                         db_write.insert_one_object(obj, delete_embedding=True)
 
@@ -86,10 +88,10 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
                     else:
                         print("MISSING", parent_klass, parent_id, parent_version, paths)
 
-                db_write.block_until_done()
-
-                rs: ResponsibilitySet = db_write.get_single(ResponsibilitySet, "RET:ResponsibilitySet:Partition_ALL")
-                rs.roles.responsibility_role_assignment[0].responsible_area_ref.version = rs.version
+                # db_write.block_until_done()
+                # rs: ResponsibilitySet = db_write.get_single(ResponsibilitySet, "RET:ResponsibilitySet:Partition_ALL")
+                # rs.roles.responsibility_role_assignment[0].responsible_area_ref.version = rs.version
+                # db_write.insert_one_object(rs, delete_embedding=True)
 
                 db_write.block_until_done()
 

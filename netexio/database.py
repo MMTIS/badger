@@ -249,7 +249,7 @@ class Database:
 
                     # Process insertions
                     for db_handle1, key, value in batch:
-                        txn.put(key, value, db=db_handle1)
+                        txn.put(key, value, db=db_handle1, dupdata=False)
 
                 break  # Success, exit loop
             except lmdb.MapFullError:

@@ -238,25 +238,30 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
     )
 
     refs = set([])
+    missing = []
 
     stop_assignments: List[PassengerStopAssignment] = load_local(db_read, PassengerStopAssignment)
     retain_stop_assignments = []
     for stop_assignment in stop_assignments:
         if stop_assignment.taxi_stand_ref_or_quay_ref_or_quay is not None:  # and 'NL:Q:' in stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref:
             # TODO: Shouldn't be done here
-            stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref.replace('NL:Q:', 'NL:CHB:Quay:')
+            stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref = stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref.replace('NL:Q:', 'NL:CHB:Quay:').replace('DE:Q:', 'DE:CHB:Quay:').replace('BE:Q:', 'BE:CHB:Quay:')
             quay: Quay = quays.get(stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref)
             if quay is not None:
                 stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.version = quay.version
                 refs.add(quay.id)
             else:
+                missing.append(stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref)
+                if stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref.split(':')[-1][0].isdigit():
+                    print(stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref)
+
                 stop_assignment.taxi_stand_ref_or_quay_ref_or_quay = None
 
         if (
             stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place is not None
         ):  # and 'NL:S:' in stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref:
             # TODO: Shouldn't be done here
-            stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref.replace('NL:S:', 'NL:CHB:StopPlace:')
+            stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref = stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref.replace('NL:S:', 'NL:CHB:StopPlace:').replace('DE:S:', 'DE:CHB:StopPlace:').replace('BE:S:', 'BE:CHB:StopPlace:')
             stop_place: StopPlace = stop_places.get(stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref)
             if stop_place is not None:
                 stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.version = stop_place.version
@@ -655,7 +660,6 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
             log_all(logging.ERROR, f'No service journey pattern for journey: {sj} {sj.journey_pattern_ref}')
 
         if service_journey_pattern is not None and service_journey_pattern.id not in sjp_ids:
-            recover_line_ref(sj, service_journey_pattern, db_read)
 
             # TODO: Here we need to add it to the new database
             # sjps[service_journey_pattern.id] = service_journey_pattern
@@ -666,7 +670,16 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
                         db_read, Route, limit=1, filter_id=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False
                     )
                     if len(routes) > 0:
-                        RoutesProfile.projectRouteToServiceLinks(db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults)
+                        for sl in RoutesProfile.projectRouteToServiceLinks(db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults):
+                            db_write.insert_one_object(sl)
+
+            service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern = [
+                pis for pis in
+                service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
+                if isinstance(pis, StopPointInJourneyPattern)]
+
+            # Ater the Routes to ServiceLinks!
+            recover_line_ref(sj, service_journey_pattern, db_read)
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 

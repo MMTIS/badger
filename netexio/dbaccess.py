@@ -28,7 +28,7 @@ from netex import (
     EntityInVersionStructure,
     ResponsibilitySetRef,
     DataSourceRefStructure,
-    EntityStructure,
+    EntityStructure, ScheduledStopPoint,
 )
 from netexio.serializer import Serializer
 from netexio.xmlserializer import MyXmlSerializer
@@ -152,9 +152,13 @@ def recursive_resolve(
     resolved.append(parent)
 
     if inwards and parent.__class__ in filter_class:
+        if parent.__class__ == ScheduledStopPoint:
+            pass
         assert parent.id is not None, "Parent.id must not be none"
         # print("INWARDS", parent.id)
         resolved_parents = list(load_referencing_inwards(db, parent.__class__, filter_id=parent.id))  # TODO: replace resolved_parents with named attributes
+        my_filterset = filter_set_assignment.get(parent.__class__, None)
+
         for y in resolved_parents:
             y_class: type[Tid] = db.get_class_by_name(y[2])
             already_done = False
@@ -164,8 +168,6 @@ def recursive_resolve(
                 ):  #  or y_class in filter_class: This seems to be an issue to get the inward relationships to work, starting from Line
                     already_done = True
                     break
-
-            my_filterset = filter_set_assignment.get(parent.__class__, None)
 
             if not already_done and (y_class in my_filterset if my_filterset is not None else True):
                 resolved_objs = load_local(
@@ -701,6 +703,12 @@ def insert_database(
         if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.VersionFrameVersionStructure in x[1].__mro__
     ]
 
+    all_with_id = [
+        get_local_name(x[1])
+        for x in clsmembers
+        if hasattr(x[1], "id")
+    ]
+
     # See: https://github.com/NeTEx-CEN/NeTEx/issues/788
     # all_datasource_refs = [x[0] for x in clsmembers if hasattr(x[1], 'Meta') and hasattr(x[1].Meta, 'namespace') and hasattr(x[1], 'data_source_ref_attribute')]
     all_datasource_refs = [
@@ -734,6 +742,7 @@ def insert_database(
     current_responsibility_set_ref = None
     current_location_system = None
     current_zoneinfo: ZoneInfo | None = None
+    last_id = None
     last_version = None
     skip_frame = False
 
@@ -744,6 +753,17 @@ def insert_database(
         if event == "start":
             if current_element_tag is None and element.tag in interesting_element_names:
                 current_element_tag = element.tag
+
+            if localname in all_with_id:
+                id = element.attrib.get("id", None)
+                if id is not None:
+                    last_id = (localname, id)
+                elif last_id is not None:
+                    element.attrib['id'] = last_id[1].replace(last_id[0], element.tag)
+
+                version = element.attrib.get("version", None)
+                if version is not None:
+                    last_version = version
 
             elif localname == "TypeOfFrameRef":
                 if type_of_frame_filter is not None and element.attrib["ref"] not in type_of_frame_filter:
@@ -804,6 +824,7 @@ def insert_database(
                         if fd.default_locale and fd.default_locale.time_zone:
                             current_zoneinfo = ZoneInfo(fd.default_locale.time_zone)
 
+                last_id = None
                 last_version = None
 
                 skip_frame = False

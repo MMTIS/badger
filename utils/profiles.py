@@ -28,7 +28,7 @@ from netex import (
     TransportAdministrativeZone,
     UicOperatingPeriod,
     ValueSet,
-    VehicleType,
+    VehicleType, ServiceLink,
 )
 
 SWISS_CLASSES = {
@@ -89,6 +89,7 @@ EPIP_CLASSES = {
     ServiceCalendar,
     ServiceJourney,
     ServiceJourneyPattern,
+    ServiceLink,
     StopPlace,
     TransportAdministrativeZone,
     UicOperatingPeriod,

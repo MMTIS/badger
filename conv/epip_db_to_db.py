@@ -14,7 +14,7 @@ from netex import (
     Network,
     DestinationDisplay,
     VehicleType,
-    VersionFrameDefaultsStructure,
+    VersionFrameDefaultsStructure, ServiceJourneyPattern, StopPointInJourneyPattern,
 )
 from netexio.database import Database
 from netexio.dbaccess import setup_database, copy_table, missing_class_update, load_generator
@@ -54,8 +54,9 @@ def main(source_database_file: str, target_database_file: str) -> None:
         target_database_file,
         serializer=MyPickleSerializer(compression=True),
         readonly=False,
+        initial_size=8 * 1024 ** 3
     ) as target_db:
-        setup_database(target_db, classes, True)
+        # setup_database(target_db, classes, True)
 
         with Database(source_database_file, MyPickleSerializer(compression=True), readonly=True) as source_db:
 
@@ -68,6 +69,14 @@ def main(source_database_file: str, target_database_file: str) -> None:
                     default_codespace = source_db.get_single(Codespace, default_codespace_ref.ref, None)
                     if default_codespace:
                         generator_defaults['codespace'] = default_codespace
+
+            # log_all(logging.INFO, "Investigate this site frame step ")
+            # epip_site_frame_memory(source_db, target_db, generator_defaults)
+            # source_db.clean_cache()
+
+            # log_all(logging.INFO, "Service journeys ")
+            # epip_service_journey_generator(source_db, target_db, generator_defaults, None, cache=False)
+            # source_db.clean_cache()
 
             log_all(logging.INFO, "Copy all tables as-is ")
             copy_table(
@@ -137,7 +146,6 @@ def main(source_database_file: str, target_database_file: str) -> None:
 
             log_all(logging.INFO, "Reprojection Update ")
             reprojection_update(target_db, "urn:ogc:def:crs:EPSG::4326")
-
 
 if __name__ == "__main__":
     import argparse
