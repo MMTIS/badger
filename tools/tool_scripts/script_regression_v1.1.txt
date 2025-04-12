@@ -180,7 +180,7 @@
     "scripts": [
         {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":2,"script": "download_input_file", "args": "%%dir%%"},
-        {"step":3,"script": "gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+        {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
        {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
         {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
