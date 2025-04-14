@@ -1,0 +1,32 @@
+[
+       {
+       "block": "swiss-prod-epip",
+       "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
+    "description":"Full swiss NeTEx dataset => EPIP",
+    "scripts": [
+        {"step":0,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":1,"script": "set_defaults", "args": "forced_db_size=20*1024**3;authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db.py", "args": "[%%inputfilepath%%] %%dir%%/03-swiss-import.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"}
+        ]
+  },
+
+         {
+       "block": "swiss-prod-gtfs",
+       "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
+    "description":"Full swiss NeTEx dataset => GTFS",
+    "scripts": [
+        {"step":0,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":1,"script": "set_defaults", "args": "authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db.py", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":4,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
+        {"step":5,"script": "conv.gtfs_db_to_gtfs.py", "args": "%%dir%%/04.lmdb %%dir%%/%%block%%-gtfs-zip"},
+        {"step":6,"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs-zip %%dir%%"}
+        ]
+  }
+
+]

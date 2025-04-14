@@ -23,7 +23,7 @@ from netexio.activelrucache import ActiveLRUCache
 from netexio.dbaccess import update_embedded_referencing
 from netexio.serializer import Serializer
 from utils.utils import get_object_name
-
+from configuration import defaults
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 Tver = TypeVar("Tver", bound=EntityInVersionStructure)
@@ -68,7 +68,7 @@ class Database:
         serializer: Serializer,
         readonly: bool = True,
         logger: Logger | None = None,
-        initial_size: int = 4 * 1024**3,
+        initial_size: int = defaults.get('forced_db_size',4 * 1024**3),
         growth_size: int | None = None,
         max_size: int = 36 * 1024**3,
         batch_size: int = 10_000,

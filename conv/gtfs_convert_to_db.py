@@ -1375,7 +1375,7 @@ class GtfsNeTexProfile(CallsProfile):
                     ).hexdigest()[0:5],
                 )
 
-                if transfer_types[i] == 0:
+                if pd.isna(transfer_types[i]) or transfer_types[i] == 0 :
                     # Recommended
                     yield InterchangeRule(
                         advertised=True, id=id, version=self.version.version, feeder_filter=feeder_filter, distributor_filter=distributor_filter
