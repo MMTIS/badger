@@ -186,7 +186,7 @@ def set_defaults(keyvaluestr: str) -> None:
     defaults.update(result)
 
 
-def download(folder: str, url: str, forced: bool = False) -> str:
+def download(folder: str, url: str, regex: str = '', forced: bool = False) -> str:
     try:
         # Create the folder if it doesn't exist
         if not os.path.exists(folder):
@@ -358,7 +358,7 @@ def main(
                 log_all(logging.INFO, f"Command 'clean' executed for folder: {folder}\n")
                 continue
             if script_name == "download_input_file":
-                # Execute the download command. The file under the download_url is copied to a folder
+                # Execute the download command. The file(s) under the download_url is copied to a folder
                 folder = script_args
                 script_input_file_path = download(folder, script_download_url)
                 if script_input_file_path == "FILE NOT FOUND":
