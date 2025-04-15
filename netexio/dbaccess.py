@@ -32,7 +32,7 @@ from netex import (
 )
 from netexio.serializer import Serializer
 from netexio.xmlserializer import MyXmlSerializer
-from transformers.references import replace_with_reference_inplace
+from transformers.references import replace_with_reference_inplace, split_path
 from utils.utils import get_object_name
 from utils.aux_logging import log_all
 import logging
@@ -709,6 +709,13 @@ def insert_database(
         if hasattr(x[1], "id")
     ]
 
+    all_with_version = [
+        get_local_name(x[1])
+        for x in clsmembers
+        if hasattr(x[1], "version")
+    ]
+
+
     # See: https://github.com/NeTEx-CEN/NeTEx/issues/788
     # all_datasource_refs = [x[0] for x in clsmembers if hasattr(x[1], 'Meta') and hasattr(x[1].Meta, 'namespace') and hasattr(x[1], 'data_source_ref_attribute')]
     all_datasource_refs = [
@@ -742,8 +749,8 @@ def insert_database(
     current_responsibility_set_ref = None
     current_location_system = None
     current_zoneinfo: ZoneInfo | None = None
-    last_id = None
-    last_version = None
+    last_id_stack = []
+    last_version_stack = []
     skip_frame = False
 
     location_srsName = None
@@ -756,14 +763,22 @@ def insert_database(
 
             if localname in all_with_id:
                 id = element.attrib.get("id", None)
-                if id is not None:
-                    last_id = (localname, id)
-                elif last_id is not None:
-                    element.attrib['id'] = last_id[1].replace(last_id[0], element.tag)
+                if id is None:
+                    id = last_id_stack[-1][1].replace(last_id_stack[-1][0], localname)
+                    element.attrib['id'] = id
 
+                last_id_stack.append((localname, id,))
+
+            if localname in all_with_version:
                 version = element.attrib.get("version", None)
-                if version is not None:
-                    last_version = version
+                if version is None:
+                    if localname in all_with_id:
+                        version = last_version_stack[-1]
+                    else: # This is a ref, and we cannot yet know if this reference exists
+                        version = "any"
+
+                element.attrib['version'] = version
+                last_version_stack.append(version)
 
             elif localname == "TypeOfFrameRef":
                 if type_of_frame_filter is not None and element.attrib["ref"] not in type_of_frame_filter:
@@ -824,8 +839,11 @@ def insert_database(
                         if fd.default_locale and fd.default_locale.time_zone:
                             current_zoneinfo = ZoneInfo(fd.default_locale.time_zone)
 
-                last_id = None
-                last_version = None
+                if localname in all_with_id: # Feels redundant
+                    last_id_stack.pop()
+
+                if localname in all_with_version: # Feels redundant
+                    last_version_stack.pop()
 
                 skip_frame = False
                 continue
@@ -857,6 +875,12 @@ def insert_database(
                 current_element_tag == element.tag
             ):  # https://stackoverflow.com/questions/65935392/why-does-elementtree-iterparse-sometimes-retrieve-xml-elements-incompletely
                 if "id" not in element.attrib:
+                    if localname in all_with_id:  # Feels redundant
+                        last_id_stack.pop()
+
+                    if localname in all_with_version:  # Feels redundant
+                        last_version_stack.pop()
+
                     current_element_tag = None
                     # print(xml)
                     continue
@@ -864,11 +888,6 @@ def insert_database(
                 clazz = clazz_by_name[element.tag]
 
                 id = element.attrib["id"]
-
-                version = element.attrib.get("version", None)
-                if version is not None:
-                    last_version = version
-
                 order = element.attrib.get("order", None)
                 object = xml_serializer.unmarshall(element, clazz)
 
@@ -882,40 +901,17 @@ def insert_database(
                         order = 1
                         object.order = order
 
-                    if version is None:
-                        version = last_version
-                        object.version = version
-                        warnings.warn(f"{localname} {id} does not have a required version, inheriting it {version}.")
-
-                    try:
-                        db.insert_one_object(object)
-                    except:
-                        print("1", etree.tostring(element))
-                        raise
-                        pass
-
-                elif hasattr(clazz, "version"):
-                    if version is None:
-                        version = last_version
-                        object.version = version
-                        warnings.warn(f"{localname} {id} does not have a required version, inheriting it {version}.")
-
-                    try:
-                        db.insert_one_object(object)
-                    except:
-                        print("2", etree.tostring(element), object)
-                        raise
-                        pass
-
-                else:
-                    try:
-                        db.insert_one_object(object)
-                    except:
-                        print("3", etree.tostring(element))
-                        raise
-                        pass
-
+                db.insert_one_object(object)
                 current_element_tag = None
+
+            elif current_element_tag is None:
+                pass
+
+            if localname in all_with_id:
+                last_id_stack.pop()
+
+            if localname in all_with_version:
+                last_version_stack.pop()
 
 
 def recursive_attributes(obj: Tid, depth: List[int | str]) -> Generator[tuple[Any, list[int | str]], None, None]:
@@ -972,3 +968,79 @@ def open_netex_file(filename: str) -> Generator[IO[Any], None, None]:
             l_zipfilename = zipfilename.filename.lower()
             if l_zipfilename.endswith(".xml.gz") or l_zipfilename.endswith(".xml"):
                 yield zip.open(zipfilename)
+
+def all_subclasses(cls):
+    return set(cls.__subclasses__()).union(
+        s for c in cls.__subclasses__() for s in all_subclasses(c)
+    )
+
+def check_referencing(db: Database) -> None:
+    """
+    The ambition of this function is to make sure that all references are valid, but also to remove the "any" version
+    towards a resolved version currently found in the database.
+
+    This could also be a place to resolve conditional valdity (valid between)
+    """
+
+    result = None
+    prev_key = None
+    prev_key_update = False
+
+    with db.env.begin(db=db.db_referencing, write=False) as txn:
+        with txn.cursor(db.db_referencing_inwards) as cursor_referencing_inwards, txn.cursor(db.db_referencing) as cursor_referencing:
+            for key, value in cursor_referencing:
+                if prev_key != key:
+                    if prev_key_update:
+                        # print(f"Would update {result.id} {attribute}")
+                        # TODO: we must aggregate all operations per single referencing object, otherwise concurrency will prevent any update
+                        db.insert_one_object(result, delete_embedding=False)
+                        prev_key_update = False
+                    print(key)
+
+                referencing_class, referencing_id, referencing_version, path = cloudpickle.loads(value)
+                orig_check_class = check_class = db.get_class_by_name(referencing_class)
+                result_reference = db.get_single(check_class, referencing_id, referencing_version)
+                if result_reference is None:
+                    alternatives = getattr(netex, referencing_class + 'RefStructure')
+                    for sc in all_subclasses(alternatives):
+                        try:
+                            check_class = getattr(netex, sc.__name__.replace('RefStructure', ''))
+
+                            result_reference = db.get_single(check_class, referencing_id, referencing_version)
+                            if result_reference:
+                                referencing_class = get_object_name(check_class)
+                                break
+                        except AttributeError:
+                            pass
+
+                if result_reference is None:
+                    print(f"referencing {referencing_id} cannot be found")
+
+                elif not path.endswith("_attribute") and result_reference.version != referencing_version:
+                    # print(result_reference.version, referencing_version)
+                    inv_key = db.serializer.encode_key(referencing_id, referencing_version, orig_check_class, True)
+
+                    if cursor_referencing_inwards.set_range(inv_key):
+                        for inv_value in cursor_referencing_inwards.iternext_dup():
+                            parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
+                            parent_class = db.get_class_by_name(parent_clazz)
+
+                            check_key = db.serializer.encode_key(parent_id, parent_version, parent_class, True)
+                            if check_key == key:
+                                if not prev_key_update:
+                                    result = db.get_single(parent_class, parent_id, parent_version)
+                                split = split_path(embedding_path)
+                                attribute = resolve_attr(result, split)
+                                # print(embedding_path)
+                                attribute.name_of_ref_class = referencing_class
+                                attribute.version = result_reference.version
+                                prev_key_update = True
+
+                prev_key = key
+
+            if prev_key_update:
+                # print(f"Would update {result.id} {attribute}")
+                # TODO: we must aggregate all operations per single referencing object, otherwise concurrency will prevent any update
+                db.insert_one_object(result, delete_embedding=False)
+                prev_key_update = False
+            print(key)

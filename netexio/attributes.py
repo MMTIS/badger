@@ -24,6 +24,8 @@ def update_attr(obj: Any, attr: list[str | int], value: Any | None) -> Any:
             if not obj.__class__.__name__.endswith("RelStructure"):  # TODO: Figure out how to skip empty objects
                 parent = obj
                 parent_name = name
+            if obj is None:
+                return None  # TODO: when there is a list op elements, the first time this already causes the removal of the entire structure, that is not what we want
             obj = getattr(obj, name)
 
     name = attr[-1]
