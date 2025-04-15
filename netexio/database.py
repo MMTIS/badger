@@ -554,13 +554,13 @@ class Database:
         return None  # If DB is empty
 
     def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> Tid | None:
-        db = self.open_db(clazz)
+        db = self.open_db(clazz, readonly=True)
         if db is None:
             return None
 
         prefix = self.serializer.encode_key(id, version, clazz)
         with self.env.begin(write=False, buffers=True, db=db) as txn:
-            if version:
+            if version is not None and version != "any":
                 value = txn.get(prefix)
                 if value:
                     return self.serializer.unmarshall(value, clazz)
