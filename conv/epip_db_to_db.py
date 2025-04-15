@@ -70,14 +70,6 @@ def main(source_database_file: str, target_database_file: str) -> None:
                     if default_codespace:
                         generator_defaults['codespace'] = default_codespace
 
-            # log_all(logging.INFO, "Investigate this site frame step ")
-            # epip_site_frame_memory(source_db, target_db, generator_defaults)
-            # source_db.clean_cache()
-
-            # log_all(logging.INFO, "Service journeys ")
-            # epip_service_journey_generator(source_db, target_db, generator_defaults, None, cache=False)
-            # source_db.clean_cache()
-
             log_all(logging.INFO, "Copy all tables as-is ")
             copy_table(
                 source_db,
