@@ -37,6 +37,7 @@ class LmdbActions(IntEnum):
     CLEAR = 3
     DROP = 4
     DELETE_EMBEDDING_REFERENCES = 5
+    DELETE_KEY_VALUE = 6
 
 
 class Embedding:
@@ -171,6 +172,7 @@ class Database:
             drop_tasks: list[lmdb._Database] = []
             clear_tasks: list[lmdb._Database] = []
             delete_embedding_task: list[str] = []
+            delete_key_value_task: list[tuple[lmdb._Database, Any, Any]] = []
 
             total_size = 0
 
@@ -199,6 +201,11 @@ class Database:
                             assert key is not None, "Key must not be none"
                             delete_embedding_task.append(key)
 
+                        case LmdbActions.DELETE_KEY_VALUE:
+                            assert key is not None, "Key must not be none"
+                            assert value is not None, "Vallue must not be none"
+                            delete_key_value_task.append((database, key, value))
+
                         case LmdbActions.STOP:
                             break
 
@@ -208,8 +215,8 @@ class Database:
             except queue.Empty:
                 pass
 
-            if batch or delete_tasks or clear_tasks or drop_tasks or delete_embedding_task:
-                self._process_batch(batch, delete_tasks, clear_tasks, drop_tasks, delete_embedding_task, total_size)
+            if batch or delete_tasks or clear_tasks or drop_tasks or delete_embedding_task or delete_key_value_task:
+                self._process_batch(batch, delete_tasks, clear_tasks, drop_tasks, delete_embedding_task, delete_key_value_task, total_size)
 
             if action == LmdbActions.STOP:
                 break
@@ -226,6 +233,7 @@ class Database:
         clear_task: list[lmdb._Database],
         drop_task: list[lmdb._Database],
         delete_embedding_task: list[str],
+        delete_key_value_task: list[tuple[lmdb._Database, Any, Any]],
         total_size: int,
     ) -> None:
         """Processes a batch of writes and deletions, retrying if needed."""
@@ -248,6 +256,9 @@ class Database:
                                 cursor.delete()
                                 if not cursor.next():
                                     break
+
+                    for db_handle1, key, value in delete_key_value_task:
+                        txn.delete(key, value, db_handle1)
 
                     for global_key in delete_embedding_task:
                         self.delete_all_references_and_embeddings(txn, global_key)
@@ -384,6 +395,15 @@ class Database:
                         break  # Stop when keys no longer match the prefix
 
                     yield self.serializer.unmarshall(value, klass)
+
+    def delete_key_value_on_queue(self, db: lmdb._Database, key: Any, value: Any) -> None:
+        """Places objects in the shared queue for writing, starting writer if needed."""
+
+        self._start_writer_if_needed()
+        assert self.task_queue is not None, "Task queue must not be none"
+
+        self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
+
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""

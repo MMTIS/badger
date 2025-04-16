@@ -995,9 +995,10 @@ def check_referencing(db: Database) -> None:
                         # TODO: we must aggregate all operations per single referencing object, otherwise concurrency will prevent any update
                         db.insert_one_object(result, delete_embedding=False)
                         prev_key_update = False
-                    print(key)
+                    # print(key)
 
                 referencing_class, referencing_id, referencing_version, path = cloudpickle.loads(value)
+                result_referencing_class = referencing_class
                 orig_check_class = check_class = db.get_class_by_name(referencing_class)
                 result_reference = db.get_single(check_class, referencing_id, referencing_version)
                 if result_reference is None:
@@ -1008,15 +1009,15 @@ def check_referencing(db: Database) -> None:
 
                             result_reference = db.get_single(check_class, referencing_id, referencing_version)
                             if result_reference:
-                                referencing_class = get_object_name(check_class)
+                                result_referencing_class = get_object_name(check_class)
                                 break
                         except AttributeError:
                             pass
 
                 if result_reference is None:
-                    print(f"referencing {referencing_id} cannot be found")
+                    print(f"referencing {key} {path} {referencing_id} cannot be found")
 
-                elif not path.endswith("_attribute") and result_reference.version != referencing_version:
+                elif not path.endswith("_attribute") and (result_reference.version != referencing_version or result_referencing_class != referencing_class):
                     # print(result_reference.version, referencing_version)
                     inv_key = db.serializer.encode_key(referencing_id, referencing_version, orig_check_class, True)
 
@@ -1032,9 +1033,11 @@ def check_referencing(db: Database) -> None:
                                 split = split_path(embedding_path)
                                 attribute = resolve_attr(result, split)
                                 # print(embedding_path)
-                                attribute.name_of_ref_class = referencing_class
+                                attribute.name_of_ref_class = result_referencing_class
                                 attribute.version = result_reference.version
                                 prev_key_update = True
+
+                                db.delete_key_value_on_queue(db.db_referencing, key, value)
 
                 prev_key = key
 
@@ -1043,4 +1046,4 @@ def check_referencing(db: Database) -> None:
                 # TODO: we must aggregate all operations per single referencing object, otherwise concurrency will prevent any update
                 db.insert_one_object(result, delete_embedding=False)
                 prev_key_update = False
-            print(key)
+            # print(key)
