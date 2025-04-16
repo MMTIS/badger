@@ -803,7 +803,8 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
             my_uic_operating_periods = [
                 uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
                 for dta in t
-                if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (hasattr(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, 'name_of_ref_class') and
+                                                                                                                                            dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod')
             ]
             my_operating_periods: list[OperatingPeriod] = [
                 operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
