@@ -227,6 +227,7 @@ column_mapping = {
 
 
 def handle_file(con: duckdb.DuckDBPyConnection, zip: zipfile.ZipFile, filename: str, column_mapping: dict[str, str]) -> None:
+    print(filename)
     table = filename.split('/')[-1].replace('.txt', '')
     with con.cursor() as cur:
         sql_drop_table = f"""DROP TABLE IF EXISTS {table};"""
@@ -234,26 +235,37 @@ def handle_file(con: duckdb.DuckDBPyConnection, zip: zipfile.ZipFile, filename: 
         cur.execute(sql_drop_table)
 
         if filename in [x.filename for x in zip.filelist]:
-            detector = UniversalDetector()
-            for line in zip.open(filename, 'r'):
-                detector.feed(line)
-                if detector.done:
-                    break
-            detector.close()
+            if filename not in {'shapes.txt'}:
+                detector = UniversalDetector()
+                for line in zip.open(filename, 'r'):
+                    detector.feed(line)
+                    if detector.done:
+                        break
+                detector.close()
 
-            assert detector.result is not None, "Detector must have a result"
+                print("Detector done")
 
-            with zip.open(filename, mode='r') as f:
-                g = io.TextIOWrapper(f, detector.result['encoding'])
-                reader = csv.reader(g)
-                header = next(reader)
+                assert detector.result is not None, "Detector must have a result"
 
-            if (detector.result['encoding'] or '').lower() not in ('utf-8', 'utf-8-sig', 'ascii'):
-                with zip.open(filename, 'r') as f_in:
-                    g = io.TextIOWrapper(f_in, detector.result['encoding'])
-                    with open("_tmp", 'w', encoding='UTF-8') as f_out:
-                        f_out.writelines(g)
+                with zip.open(filename, mode='r') as f:
+                    g = io.TextIOWrapper(f, detector.result['encoding'])
+                    reader = csv.reader(g)
+                    header = next(reader)
+
+                if (detector.result['encoding'] or '').lower() not in ('utf-8', 'utf-8-sig', 'ascii'):
+                    with zip.open(filename, 'r') as f_in:
+                        g = io.TextIOWrapper(f_in, detector.result['encoding'])
+                        with open("_tmp", 'w', encoding='UTF-8') as f_out:
+                            f_out.writelines(g)
+                else:
+                    zip.extract(filename)
+                    os.rename(filename, '_tmp')
             else:
+                with zip.open(filename, mode='r') as f:
+                    g = io.TextIOWrapper(f, 'utf-8')
+                    reader = csv.reader(g)
+                    header = next(reader)
+
                 zip.extract(filename)
                 os.rename(filename, '_tmp')
 
@@ -268,6 +280,8 @@ def handle_file(con: duckdb.DuckDBPyConnection, zip: zipfile.ZipFile, filename: 
                 missing_mapping[column] = column_mapping.get(column, 'VARCHAR')
 
             this_mapping_str = json.dumps(this_mapping)
+
+
 
             sql_create_table = f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{filename}', delim=',', quote='"', escape='"',header=true, auto_detect=true, columns = {this_mapping_str});"""
             # print(sql_create_table)
