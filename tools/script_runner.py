@@ -261,7 +261,7 @@ def main(
     # go through each block
     for block in data:
         if url:
-            processdir = processing_data + "/" + parent_block + "-" + todo_block + "-" + str(custom_hash(url))
+            processdir = processing_data + "/" + parent_block + "/" + todo_block + "-" + str(custom_hash(url))
         else:
             processdir = processing_data + "/" + block["block"]
         blockstop = False
