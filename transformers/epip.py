@@ -491,7 +491,9 @@ def service_journey_ac_to_day_type(
             order=1,
             derived_from_object_ref=acs[0].id,
             derived_from_version_ref_attribute=acs[0].version,
-            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=cast(OperatingPeriodRef, getRef(uic_operating_period, OperatingPeriodRef)),
+            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=cast(
+                OperatingPeriodRef, getRef(uic_operating_period, OperatingPeriodRef)
+            ),
             day_type_ref=cast(DayTypeRef, getRef(day_type)),
         )
         day_type_assignments_ids.add(day_type_assignment.id)
@@ -846,7 +848,9 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
                     my_operational_dates = set(my_operational_dates)
                     for dta in t:
                         if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingDayRef):
-                            dt = operating_days[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref].calendar_date
+                            dt = operating_days[
+                                dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref
+                            ].calendar_date.to_datetime()
                             if dta.is_available is None or dta.is_available:
                                 my_operational_dates.add(dt)
                             else:
@@ -855,7 +859,7 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
                                 except KeyError:
                                     pass
                         elif isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, XmlDate):
-                            dt = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.to_date()
+                            dt = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.to_datetime()
                             if dta.is_available is None or dta.is_available:
                                 my_operational_dates.add(dt)
                             else:
@@ -971,7 +975,11 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
     db_write.insert_objects_on_queue(ServiceJourney, query4(db_read))
 
 
-def export_epip_network_offer(db_epip: Database, composite_frame_id: str="EU_NETWORK_OFFER", type_of_frame_ref: TypeOfFrameRef=TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0')) -> PublicationDelivery:
+def export_epip_network_offer(
+    db_epip: Database,
+    composite_frame_id: str = "EU_NETWORK_OFFER",
+    type_of_frame_ref: TypeOfFrameRef = TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0'),
+) -> PublicationDelivery:
     # Maybe generalize this for other profiles too
     default_locale: Locale | None = None
     default_codespace: Codespace | None = None
