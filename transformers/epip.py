@@ -245,7 +245,11 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
     for stop_assignment in stop_assignments:
         if stop_assignment.taxi_stand_ref_or_quay_ref_or_quay is not None:  # and 'NL:Q:' in stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref:
             # TODO: Shouldn't be done here
-            stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref = stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref.replace('NL:Q:', 'NL:CHB:Quay:').replace('DE:Q:', 'DE:CHB:Quay:').replace('BE:Q:', 'BE:CHB:Quay:')
+            stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref = (
+                stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref.replace('NL:Q:', 'NL:CHB:Quay:')
+                .replace('DE:Q:', 'DE:CHB:Quay:')
+                .replace('BE:Q:', 'BE:CHB:Quay:')
+            )
             quay: Quay = quays.get(stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref)
             if quay is not None:
                 stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.version = quay.version
@@ -261,7 +265,11 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
             stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place is not None
         ):  # and 'NL:S:' in stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref:
             # TODO: Shouldn't be done here
-            stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref = stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref.replace('NL:S:', 'NL:CHB:StopPlace:').replace('DE:S:', 'DE:CHB:StopPlace:').replace('BE:S:', 'BE:CHB:StopPlace:')
+            stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref = (
+                stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref.replace('NL:S:', 'NL:CHB:StopPlace:')
+                .replace('DE:S:', 'DE:CHB:StopPlace:')
+                .replace('BE:S:', 'BE:CHB:StopPlace:')
+            )
             stop_place: StopPlace = stop_places.get(stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref)
             if stop_place is not None:
                 stop_assignment.taxi_rank_ref_or_stop_place_ref_or_stop_place.version = stop_place.version
@@ -672,13 +680,16 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
                         db_read, Route, limit=1, filter_id=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False
                     )
                     if len(routes) > 0:
-                        for sl in RoutesProfile.projectRouteToServiceLinks(db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults):
+                        for sl in RoutesProfile.projectRouteToServiceLinks(
+                            db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults
+                        ):
                             db_write.insert_one_object(sl)
 
             service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern = [
-                pis for pis in
-                service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
-                if isinstance(pis, StopPointInJourneyPattern)]
+                pis
+                for pis in service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
+                if isinstance(pis, StopPointInJourneyPattern)
+            ]
 
             # Ater the Routes to ServiceLinks!
             recover_line_ref(sj, service_journey_pattern, db_read)
@@ -805,14 +816,20 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
             my_uic_operating_periods = [
                 uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
                 for dta in t
-                if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (hasattr(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, 'name_of_ref_class') and
-                                                                                                                                            dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod')
+                if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef)
+                or (
+                    hasattr(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, 'name_of_ref_class')
+                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                )
             ]
             my_operating_periods: list[OperatingPeriod] = [
                 operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
                 for dta in t
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'OperatingPeriod'
+                and (
+                    dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class is None
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'OperatingPeriod'
+                )
                 and (dta.is_available is None or dta.is_available)
             ]
             # my_operating_days = [operating_days[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref] for dta in day_type_assignments if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingDayRef)]
@@ -903,6 +920,9 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
 
                     result_day_type_assignments.append(res_dta)
                     result_uic_operating_periods.append(uic_operating_period)
+                else:
+                    log_all(logging.WARNING, f"There are no operatingdays for DayType {my_day_type.id}")
+
             else:
                 result_day_type_assignments += t
                 result_uic_operating_periods += my_uic_operating_periods
