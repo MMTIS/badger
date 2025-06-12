@@ -34,7 +34,7 @@ from netexio.serializer import Serializer
 from netexio.xmlserializer import MyXmlSerializer
 from transformers.references import replace_with_reference_inplace, split_path
 from utils.utils import get_object_name
-from utils.aux_logging import log_all
+from utils.aux_logging import log_all, log_once
 import logging
 from lxml import etree
 
@@ -603,6 +603,10 @@ def update_embedded_referencing(serializer: Serializer, deserialized: Tid) -> Ge
                     obj.name_of_ref_class = obj.__class__.__name__[0:-12]
                 elif obj.__class__.__name__.endswith("Ref"):
                     obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+
+            if obj.name_of_ref_class not in serializer.name_object:
+                log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
+                continue
 
             yield (
                 False,
