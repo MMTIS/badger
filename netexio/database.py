@@ -9,13 +9,14 @@ import threading
 import queue
 import os
 import cloudpickle
-from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator
+from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator, Iterator, Tuple
 from enum import IntEnum
 
 from netex import (
     EntityStructure,
     EntityInVersionStructure,
     VersionOfObjectRefStructure,
+    MultilingualString,
 )
 import utils.netex_monkeypatching  # noqa: F401
 
@@ -24,6 +25,7 @@ from netexio.dbaccess import update_embedded_referencing
 from netexio.serializer import Serializer
 from utils.utils import get_object_name
 from configuration import defaults
+
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 Tver = TypeVar("Tver", bound=EntityInVersionStructure)
@@ -59,6 +61,37 @@ class Referencing:
     version: str
 
 
+class LMDBObject:
+    def __init__(self, clazz: type[Tid], key: bytes, raw_value: bytes, serializer: Any):
+        self.clazz = clazz
+
+        # self.db_name = db_name
+        self.key = key
+        # self.class_name = db_name;
+        # self.serializer.name_object.get(self.class_name)
+        self.serializer = serializer
+        self.obj = serializer.unmarshall(raw_value, self.clazz) if clazz else None
+
+    def get_id_version(self) -> Optional[Tuple[Any, Any]]:
+        id = getattr(self.obj, 'id', None)
+        version = getattr(self.obj, 'version', None)
+        return id, version
+
+        """
+        if self.obj and hasattr(self.obj, "name"):
+            name = getattr(self.obj, 'name', None)
+            version = getattr(self.obj, 'version', None)
+            if isinstance(name, MultilingualString):
+                return name.value, version
+
+            elif name is None:
+                return self.obj.id, version
+
+            return name, version        
+            return self.key.decode('utf-8', 'ignore'), None
+        """
+
+
 class Database:
     task_queue: queue.Queue[tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]] | None
     writer_thread: threading.Thread | None
@@ -69,7 +102,7 @@ class Database:
         serializer: Serializer,
         readonly: bool = True,
         logger: Logger | None = None,
-        initial_size: int = defaults.get('forced_db_size',4 * 1024**3),
+        initial_size: int = defaults.get('forced_db_size', 4 * 1024**3),
         growth_size: int | None = None,
         max_size: int = 36 * 1024**3,
         batch_size: int = 10_000,
@@ -93,7 +126,7 @@ class Database:
 
     def __enter__(self) -> Database:
         if self.multithreaded:
-            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024, lock = False, readahead = False)
+            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024, lock=False, readahead=False)
 
         elif self.readonly:
             self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024)
@@ -281,7 +314,7 @@ class Database:
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
-    def open_db(self, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
+    def open_database(self, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
         name: str = get_object_name(klass)
 
         if name in self.dbs:
@@ -404,10 +437,9 @@ class Database:
 
         self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
 
-
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
-        db_handle = self.open_db(klass)
+        db_handle = self.open_database(klass)
         if db_handle is None:
             return
 
@@ -445,7 +477,7 @@ class Database:
         assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
-            db_handle = self.open_db(klass)
+            db_handle = self.open_database(klass)
             if db_handle is None:
                 return
 
@@ -498,7 +530,7 @@ class Database:
         assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
-            db_handle = self.open_db(klass, delete=True)
+            db_handle = self.open_database(klass, delete=True)
             if db_handle is None:
                 return
 
@@ -515,7 +547,7 @@ class Database:
         if self.readonly:
             return
 
-        db_handle = self.open_db(klass)
+        db_handle = self.open_database(klass)
         if db_handle is None:
             return
 
@@ -555,7 +587,7 @@ class Database:
                 self._reopen_dbs()
 
     def get_random(self, clazz: type[Tid]) -> Tid | None:
-        db_handle = self.open_db(clazz)
+        db_handle = self.open_database(clazz)
         if db_handle is None:
             return None
 
@@ -574,7 +606,7 @@ class Database:
         return None  # If DB is empty
 
     def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> Tid | None:
-        db = self.open_db(clazz, readonly=True)
+        db = self.open_database(clazz, readonly=True)
         if db is None:
             return None
 
@@ -596,6 +628,9 @@ class Database:
 
         return None
 
+    def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> LMDBObject | None:
+        yield LMDBObject(clazz, key, value, self.serializer)
+
     def copy_db(self, target: Database, klass: type[Tid]) -> None:
         """
         Copies a single database from `src_env` to `dst_env` with high throughput.
@@ -609,11 +644,11 @@ class Database:
         target._start_writer_if_needed()
         assert target.task_queue is not None, "Task queue must not be none"
 
-        src_db = self.open_db(klass)
+        src_db = self.open_database(klass)
         if src_db is None:
             return
 
-        dst_db = target.open_db(klass)
+        dst_db = target.open_database(klass)
         if dst_db is None:
             return
 
@@ -745,3 +780,74 @@ class Database:
                 tables.add(self.get_class_by_name(klass))
 
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
+
+    def list_databases(self) -> Generator[tuple[str, type[Tid]], None, None]:
+        with self.env.begin() as txn:
+            for key, _ in txn.cursor():
+                if not key.startswith(b"_"):
+                    key = key.decode("utf-8")
+                    yield key, self.serializer.name_object[key]  # Check if key is correct, or self.serializer.name_object[key]
+
+    def scan_objects(self, clazz: type[Tid], start_key: Optional[bytes] = None, limit: int = 100, filter_text: str = "") -> Iterator[LMDBObject]:
+        db = self.open_database(clazz)
+        if not db:
+            return
+        with self.env.begin(db=db) as txn:
+            cursor = txn.cursor()
+
+            # Positioneer de cursor op de juiste startpositie
+            if start_key:
+                # set_range() positioneert ons *voor* de start_key. We moeten expliciet
+                # een stap vooruit om de duplicatie te voorkomen.
+                if not cursor.set_range(start_key):
+                    return
+                try:
+                    next(cursor)
+                except StopIteration:
+                    return  # start_key was het allerlaatste item.
+                except:
+                    # TODO: this should really be caught differently
+                    return
+            elif not cursor.first():
+                return  # Database is leeg
+
+            count = 0
+            filter_text_lower = filter_text.lower()
+
+            # De for-lus verbruikt nu de correct gepositioneerde iterator.
+            for key, value in cursor:
+                key_str = key.decode('utf-8', 'ignore').lower()
+                value
+                if not filter_text_lower or filter_text_lower in key_str:
+                    yield LMDBObject(clazz, key, value, self.serializer)
+                    count += 1
+                    if count >= limit:
+                        break
+
+    def get_object_by_key(self, clazz: type[Tid], key: bytes) -> Optional[LMDBObject]:
+        db = self.open_database(clazz)
+        if not db:
+            return None
+        with self.env.begin(db=db) as txn:
+            value = txn.get(key)
+            if value:
+                return LMDBObject(clazz, key, value, self.serializer)
+        return None
+
+    def check_object_by_key(self, clazz: type[Tid], key: bytes) -> bool:
+        db = self.open_database(clazz)
+        if not db:
+            return False
+        with self.env.begin(db=db) as txn:
+            value = txn.get(key)
+            if value:
+                return True
+        return False
+
+    def get_relationships(self, obj: LMDBObject) -> tuple[list[LMDBObject], list[LMDBObject]]:
+        if not obj or not obj.obj:
+            return [], []
+        outgoing = [self.get_object_by_key(ref['db_name'], ref['key'].encode()) for ref in getattr(obj.obj, 'outgoing_refs', [])]
+        incoming = [self.get_object_by_key(ref['db_name'], ref['key'].encode()) for ref in getattr(obj.obj, 'incoming_refs', [])]
+        # Filter Nones eruit voor het geval een referentie niet gevonden kon worden
+        return [o for o in outgoing if o], [i for i in incoming if i]

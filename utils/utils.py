@@ -5,11 +5,7 @@ import warnings
 import re
 from typing import TypeVar, Iterable, Any
 from xsdata.models.datatype import XmlDuration
-from netex import (
-    VersionFrameDefaultsStructure,
-    EntityStructure,
-    VersionOfObjectRefStructure,
-)
+from netex import VersionFrameDefaultsStructure, EntityStructure, VersionOfObjectRefStructure
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)

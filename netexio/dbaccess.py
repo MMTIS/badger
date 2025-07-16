@@ -28,7 +28,8 @@ from netex import (
     EntityInVersionStructure,
     ResponsibilitySetRef,
     DataSourceRefStructure,
-    EntityStructure, ScheduledStopPoint,
+    EntityStructure,
+    ScheduledStopPoint,
 )
 from netexio.serializer import Serializer
 from netexio.xmlserializer import MyXmlSerializer
@@ -90,8 +91,10 @@ parser = XmlParser(context=context, config=config, handler=LxmlEventHandler)
 # TODO: For all load_ functions filter by id + version, not only id
 
 
-def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str, str], None, None]:
-    prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
+def load_referencing(
+    db: Database, clazz: type[Tid], filter_id: str | None = None, filter_version: str | None = None
+) -> Generator[tuple[str, str, str, str], None, None]:
+    prefix = db.serializer.encode_key(filter_id, filter_version, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing, buffers=True, write=False) as txn:
         cursor = txn.cursor()
@@ -105,8 +108,10 @@ def load_referencing(db: Database, clazz: type[Tid], filter_id: str | None = Non
                 yield referencing_id, referencing_version, referencing_class, path
 
 
-def load_referencing_inwards(db: Database, clazz: type[Tid], filter_id: str | None = None) -> Generator[tuple[str, str, str, str], None, None]:
-    prefix = db.serializer.encode_key(filter_id, None, clazz, include_clazz=True)
+def load_referencing_inwards(
+    db: Database, clazz: type[Tid], filter_id: str | None = None, filter_version: str | None = None
+) -> Generator[tuple[str, str, str, str], None, None]:
+    prefix = db.serializer.encode_key(filter_id, filter_version, clazz, include_clazz=True)
 
     with db.env.begin(db=db.db_referencing_inwards, buffers=True, write=False) as txn:
         cursor = txn.cursor()
@@ -141,7 +146,7 @@ def recursive_resolve(
     filter_class: set[type[Tid]] = set([]),
     inwards: bool = True,
     outwards: bool = True,
-    filter_set_assignment: dict[type[Tid]: set[type[Tid]]] = {}
+    filter_set_assignment: dict[type[Tid] : set[type[Tid]]] = {},
 ) -> None:
     resolved_objs: list[Any]
 
@@ -179,14 +184,7 @@ def recursive_resolve(
                 )
                 if len(resolved_objs) > 0:
                     recursive_resolve(
-                        db,
-                        resolved_objs[0],
-                        resolved,
-                        filter,
-                        filter_class,
-                        inwards,
-                        outwards,
-                        filter_set_assignment=filter_set_assignment
+                        db, resolved_objs[0], resolved, filter, filter_class, inwards, outwards, filter_set_assignment=filter_set_assignment
                     )  # TODO: not only consider the first
 
     # In principle this would already take care of everything recursive_attributes could find, but now does it inwards.
@@ -211,14 +209,7 @@ def recursive_resolve(
                 )
                 if len(resolved_objs) > 0:
                     recursive_resolve(
-                        db,
-                        resolved_objs[0],
-                        resolved,
-                        filter,
-                        filter_class,
-                        inwards,
-                        outwards,
-                        filter_set_assignment=filter_set_assignment
+                        db, resolved_objs[0], resolved, filter, filter_class, inwards, outwards, filter_set_assignment=filter_set_assignment
                     )  # TODO: not only consider the first
 
         for obj, path in recursive_attributes(parent, []):
@@ -265,14 +256,7 @@ def recursive_resolve(
                     )
                     if len(resolved_objs) > 0:
                         recursive_resolve(
-                            db,
-                            resolved_objs[0],
-                            resolved,
-                            filter,
-                            filter_class,
-                            inwards,
-                            outwards,
-                            filter_set_assignment=filter_set_assignment
+                            db, resolved_objs[0], resolved, filter, filter_class, inwards, outwards, filter_set_assignment=filter_set_assignment
                         )  # TODO: not only consider the first
                     else:
                         # print(obj.ref)
@@ -294,14 +278,7 @@ def recursive_resolve(
                                 )
                                 if len(resolved_objs) > 0:
                                     recursive_resolve(
-                                        db,
-                                        resolved_objs[0],
-                                        resolved,
-                                        filter,
-                                        filter_class,
-                                        inwards,
-                                        outwards,
-                                        filter_set_assignment=filter_set_assignment
+                                        db, resolved_objs[0], resolved, filter, filter_class, inwards, outwards, filter_set_assignment=filter_set_assignment
                                     )  # TODO: not only consider the first
                         else:
                             log_all(
@@ -327,7 +304,7 @@ def fetch_references_classes_generator(db: Database, classes: list[type[Tid]]) -
 
     for clazz in classes:
         # print(clazz)
-        db_name = db.open_db(clazz, readonly=True)
+        db_name = db.open_database(clazz, readonly=True)
         if not db_name:
             continue
 
@@ -458,8 +435,8 @@ def load_generator(
     parent: bool = False,
     cache: bool = True,
 ) -> Generator[Tid, None, None]:
-    if db.env and db.open_db(clazz, readonly=True) is not None:
-        with db.env.begin(write=False, buffers=True, db=db.open_db(clazz, readonly=True)) as txn:
+    if db.env and db.open_database(clazz, readonly=True) is not None:
+        with db.env.begin(write=False, buffers=True, db=db.open_database(clazz, readonly=True)) as txn:
             cursor = txn.cursor()
             if filter_id:
                 prefix = db.serializer.encode_key(filter_id, None, clazz)
@@ -707,18 +684,9 @@ def insert_database(
         if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.VersionFrameVersionStructure in x[1].__mro__
     ]
 
-    all_with_id = [
-        get_local_name(x[1])
-        for x in clsmembers
-        if hasattr(x[1], "id")
-    ]
+    all_with_id = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "id")]
 
-    all_with_version = [
-        get_local_name(x[1])
-        for x in clsmembers
-        if hasattr(x[1], "version")
-    ]
-
+    all_with_version = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "version")]
 
     # See: https://github.com/NeTEx-CEN/NeTEx/issues/788
     # all_datasource_refs = [x[0] for x in clsmembers if hasattr(x[1], 'Meta') and hasattr(x[1].Meta, 'namespace') and hasattr(x[1], 'data_source_ref_attribute')]
@@ -771,14 +739,19 @@ def insert_database(
                     id = last_id_stack[-1][1].replace(last_id_stack[-1][0], localname)
                     element.attrib['id'] = id
 
-                last_id_stack.append((localname, id,))
+                last_id_stack.append(
+                    (
+                        localname,
+                        id,
+                    )
+                )
 
             if localname in all_with_version:
                 version = element.attrib.get("version", None)
                 if version is None:
                     if localname in all_with_id:
                         version = last_version_stack[-1]
-                    else: # This is a ref, and we cannot yet know if this reference exists
+                    else:  # This is a ref, and we cannot yet know if this reference exists
                         version = "any"
 
                 element.attrib['version'] = version
@@ -843,10 +816,10 @@ def insert_database(
                         if fd.default_locale and fd.default_locale.time_zone:
                             current_zoneinfo = ZoneInfo(fd.default_locale.time_zone)
 
-                if localname in all_with_id: # Feels redundant
+                if localname in all_with_id:  # Feels redundant
                     last_id_stack.pop()
 
-                if localname in all_with_version: # Feels redundant
+                if localname in all_with_version:  # Feels redundant
                     last_version_stack.pop()
 
                 skip_frame = False
@@ -973,10 +946,10 @@ def open_netex_file(filename: str) -> Generator[IO[Any], None, None]:
             if l_zipfilename.endswith(".xml.gz") or l_zipfilename.endswith(".xml"):
                 yield zip.open(zipfilename)
 
+
 def all_subclasses(cls):
-    return set(cls.__subclasses__()).union(
-        s for c in cls.__subclasses__() for s in all_subclasses(c)
-    )
+    return set(cls.__subclasses__()).union(s for c in cls.__subclasses__() for s in all_subclasses(c))
+
 
 def check_referencing(db: Database) -> None:
     """
