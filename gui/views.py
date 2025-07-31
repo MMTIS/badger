@@ -1,8 +1,17 @@
 # views.py
-from PySide6.QtCore import Qt, Signal, QModelIndex, QEvent
-from PySide6.QtWidgets import QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QComboBox, QListView, QTabWidget, QLineEdit, QPushButton, QLabel
-from gui.models import ReferenceListModel
-from netexio.database import Tid
+from typing import List, Tuple, Optional
+from PySide6.QtCore import Qt, Signal, QModelIndex, QEvent, Slot, QTimer, QPoint
+from PySide6.QtWidgets import (
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QSplitter,
+    QComboBox, QListView, QTabWidget, QLineEdit, QPushButton, QLabel,
+    QAbstractItemView
+)
+
+from explorer.controller import Controller
+from explorer.model import ObjectTableModel
+from gui.models import ReferenceListModel, LazyObjectListModel
+from netexio.database import Database, Tid
+from utils.utils import get_object_name
 
 
 class CtrlClickListView(QListView):
@@ -20,6 +29,7 @@ class CtrlClickListView(QListView):
 class PerspectiveWidget(QWidget):
     def __init__(self):
         super().__init__()
+
         self.splitter = QSplitter()
         main_layout = QHBoxLayout(self)
         main_layout.addWidget(self.splitter)
@@ -27,6 +37,14 @@ class PerspectiveWidget(QWidget):
         self.splitter.addWidget(self._create_left_panel())
         self.splitter.addWidget(self._create_right_panel())
         self.splitter.setSizes([350, 850])
+
+        # When the combobox changes, the controller updates the model. However,
+        # the model might not emit `modelReset` or `layoutChanged`, leaving the
+        # view unaware of the update. By connecting here, we ensure the
+        # proactive loading is triggered. Using QTimer.singleShot ensures this
+        # runs *after* the controller's slot has finished updating the model.
+        self.db_combo_box.currentIndexChanged.connect(
+            lambda: QTimer.singleShot(0, self.on_left_list_view_updated))
 
     def _create_left_panel(self):
         left_widget = QWidget()
@@ -79,11 +97,49 @@ class PerspectiveWidget(QWidget):
         return right_widget
 
     def set_list_model(self, model):
+        # First, disconnect from the old model if it exists.
+        old_model = self.list_view_left.model()
+        if old_model:
+            try:
+                old_model.modelReset.disconnect(self.on_left_list_view_updated)
+                old_model.layoutChanged.disconnect(self.on_left_list_view_updated)
+                self.list_view_left.verticalScrollBar().valueChanged.disconnect(self.on_left_list_view_updated)
+            except (RuntimeError, TypeError):
+                pass  # It's fine if they were not connected.
+
+        # Now, set the new model.
         self.list_view_left.setModel(model)
 
-    def update_reference_lists(self, incoming: tuple[tuple[type[Tid], str, str], bool], outgoing: tuple[tuple[type[Tid], str, str], bool]):
-        self.incoming_ref_model.populate(incoming)
-        self.outgoing_ref_model.populate(outgoing)
+        # Finally, connect to the new model's signals.
+        if model:
+            model.modelReset.connect(self.on_left_list_view_updated)
+            model.layoutChanged.connect(self.on_left_list_view_updated)
+            self.list_view_left.verticalScrollBar().valueChanged.connect(self.on_left_list_view_updated)
+
+            # Schedule an initial load for the currently visible items.
+            # Using QTimer.singleShot ensures this runs after the current event processing,
+            # allowing the view to update its layout first.
+            QTimer.singleShot(0, self.on_left_list_view_updated)
+
+    def update_reference_lists(self, incoming: List[Tuple[type[Tid], str, str]], outgoing: List[Tuple[type[Tid], str, str]], database: Database):
+        self.incoming_ref_model.populate(incoming, database)
+        self.outgoing_ref_model.populate(outgoing, database)
+
+    @Slot()
+    def on_left_list_view_updated(self):
+        model = self.list_view_left.model()
+        if not isinstance(model, LazyObjectListModel):
+            return
+
+        viewport_rect = self.list_view_left.viewport().rect()
+        first_index = self.list_view_left.indexAt(viewport_rect.topLeft())
+        # Check the bottom-right corner (minus 1px) to robustly find the last visible item.
+        last_index = self.list_view_left.indexAt(viewport_rect.bottomRight() - QPoint(1, 1))
+
+        if first_index.isValid():
+            start_row = first_index.row()
+            end_row = last_index.row() if last_index.isValid() else model.rowCount() - 1
+            model.proactively_load_range(start_row, end_row)
 
 
 class MainView(QMainWindow):

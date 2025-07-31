@@ -54,7 +54,7 @@ def _populate_tree_from_object(parent_item: QStandardItem, data: Any, visited: s
             for field_info in dataclasses.fields(data):
                 key = field_info.name
                 value = getattr(data, key)
-                if value is None or value == {} or value == []:
+                if value is None or value == {} or value == [] or value == '':
                     continue
                 child_item = QStandardItem(str(key))
                 parent_item.appendRow(child_item)
@@ -137,7 +137,7 @@ class TextDumpPanelProvider(DetailPanelProvider):
     def update_panel(self, widget: QWidget, lmdbo: LMDBObject) -> None:
         text_edit: QTextEdit = widget
 
-        text_edit.setText(lmdbo.serializer.xmlserializer.marshall(lmdbo.obj, lmdbo.obj.__class__, pretty_print=True))
+        text_edit.setText(lmdbo._db.serializer.xmlserializer.marshall(lmdbo.obj, lmdbo.obj.__class__, pretty_print=True))
 
     def clear_panel(self, widget: QWidget) -> None:
         text_edit: QTextEdit = widget

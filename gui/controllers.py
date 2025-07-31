@@ -20,6 +20,8 @@ class PerspectiveController(QObject):
         super().__init__()
         self.database = database
         self.widget = widget  # Gebruik de doorgegeven widget
+        self.current_lmdbo: Optional[LMDBObject] = None
+        self.dirty_panels: set[QWidget] = set()
         for label, clazz in self.database.list_databases():
             self.widget.db_combo_box.addItem(label, clazz)
         self.source_model = LazyObjectListModel(self.database)
@@ -40,9 +42,17 @@ class PerspectiveController(QObject):
         self.widget.db_combo_box.currentIndexChanged.connect(self.on_database_changed)
         self.widget.search_input.textChanged.connect(self.source_model.setFilterText)
         self.widget.clear_filter_button.clicked.connect(lambda: self.widget.search_input.clear())
-        for list_view in [self.widget.list_view_left, self.widget.list_view_incoming, self.widget.list_view_outgoing]:
+        # The main list updates on any selection change (click or keyboard).
+        # The selectionModel().currentChanged signal handles this perfectly.
+        self.widget.list_view_left.selectionModel().currentChanged.connect(
+            lambda current, previous: self.handle_item_selected(current)
+        )
+        self.widget.list_view_left.ctrlClicked.connect(self.handle_item_ctrl_clicked)
+        # The reference lists can still use the simpler click-to-select handler.
+        for list_view in [self.widget.list_view_incoming, self.widget.list_view_outgoing]:
             list_view.clicked.connect(self.handle_item_selected)
             list_view.ctrlClicked.connect(self.handle_item_ctrl_clicked)
+        self.widget.details_tab_widget.currentChanged.connect(self._on_detail_tab_changed)
 
     @staticmethod
     def set_current_index_by_data(combo: QComboBox, value: Any) -> None:
@@ -51,75 +61,63 @@ class PerspectiveController(QObject):
                 combo.setCurrentIndex(index)
                 return
 
-    @staticmethod
-    def get_name_or_id(lmdbo: LMDBObject) -> str:
-        name = getattr(lmdbo.obj, 'name', None)
-        if name is not None:
-            if isinstance(name, MultilingualString):
-                return name.value
-            else:
-                return name
-
-        return lmdbo.obj.id
-
     def navigate_to_object(self, lmdbo: LMDBObject):
         if not lmdbo:
             return
-        self.titleChanged.emit(self.get_name_or_id(lmdbo))
+        self.current_lmdbo = lmdbo  # Store object for lazy loading panels
+        self.titleChanged.emit(lmdbo.get_name_or_id())
         # Use db_name for consistency, as obj.__class__.__name__ might not be the DB key
         if self.widget.db_combo_box.currentData() != lmdbo.obj.__class__:
             self.set_current_index_by_data(self.widget.db_combo_box, lmdbo.obj.__class__)
-        else:
-            self._select_item_in_main_list(lmdbo)
 
-        # Preserve the currently selected detail tab
+        # Mark all detail panels as "dirty" - needing an update.
+        self.dirty_panels = {widget for _, widget in self.detail_panels}
+
+        # Preserve the currently selected detail tab and trigger its update.
         current_tab_index = self.widget.details_tab_widget.currentIndex()
-
-        # Update panels instead of recreating them
-        for provider, widget in self.detail_panels:
-            can_handle = provider.can_handle(lmdbo)
-            if can_handle:
-                provider.update_panel(widget, lmdbo)
-            else:
-                provider.clear_panel(widget)
-            widget.setEnabled(can_handle)
-
-        # Restore the selected tab if it was valid
         if current_tab_index != -1:
-            self.widget.details_tab_widget.setCurrentIndex(current_tab_index)
+            self._on_detail_tab_changed(current_tab_index)
 
-        # TODO: this function currently cannot show references that are not in the database, would be nice to be able to show missing references
-        incoming = [
-            (
-                (self.database.get_class_by_name(parent_class), parent_id, parent_version),
-                self.database.check_object_by_key(
-                    self.database.get_class_by_name(parent_class),
-                    self.database.serializer.encode_key(parent_id, parent_version, self.database.get_class_by_name(parent_class)),
-                ),
+        # Gather raw reference identifiers without checking for existence here.
+        # This avoids thousands of synchronous database calls.
+        incoming_refs = [
+            (self.database.get_class_by_name(parent_class), parent_id, parent_version)
+            for parent_id, parent_version, parent_class, path in load_referencing_inwards(
+                self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version
             )
-            for parent_id, parent_version, parent_class, path in load_referencing_inwards(self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version)
         ]
-        outgoing = [
-            (
-                (self.database.get_class_by_name(reference_class), reference_id, reference_version),
-                self.database.check_object_by_key(
-                    self.database.get_class_by_name(reference_class),
-                    self.database.serializer.encode_key(reference_id, reference_version, self.database.get_class_by_name(reference_class)),
-                ),
+        outgoing_refs = [
+            (self.database.get_class_by_name(reference_class), reference_id, reference_version)
+            for reference_id, reference_version, reference_class, path in load_referencing(
+                self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version
             )
-            for reference_id, reference_version, reference_class, path in load_referencing(self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version)
         ]
-        self.widget.update_reference_lists(incoming, outgoing)
+        # Pass the database object to the view so the model can perform lazy checks.
+        self.widget.update_reference_lists(incoming_refs, outgoing_refs, self.database)
 
     def handle_item_selected(self, index: QModelIndex):
-        data = index.data(Qt.UserRole)
+        if not index.isValid():
+            return
 
-        # TODO: Refactor
-        if isinstance(data, tuple):
-            clazz, id_val, version = data
-            data = self.database.get_object_by_key(clazz, self.database.serializer.encode_key(id_val, version, clazz))
+        lmdbo = index.data(Qt.UserRole)
+        is_from_reference_list = isinstance(lmdbo, tuple)
 
-        self.navigate_to_object(data)
+        if is_from_reference_list:
+            clazz, id_val, version = lmdbo
+            key = self.database.serializer.encode_key(id_val, version, clazz)
+            lmdbo = self.database.get_object_by_key(clazz, key)
+
+        if not lmdbo:
+            return
+
+        self.navigate_to_object(lmdbo)
+
+        # If the click was on a reference list and the referenced object's type
+        # matches the type currently displayed in the main list, select it.
+        if is_from_reference_list:
+            # After navigate_to_object, the combo box is authoritative.
+            if self.widget.db_combo_box.currentData() == lmdbo.obj.__class__:
+                self._find_and_select_item_in_main_list(lmdbo)
 
     def handle_item_ctrl_clicked(self, index: QModelIndex):
         lmdbo = index.data(Qt.UserRole)
@@ -130,6 +128,26 @@ class PerspectiveController(QObject):
     def on_database_changed(self, index: int) -> None:
         self.source_model.set_database(self.widget.db_combo_box.itemData(index))
 
+    @Slot(int)
+    def _on_detail_tab_changed(self, index: int):
+        """
+        Updates a detail panel only when its tab becomes visible and it's marked as dirty.
+        """
+        if not self.current_lmdbo or index < 0 or index >= len(self.detail_panels):
+            return
+
+        provider, widget = self.detail_panels[index]
+
+        # Only update if the panel is "dirty" (i.e., a new object has been selected)
+        if widget in self.dirty_panels:
+            can_handle = provider.can_handle(self.current_lmdbo)
+            if can_handle:
+                provider.update_panel(widget, self.current_lmdbo)
+            else:
+                provider.clear_panel(widget)
+            widget.setEnabled(can_handle)
+            self.dirty_panels.remove(widget)
+
     def set_initial_state(self, clazz: type[Tid], lmdbo_to_show: Optional[LMDBObject] = None):
         self.widget.db_combo_box.blockSignals(True)
         self.widget.db_combo_box.setCurrentText(get_object_name(clazz))
@@ -137,15 +155,40 @@ class PerspectiveController(QObject):
         self.source_model.set_database(clazz)
         if lmdbo_to_show:
             self.navigate_to_object(lmdbo_to_show)
-            self._select_item_in_main_list(lmdbo_to_show)
+            self._find_and_select_item_in_main_list(lmdbo_to_show)
 
-    def _select_item_in_main_list(self, target_obj: LMDBObject):
-        for row in range(self.source_model.rowCount()):
-            index = self.source_model.index(row, 0)
-            item_obj = index.data(Qt.UserRole)
-            if item_obj and item_obj.key == target_obj.key:
-                self.widget.list_view_left.setCurrentIndex(index)
-                return
+    def _find_and_select_item_in_main_list(self, target_obj: LMDBObject):
+        """Finds an item in the main list model, fetching more if necessary, and selects it."""
+        # To guarantee that we can find the target object, we must first ensure
+        # the model is in a clean, unfiltered state, just like when a new
+        # perspective is created.
+        # We achieve this by programmatically clearing the search input. This
+        # triggers the model to reset itself via the existing signal-slot connection,
+        # which is the most reliable way to synchronize the UI and the model state.
+        if self.widget.search_input.text():
+            self.widget.search_input.clear()
+
+        start_row = 0
+        while True:
+            # Search for the object in the currently cached items, starting from where we left off
+            for row in range(start_row, self.source_model.rowCount()):
+                index = self.source_model.index(row, 0)
+                item_obj = index.data(Qt.UserRole)
+                if item_obj and item_obj.key == target_obj.key:
+                    self.widget.list_view_left.setCurrentIndex(index)
+                    self.widget.list_view_left.scrollTo(index)
+                    return
+
+            # If not found, check if we can fetch more
+            rows_before_fetch = self.source_model.rowCount()
+            if self.source_model.canFetchMore():
+                self.source_model.fetchMore(QModelIndex())
+                start_row = rows_before_fetch
+                # If fetchMore didn't add any items, we're at the end
+                if start_row == self.source_model.rowCount():
+                    break
+            else:
+                break  # No more items to fetch
 
 
 class MainController(QObject):

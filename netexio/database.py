@@ -11,6 +11,7 @@ import os
 import cloudpickle
 from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator, Iterator, Tuple
 from enum import IntEnum
+from PySide6.QtCore import QObject, Signal
 
 from netex import (
     EntityStructure,
@@ -61,35 +62,64 @@ class Referencing:
     version: str
 
 
-class LMDBObject:
-    def __init__(self, clazz: type[Tid], key: bytes, raw_value: bytes, serializer: Any):
+class LMDBObject(QObject):
+    """A lightweight, lazy-loading proxy for an object stored in LMDB.
+
+    It inherits from QObject to signal when its data is loaded, allowing
+    UI components to update automatically.
+    """
+    dataLoaded = Signal()
+
+    def __init__(self, clazz: type[Tid], key: bytes, database: Database, parent: Optional[QObject] = None):
+        super().__init__(parent)
         self.clazz = clazz
-
-        # self.db_name = db_name
         self.key = key
-        # self.class_name = db_name;
-        # self.serializer.name_object.get(self.class_name)
-        self.serializer = serializer
-        self.obj = serializer.unmarshall(raw_value, self.clazz) if clazz else None
+        self._db = database
+        self._obj: Optional[Tid] = None
+        self._name: Optional[str] = None
 
-    def get_id_version(self) -> Optional[Tuple[Any, Any]]:
-        id = getattr(self.obj, 'id', None)
-        version = getattr(self.obj, 'version', None)
+    @property
+    def obj(self) -> Optional[Tid]:
+        """Lazily deserializes the object on first access."""
+        if self._obj is None:  # Load only once
+            raw_value = self._db.get_raw_value_by_key(self.clazz, self.key)
+            if raw_value:
+                self._obj = self._db.serializer.unmarshall(raw_value, self.clazz)
+                if self._obj is not None:
+                    self.dataLoaded.emit()
+        return self._obj
+
+    def get_name_or_id(self) -> tuple[str, str]:
+        id, version = self.get_id_version()
+
+        if self._obj is not None:
+            name = getattr(self._obj, 'name', None)
+            if name is not None:
+                if isinstance(name, MultilingualString):
+                    name = name.value
+
+            if name is not None:
+                return name, version
+
         return id, version
 
-        """
-        if self.obj and hasattr(self.obj, "name"):
-            name = getattr(self.obj, 'name', None)
-            version = getattr(self.obj, 'version', None)
-            if isinstance(name, MultilingualString):
-                return name.value, version
+    def get_id_version(self) -> Optional[Tuple[Any, Any]]:
+        if self._obj is not None:
+            return self._obj.id, self._obj.version
 
-            elif name is None:
-                return self.obj.id, version
+        # Optimization: parse id/version from key instead of loading the object.
+        # This is much faster and avoids a DB read when just displaying the list.
+        # Assuming the key format for data dbs is "id:version" or "id".
+        key_str = self.key.decode('utf-8', 'ignore')
+        parts = key_str.split('-', 1)
+        parts[0] = parts[0].replace('#', get_object_name(self.clazz)).replace('*', ':')
+        if len(parts) == 2:
+            return parts[0], parts[1]
+        elif len(parts) == 1 and parts[0]:
+            # Handle case where there is no version in the key
+            return parts[0], None
 
-            return name, version        
-            return self.key.decode('utf-8', 'ignore'), None
-        """
+        return None, None
 
 
 class Database:
@@ -269,6 +299,8 @@ class Database:
         delete_key_value_task: list[tuple[lmdb._Database, Any, Any]],
         total_size: int,
     ) -> None:
+        print(f"drop_task: {len(drop_task)}  clear_task:  {len(clear_task)}  delete_tasks: {len(delete_tasks)}  delete_key_value_task: {len(delete_key_value_task)}  batch: {len(batch)}")
+
         """Processes a batch of writes and deletions, retrying if needed."""
         while True:
             try:
@@ -310,7 +342,7 @@ class Database:
         assert self.readonly is False, "Database is in read only mode"
         with self.lock:
             if self.task_queue is None:
-                self.task_queue = queue.Queue(maxsize=1000)  # Shared queue
+                self.task_queue = queue.Queue(maxsize=10000)  # Shared queue
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
@@ -454,6 +486,7 @@ class Database:
             version = obj.version if hasattr(obj, "version") else None
             key = self.serializer.encode_key(obj.id, version, klass)
             value = self.serializer.marshall(obj, klass)
+            print(obj.id)
 
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
             self._insert_embedding_on_queue(obj, delete_embedding)
@@ -628,9 +661,6 @@ class Database:
 
         return None
 
-    def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> LMDBObject | None:
-        yield LMDBObject(clazz, key, value, self.serializer)
-
     def copy_db(self, target: Database, klass: type[Tid]) -> None:
         """
         Copies a single database from `src_env` to `dst_env` with high throughput.
@@ -795,44 +825,59 @@ class Database:
         with self.env.begin(db=db) as txn:
             cursor = txn.cursor()
 
-            # Positioneer de cursor op de juiste startpositie
+            # Position the cursor at the correct starting point
             if start_key:
-                # set_range() positioneert ons *voor* de start_key. We moeten expliciet
-                # een stap vooruit om de duplicatie te voorkomen.
-                if not cursor.set_range(start_key):
-                    return
-                try:
-                    next(cursor)
-                except StopIteration:
-                    return  # start_key was het allerlaatste item.
-                except:
-                    # TODO: this should really be caught differently
-                    return
+                # set_range() positions cursor at or after start_key.
+                # If it lands exactly on start_key, we need to move to the next item
+                # to avoid fetching the last item of the previous page again.
+                if cursor.set_range(start_key):
+                    if cursor.key() == start_key:
+                        if not cursor.next():
+                            return  # start_key was the last item
+                else:
+                    return  # No keys at or after start_key
             elif not cursor.first():
-                return  # Database is leeg
+                return  # Database is empty
 
             count = 0
             filter_text_lower = filter_text.lower()
 
-            # De for-lus verbruikt nu de correct gepositioneerde iterator.
-            for key, value in cursor:
+            # Iterate over keys only for maximum efficiency
+            for key in cursor.iternext(keys=True, values=False):
                 key_str = key.decode('utf-8', 'ignore').lower()
-                value
                 if not filter_text_lower or filter_text_lower in key_str:
-                    yield LMDBObject(clazz, key, value, self.serializer)
+                    # Yield a lightweight, lazy object
+                    yield LMDBObject(clazz, key, self)
                     count += 1
                     if count >= limit:
                         break
 
     def get_object_by_key(self, clazz: type[Tid], key: bytes) -> Optional[LMDBObject]:
+        # This method now only checks for existence and returns a lazy object
+        # if the key is found. The actual data is not read here.
+        if self.check_object_by_key(clazz, key):
+            return LMDBObject(clazz, key, self)
+        return None
+
+    def get_raw_value_by_key(self, clazz: type[Tid], key: bytes) -> Optional[bytes]:
+        """Fetches the raw value for a given key from the database."""
         db = self.open_database(clazz)
         if not db:
             return None
-        with self.env.begin(db=db) as txn:
-            value = txn.get(key)
-            if value:
-                return LMDBObject(clazz, key, value, self.serializer)
-        return None
+        with self.env.begin(db=db, buffers=True) as txn:
+            raw_value = txn.get(key)
+            if raw_value:
+                return raw_value
+
+            # This handles an alternative in case the version is not added.
+            cursor = txn.cursor()
+            if cursor.set_range(key):
+                for key_alt, raw_value in cursor:
+                    if bytes(key_alt).startswith(key):
+                        return raw_value
+                    return None
+
+            return None
 
     def check_object_by_key(self, clazz: type[Tid], key: bytes) -> bool:
         db = self.open_database(clazz)
@@ -842,6 +887,15 @@ class Database:
             value = txn.get(key)
             if value:
                 return True
+
+            # This handles an alternative in case the version is not added.
+            cursor = txn.cursor()
+            if cursor.set_range(key):
+                for key_alt, _value in cursor:
+                    if not bytes(key_alt).startswith(key):
+                        return False
+                    return True
+
         return False
 
     def get_relationships(self, obj: LMDBObject) -> tuple[list[LMDBObject], list[LMDBObject]]:
