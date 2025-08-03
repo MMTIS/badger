@@ -7,7 +7,7 @@ from netex import MultilingualString
 from netexio.database import Database, LMDBObject, Tid
 from gui.models import LazyObjectListModel
 from gui.views import MainView, PerspectiveWidget
-from gui.detail_panels import DetailPanelProvider, TreeViewPanelProvider, TextDumpPanelProvider
+from gui.detail_panels import DetailPanelProvider, TreeViewPanelProvider, TextDumpPanelProvider, GeoPanelProvider
 from netexio.dbaccess import load_referencing_inwards, load_referencing
 from utils.utils import get_object_name
 
@@ -32,11 +32,11 @@ class PerspectiveController(QObject):
 
     def _setup_detail_panels(self):
         """Creates the detail panel widgets once and adds them to the tab view."""
-        panel_providers = [TreeViewPanelProvider(), TextDumpPanelProvider()]
+        panel_providers = [TreeViewPanelProvider(), TextDumpPanelProvider(), GeoPanelProvider()]
         for provider in panel_providers:
             widget, title = provider.create_panel()
             self.detail_panels.append((provider, widget))
-            self.widget.details_tab_widget.addTab(widget, title)
+            index = self.widget.details_tab_widget.addTab(widget, title)
 
     def _connect_signals(self):
         self.widget.db_combo_box.currentIndexChanged.connect(self.on_database_changed)
@@ -225,7 +225,6 @@ class MainController(QObject):
         default_title = p_widget.db_combo_box.currentText()
         tab_title = getattr(lmdbo_to_show.obj, 'id', default_title) if lmdbo_to_show else default_title
         tab_index = self.view.tab_widget.addTab(p_widget, tab_title)
-        self.view.tab_widget.setCurrentIndex(tab_index)
         if lmdbo_to_show:
             p_controller.set_initial_state(lmdbo_to_show.obj.__class__, lmdbo_to_show)
         else:

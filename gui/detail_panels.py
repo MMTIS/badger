@@ -1,15 +1,20 @@
 # detail_panels.py
 from abc import ABC, abstractmethod
+import json
 import pprint
 import dataclasses
 import enum
+from decimal import Decimal
 from typing import Any
 from PySide6.QtCore import QRegularExpression
 from PySide6.QtGui import QStandardItemModel, QStandardItem, QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 from PySide6.QtWidgets import QAbstractItemView, QWidget, QTreeView, QTextEdit
 
+from conv.netex_db_to_mbtiles import to_feature
 from gui.xmlsyntaxhighlighter import XmlSyntaxHighlighter
-from netexio.database import LMDBObject
+from netexio.database import LMDBObject, Tid
+from transformers.projection import get_all_geo_elements, reprojection
+from utils.utils import get_object_name
 
 
 class DetailPanelProvider(ABC):
@@ -138,6 +143,38 @@ class TextDumpPanelProvider(DetailPanelProvider):
         text_edit: QTextEdit = widget
 
         text_edit.setText(lmdbo._db.serializer.xmlserializer.marshall(lmdbo.obj, lmdbo.obj.__class__, pretty_print=True))
+
+    def clear_panel(self, widget: QWidget) -> None:
+        text_edit: QTextEdit = widget
+        text_edit.clear()
+
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        return super().default(obj)
+
+class GeoPanelProvider(DetailPanelProvider):
+    geo_classes: set[Tid]
+
+    def __init__(self):
+        super().__init__()
+        self.geo_classes = set(get_all_geo_elements())
+
+    def can_handle(self, lmdbo: LMDBObject) -> bool:
+        return lmdbo.obj is not None and lmdbo.obj.__class__ in self.geo_classes
+
+    def create_panel(self) -> tuple[QWidget, str]:
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setEnabled(False)
+        return text_edit, "Map"
+
+    def update_panel(self, widget: QWidget, lmdbo: LMDBObject) -> None:
+        text_edit: QTextEdit = widget
+        text_edit.setText(
+            json.dumps(list(to_feature(reprojection(lmdbo.obj, "EPSG:4326"), get_object_name(lmdbo.clazz))), indent=2, cls=DecimalEncoder)
+        )
 
     def clear_panel(self, widget: QWidget) -> None:
         text_edit: QTextEdit = widget
