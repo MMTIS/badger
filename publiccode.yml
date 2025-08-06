@@ -42,7 +42,7 @@ maintenance:
     - name: Stefan de Konink
       email: stefan@opengeo.nl
       phone: ""
-      affiliation: ""
+      affiliation: Stichting OpenGeo
     - name: SBB
       email: opendata@sbb.ch
       phone: ""
