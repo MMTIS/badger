@@ -270,10 +270,10 @@ def main(yeartimetable: str, target_database_file: str) -> None:
     timetable = load_from_file(yeartimetable)
 
     with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
-        db_write.insert_objects_on_queue(Operator, get_operators(timetable))
+        db_write.insert_objects_on_queue(Operator, get_operators(timetable), empty=True)
         db_write.insert_objects_on_queue(Line, get_lines(timetable), empty=True)
-        db_write.insert_objects_on_queue(StopArea, get_stopareas(timetable))
-        db_write.insert_objects_on_queue(ScheduledStopPoint, get_scheduledstoppoint(timetable))
+        db_write.insert_objects_on_queue(StopArea, get_stopareas(timetable), empty=True)
+        db_write.insert_objects_on_queue(ScheduledStopPoint, get_scheduledstoppoint(timetable), empty=True)
         db_write.insert_objects_on_queue(TimeDemandType, get_timedemandtype(timetable), empty=True)
         db_write.insert_objects_on_queue(ServiceJourney, get_vehiclejourney(timetable), empty=True)
 
