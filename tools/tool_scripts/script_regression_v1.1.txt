@@ -106,8 +106,26 @@
          ]
   },
 
+
              {
-    "block": "at-test",
+    "block": "fr_sncf_gtfs",
+    "url":"https://transport.data.gouv.fr/datasets/horaires-sncf",
+    "download_url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-opendata-sncf-gtfs.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+       {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
+        {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
+        {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.lmdb %%dir%%/07-%%block%%-netex.xml.gz"},
+        {"step":8,"script": "tools.gtfs_validator", "args": "%%inputfilepath%% %%dir%%"},
+        {"step":9,"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/09-%%block%%-map.html 1"}
+         ]
+  },
+
+             {
+    "block": "at_test",
     "url":"https://github.com/user-attachments/files/18965099/20250224-2317_netex_vmobil_2025.zip",
     "download_url":"https://github.com/user-attachments/files/18965099/20250224-2317_netex_vmobil_2025.zip",
     "scripts": [
@@ -285,5 +303,30 @@
         {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
         {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
-  }
+  },
+          {
+    "block": "filter_test",
+    "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
+    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0045-0000/fluo-grand-est-fluo08-netex.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":11,"script": "#tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "#tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"step":14,"script": "conv.filter_db_to_db", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/14-netex.lmdb  Line ARDENNES:Line:01:LOC" },
+        {"step":15,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/14-netex.lmdb %%dir%%/15-gtfs.lmdb"},
+        {"step":16,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/15-gtfs.lmdb %%dir%%/16-%%block%%-gtfs.zip"},
+        {"step":17,"script": "tools.gtfs_validator", "args": "%%dir%%/16-%%block%%-gtfs.zip %%dir%%"},
+        {"step":18,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/16-%%block%%-gtfs.zip %%dir%%/18-%%block%%-map.html 1"}
+         ]}
+
 ]
