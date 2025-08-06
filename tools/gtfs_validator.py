@@ -21,7 +21,7 @@ def main(gtfs_file: str, res_folder: str) -> None:
             raise
         log_all(logging.INFO, command)
         # Execute the command in the shell
-        subprocess.run(command, shell=True)
+        subprocess.run(command, shell=True, check=True)
     else:
         log_all(logging.ERROR, f"validator not found {validator_path}")
         raise Exception(f"validator not found {validator_path}")
