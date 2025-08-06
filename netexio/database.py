@@ -122,6 +122,11 @@ class LMDBObject(QObject):
         return None, None
 
 
+class TaskQueueDebug(queue.Queue):
+    def put(self, item, block = True, timeout = None):
+        print(item[:-1])
+        super(TaskQueueDebug, self).put(item, block, timeout)
+
 class Database:
     task_queue: queue.Queue[tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]] | None
     writer_thread: threading.Thread | None
@@ -343,6 +348,7 @@ class Database:
         with self.lock:
             if self.task_queue is None:
                 self.task_queue = queue.Queue(maxsize=10000)  # Shared queue
+                # self.task_queue = TaskQueueDebug(maxsize=10000)  # Shared queue
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
@@ -390,9 +396,8 @@ class Database:
         object_version: str
         path: str | None
 
-        key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
-
         if delete_embedding:
+            key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
             self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, None))
 
         for (
@@ -405,6 +410,8 @@ class Database:
             object_version,
             path,
         ) in update_embedded_referencing(self.serializer, obj):
+            if obj.__class__.__name__ == 'DestinationDisplay':
+                pass
             if embedding:
                 embedding_inverse_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
                 embedding_inverse_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
@@ -432,6 +439,12 @@ class Database:
                 # TODO: This won't work because of out of order behavior
                 # self.task_queue.put((LmdbActions.DELETE_PREFIX, self.db_referencing, key_prefix))
 
+                # By skipping these, we effectively save 4 rows per object.
+                if path.endswith("data_source_ref_attribute") or path.endswith("responsibility_set_ref_attribute"):
+                    continue
+
+                # When an object embeds more sub-objects, it will create more references, the path makes them unique,
+                # TODO: one could argue that we could aggregate all paths, so we have at most two writes per reference.
                 ref_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
                 ref_value = cloudpickle.dumps((get_object_name(object_class), object_id, object_version, path))
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing, ref_key, ref_value))
@@ -486,9 +499,11 @@ class Database:
             version = obj.version if hasattr(obj, "version") else None
             key = self.serializer.encode_key(obj.id, version, klass)
             value = self.serializer.marshall(obj, klass)
-            print(obj.id)
+            # print(obj.id)
 
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
+
+            # TODO: Debug the embedded generation
             self._insert_embedding_on_queue(obj, delete_embedding)
 
     def insert_one_object(self, object: Tid, delete_embedding=False) -> None:

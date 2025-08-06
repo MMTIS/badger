@@ -892,8 +892,7 @@ def insert_database(
 
 
 def recursive_attributes(obj: Tid, depth: List[int | str]) -> Generator[tuple[Any, list[int | str]], None, None]:
-    # qprint(obj.__class__.__name__)
-
+    # We skip data_source_ref_attribute and  responsibility_set_ref_attribute later in the pipeline
     data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
     if data_source_ref_attribute:
         yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + ["data_source_ref_attribute"]
