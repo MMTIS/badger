@@ -1,7 +1,8 @@
 import datetime
 import hashlib
 import math
-from _decimal import Decimal
+from decimal import Decimal
+#from _decimal import Decimal
 from typing import List, TypeVar, Any, Iterable, Generator, cast, Union
 
 import duckdb
