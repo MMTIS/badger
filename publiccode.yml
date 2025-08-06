@@ -1,0 +1,53 @@
+publiccodeYmlVersion: "0.4"
+name: badger
+applicationSuite: timetable conversion tools
+url: https://github.com/MMTIS/badger/
+landingURL: https://github.com/MMTIS/badger/
+softwareVersion: "0.9"
+releaseDate: 2025-03-12
+platforms:
+  - windows
+  - linux
+categories:
+  - data-collection
+  - data-analytics
+developmentStatus: beta
+softwareType: standalone/backend
+description:
+  en:
+    localisedName: badger
+    shortDescription: An extremely fast, state of the art, and consistent approach
+      for timetable conversions.
+    longDescription: >+
+      An extremely fast, state-of-the-art, and academically correct approach for timetable conversions. No shortcuts are taken, ensuring consistency and traceability throughout the process.
+
+      The framework uses the NeTEx domain model as a digital intermediate. It imports a source timetable standard into an object-based database, and then outputs a clean NeTEx profile that represents that standard — a lossless transformation. The NeTEx profile can be reused and converted into other NeTEx profiles, enabling interoperability between standards.
+
+      To handle large timetable datasets that exceed available memory, the application uses streaming (SAX-based) XML parsing. Each deserialised class instance is stored as an object in a Lightning Memory-Mapped Database (LMDB), organized by object type. Bidirectional references are stored for efficient navigation between related objects.
+
+      A graphical user interface is provided to explore the contents of the LMDB database, offering a quick and intuitive way to inspect the data structure and relationships. This tool is particularly useful for public transport data providers, integrators, and researchers aiming to unify legacy formats under the NeTEx standard without loss of detail.
+
+    documentation: https://github.com/MMTIS/badger/README.md
+    apiDocumentation: https://github.com/MMTIS/badger/README.md
+    features:
+      - Conversion GTFS to NeTEx
+      - Conversion NeTEx to GTFS
+      - Conversion NeTEx to EPIP (European Passenger Information Profile)
+      - Validation of GTFS and NeTEx
+legal:
+  license: AGPL-1.0-or-later
+maintenance:
+  type: community
+  contacts:
+    - name: Stefan de Konink
+      email: stefan@opengeo.nl
+      phone: ""
+      affiliation: Stichting OpenGeo
+    - name: SBB
+      email: opendata@sbb.ch
+      phone: ""
+      affiliation: ""
+localisation:
+  localisationReady: false
+  availableLanguages:
+    - en
