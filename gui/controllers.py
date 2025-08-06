@@ -3,8 +3,7 @@ from typing import Optional, List, Any
 from PySide6.QtCore import QObject, Signal, QModelIndex, Qt, Slot
 from PySide6.QtWidgets import QWidget, QComboBox
 
-from netex import MultilingualString
-from netexio.database import Database, LMDBObject, Tid
+from gui.qdatabase import QDatabase, LMDBObject, Tid
 from gui.models import LazyObjectListModel
 from gui.views import MainView, PerspectiveWidget
 from gui.detail_panels import DetailPanelProvider, TreeViewPanelProvider, TextDumpPanelProvider, GeoPanelProvider
@@ -16,7 +15,7 @@ class PerspectiveController(QObject):
     request_new_perspective = Signal(object)
     titleChanged = Signal(str)
 
-    def __init__(self, database: Database, widget: PerspectiveWidget):
+    def __init__(self, database: QDatabase, widget: PerspectiveWidget):
         super().__init__()
         self.database = database
         self.widget = widget  # Gebruik de doorgegeven widget
@@ -192,7 +191,7 @@ class PerspectiveController(QObject):
 
 
 class MainController(QObject):
-    def __init__(self, app, database: Database):
+    def __init__(self, app, database: QDatabase):
         super().__init__()
         self.app = app
         self.database = database

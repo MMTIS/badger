@@ -2,8 +2,7 @@
 from typing import Optional, List, Tuple, Dict
 from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Slot, QThreadPool, QRunnable
 
-from netex import MultilingualString
-from netexio.database import Database, LMDBObject, Tid
+from gui.qdatabase import QDatabase, LMDBObject, Tid
 
 OBJECT_FETCH_BATCH_SIZE = 50
 
@@ -23,7 +22,7 @@ class _ObjectLoaderTask(QRunnable):
 
 
 class LazyObjectListModel(QAbstractListModel):
-    def __init__(self, database: Database, parent=None):
+    def __init__(self, database: QDatabase, parent=None):
         super().__init__(parent)
         self.database = database
         self._cache: List[LMDBObject] = []
@@ -139,11 +138,11 @@ class ReferenceListModel(QAbstractListModel):
         super().__init__(parent)
         # Store raw reference identifiers, not objects or availability flags
         self._references: List[Tuple[type[Tid], str, str]] = []
-        self.database: Optional[Database] = None
+        self.database: Optional[QDatabase] = None
         # Cache availability to avoid repeated DB checks for the same item
         self._availability_cache: Dict[int, bool] = {}
 
-    def populate(self, references: List[Tuple[type[Tid], str, str]], database: Database):
+    def populate(self, references: List[Tuple[type[Tid], str, str]], database: QDatabase):
         self.beginResetModel()
         self._references = references
         self.database = database

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from explorer.controller import Controller
 from explorer.model import ObjectTableModel
 from gui.models import ReferenceListModel, LazyObjectListModel
-from netexio.database import Database, Tid
+from gui.qdatabase import QDatabase, Tid
 from utils.utils import get_object_name
 
 
@@ -121,7 +121,7 @@ class PerspectiveWidget(QWidget):
             # allowing the view to update its layout first.
             QTimer.singleShot(0, self.on_left_list_view_updated)
 
-    def update_reference_lists(self, incoming: List[Tuple[type[Tid], str, str]], outgoing: List[Tuple[type[Tid], str, str]], database: Database):
+    def update_reference_lists(self, incoming: List[Tuple[type[Tid], str, str]], outgoing: List[Tuple[type[Tid], str, str]], database: QDatabase):
         self.incoming_ref_model.populate(incoming, database)
         self.outgoing_ref_model.populate(outgoing, database)
 

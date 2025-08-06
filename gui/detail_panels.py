@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QAbstractItemView, QWidget, QTreeView, QTextEdit
 
 from conv.netex_db_to_mbtiles import to_feature
 from gui.xmlsyntaxhighlighter import XmlSyntaxHighlighter
-from netexio.database import LMDBObject, Tid
+from gui.qdatabase import LMDBObject, Tid
 from transformers.projection import get_all_geo_elements, reprojection
 from utils.utils import get_object_name
 
