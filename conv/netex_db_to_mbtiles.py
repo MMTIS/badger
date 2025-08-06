@@ -74,7 +74,7 @@ def to_feature(deserialized: Tid, clazz) -> Generator[dict, None, None]:
         # For ServiceLink (in the context of EPIP) we can assign which ServiceJourneyPatterns
         # use the ServiceLink, and also find the scope.
 
-from rtree import index as rtree_index
+# from rtree import index as rtree_index
 from collections import defaultdict
 from mapbox_vector_tile import encode
 
@@ -208,7 +208,7 @@ def features_to_mvt_tile(features: list[dict]) -> bytes:
     ])
 
 def main(database: str, output_filename: str) -> None:
-    rtree = rtree_index.Index()
+    # rtree = rtree_index.Index()
     object_map = {}  # id → geometry
 
     tile_index = defaultdict(list)
