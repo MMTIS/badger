@@ -81,6 +81,58 @@
         {"step":10,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
          ]
   },
+
+    {
+       "block": "swiss4",
+       "download_url":"https://github.com/user-attachments/files/18593829/swiss4.zip",
+        "description":"Reduced Swiss data set for tests, still a bit large",
+        "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-epip.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":10,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+         ]
+  },
+
+           {
+    "block": "swissinterchange",
+    "download_url":"https://github.com/user-attachments/files/18870701/swiss_interchange.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-epip.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":10,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+         ]
+  },
+
+           {
+    "block": "swissinterchange_r",
+    "download_url":"https://github.com/user-attachments/files/18885408/swiss_interchange_resp_set_only.zip",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-epip.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":9,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"step":10,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+         ]
+  },
     {
         "block":"nl3",
         "description":"nl 3 test with list",

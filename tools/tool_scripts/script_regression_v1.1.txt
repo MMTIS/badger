@@ -1,5 +1,4 @@
-                             [
-
+    [
            {
     "block": "fr_ardennes",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
@@ -106,8 +105,7 @@
          ]
   },
 
-
-             {
+  {
     "block": "fr_sncf_gtfs",
     "url":"https://transport.data.gouv.fr/datasets/horaires-sncf",
     "download_url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-opendata-sncf-gtfs.zip",
@@ -115,7 +113,7 @@
         {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":2,"script": "download_input_file", "args": "%%dir%%"},
         {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
-       {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
+        {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
         {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
         {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.lmdb %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -124,8 +122,8 @@
          ]
   },
 
-             {
-    "block": "at_test",
+  {
+    "block": "at-test",
     "url":"https://github.com/user-attachments/files/18965099/20250224-2317_netex_vmobil_2025.zip",
     "download_url":"https://github.com/user-attachments/files/18965099/20250224-2317_netex_vmobil_2025.zip",
     "scripts": [
@@ -199,7 +197,7 @@
         {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":2,"script": "download_input_file", "args": "%%dir%%"},
         {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
-       {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
+        {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
         {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
         {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.lmdb %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -221,7 +219,7 @@
        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":2,"script": "download_input_file", "args": "%%dir%%"},
         {"step":3,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
-       {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
+        {"step":4,"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.lmdb"},
         {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.lmdb %%dir%%/06-netex-database.lmdb"},
         {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.lmdb %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -232,7 +230,6 @@
         {"step":12,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.lmdb %%dir%%/12-%%block%%-gtfs.zip"},
         {"step":13,"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
         {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 1"}
-
          ]
   },
 
@@ -294,6 +291,7 @@
         {"step":4,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"step":5,"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
         {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% ../schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":7,"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.lmdb %%dir%%/07-netex-database.lmdb"},
         {"step":8,"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.lmdb %%dir%%/08-%%block%%-netex.xml.gz"},
         {"step":9,"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.lmdb "},
