@@ -14,14 +14,23 @@ dependencies = [
     "numpy",
     "pandas",
     "pyproj",
+    "pyside6",
+    "pymbtiles",
+    "mapbox_vector_tile",
+    "shiboken6",
+    "shapely",
     "folium",
     "paramiko",
+    "types-paramiko",
     "xsdata[cli,soap,lxml]>=24.12",
 ]
 requires-python = ">=3.12"
 
 [tool.black]
 extend-exclude = "netex"
+preview = true
+line-length = 160
+skip-string-normalization = true
 
 [tool.mypy]
 strict = true

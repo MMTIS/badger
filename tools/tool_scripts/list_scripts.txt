@@ -9,7 +9,7 @@
         {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
         {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
         {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":5,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"}
+        {"step":5,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"}
          ]
   },
 
@@ -22,7 +22,7 @@
         {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
         {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
         {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
-        {"step":6,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":6,"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":7,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz]  %%dir%%/07.lmdb"},
         {"step":8,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/07.lmdb %%dir%%/08.lmdb"},
         {"step":9,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/08.lmdb %%dir%%/%%block%%-gtfs.zip"},
@@ -40,7 +40,7 @@
         {"step":4,"script": "conv.gtfs_convert_to_db.py", "args": "%%dir%%/03.duckdb %%dir%%/04.lmdb"},
         {"step":5,"script": "conv.epip_db_to_db.py", "args": "%%dir%%/04.lmdb %%dir%%/05.lmdb"},
         {"step":6,"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/05.lmdb %%dir%%/06-%%block%%-netex.xml.gz"},
-        {"step":7,"script": "tools.xml_validator.py", "args": "%%dir%%/06-%%block%%-netex.xml.gz ../schema/netex/xsd/NeTEx_publication.xsd"}
+        {"step":7,"script": "tools.xml_validator.py", "args": "%%dir%%/06-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"}
         ]
   }
 ]

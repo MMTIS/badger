@@ -7,14 +7,21 @@ import traceback
 from configuration import gtfs_validator
 
 
+def is_existing_path(path: str) -> bool:
+    return os.path.exists(path)
+
+
 def main(gtfs_file: str, res_folder: str) -> None:
     # Build the shell command
     validator_path = gtfs_validator
     if os.path.exists(validator_path):
         command: str = f"java -jar {validator_path} -i {gtfs_file} -o {res_folder}"
+        if not is_existing_path(gtfs_file) or not is_existing_path(res_folder):
+            log_all(logging.ERROR, f"{gtfs_file} or  {res_folder} not valid. Stopping")
+            raise
         log_all(logging.INFO, command)
         # Execute the command in the shell
-        subprocess.run(command, shell=True)
+        subprocess.run(command, shell=True, check=True)
     else:
         log_all(logging.ERROR, f"validator not found {validator_path}")
         raise Exception(f"validator not found {validator_path}")
@@ -41,9 +48,7 @@ def main(gtfs_file: str, res_folder: str) -> None:
                         logging.ERROR,
                         f"ERROR notice in report.json: {notice.get('code')}",
                     )
-                    raise Exception(
-                        f"ERROR notice in report.json: {notice.get('code')}"
-                    )
+                    raise Exception(f"ERROR notice in report.json: {notice.get('code')}")
         else:
             log_all(logging.INFO, "No notices found in report.json")
 
@@ -51,9 +56,7 @@ def main(gtfs_file: str, res_folder: str) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Validates a gtfs file and shows some stats"
-    )
+    parser = argparse.ArgumentParser(description="Validates a gtfs file and shows some stats")
     parser.add_argument("gtfs_file", type=str, help="The input file (gtfs.zip)")
     parser.add_argument("res_folder", type=str, help="The folder for the report.")
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")

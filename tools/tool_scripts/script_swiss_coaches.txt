@@ -1,0 +1,59 @@
+[
+    {
+    "block": "blablacar-prod",
+    "url":"https://transport.data.gouv.fr/datasets/blablacar-bus-horaires-theoriques-et-temps-reel-du-reseau-europeen",
+    "download_url":"https://github.com/user-attachments/files/18202184/blablacar.zip",
+    "description":"Blablacar data",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "set_defaults", "args": "authority='Blablacar'; codespace='Blabla'; time_zone='Europe/Berlin'; feed_publisher_name='SBBSKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":4,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+        {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/04-netex-import.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.lmdb %%dir%%/05-netex-database.lmdb"},
+        {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.lmdb %%dir%%//epip_netex_blablacar.zip"},
+        {"step":8,"script": "#tools.netex_check_assertions", "args": "./scripts/blablacar-assertions.txt %%dir%%/epip_netex_blablacar.zip"},
+        {"step":9,"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_blablacar.zip"},
+        {"step":10,"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_blablacar.zip schema/netex/xsd/NeTEx_publication.xsd"}
+        ]
+  },
+  {
+    "block": "flixbus-prod",
+    "download_url":"https://gtfs.gis.flix.tech/gtfs_generic_eu.zip",
+    "description":"Flixbus data",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "set_defaults", "args": "authority='Flixbus'; codespace='flixbus';time_zone='Europe/Berlin'; feed_publisher_name='SBBSKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":4,"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+        {"step":5,"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/04-netex-import.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.lmdb %%dir%%/05-netex-database.lmdb"},
+        {"step":7,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.lmdb %%dir%%/epip_netex_flixbus.zip"},
+        {"step":8,"script": "#tools.netex_check_assertions", "args": "./scripts/flixbus-assertions.txt %%dir%%/epip_netex_flixbus.zip"},
+        {"step":9,"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_flixbus.zip schema/netex/xsd/NeTEx_publication.xsd"}
+        ]
+  },
+
+       {
+       "block": "merge_fernbusse",
+    "description":"Merge Fernbusse and upload it",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "set_defaults", "args": "authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB-SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%dir%%/../flixbus-prod/epip_netex_flixbus.zip %%dir%%/../blablacar-prod/epip_netex_blablacar.zip] %%dir%%/03-gtfs.lmdb "},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-gtfs.lmdb %%dir%%/04-epip.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-epip.lmdb %%dir%%/epip_netex_fernbusse.xml.zip"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/epip_netex_fernbusse.xml.zip] %%dir%%/06-gtfs.lmdb"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.lmdb %%dir%%/07-gtfs.lmdb"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.lmdb %%dir%%/gtfs_fernbusse.zip"},
+        {"step":9,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/epip_netex_fernbusse.xml.zip"},
+        {"step":10,"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_fernbusse.xml.zip"},
+        {"step":11,"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%"},
+        {"step":13,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"step":14,"script": "#tools.ftp_upload", "args": "%%dir%%/epip_netex_fernbusse.xml.zip sbb_ftp"}
+
+        ]
+  }
+
+]

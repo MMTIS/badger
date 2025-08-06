@@ -1,13 +1,13 @@
 import csv
 import datetime
-import re
 import warnings
-from typing import List, Union
+import zipfile
+from typing import List, Union, Any, TypeVar, Literal, Generator
 import io
+import logging
 from pyproj import Transformer
-from xsdata.models.datatype import XmlDateTime, XmlDuration
+from decimal import Decimal
 
-from transformers.nordicprofile import NordicProfile
 from transformers.projection import project_location_4326
 
 from utils.utils import to_seconds
@@ -22,8 +22,10 @@ from netex import Line, MultilingualString, AllVehicleModesOfTransportEnumeratio
     VersionOfObjectRefStructure
 
 import operator as operator_f
-from utils.aux_logging import *
+from utils.aux_logging import log_once
 from configuration import defaults
+
+T = TypeVar("T")
 
 gtfs_id_lookup = {} # TODO: better way?
 
@@ -39,7 +41,7 @@ class GtfsProfile:
     empty_shapes = {'shape_id': None, 'shape_pt_lat': None, 'shape_pt_lon': None, 'shape_pt_sequence': None, 'shape_dist_traveled': None}
 
     @staticmethod
-    def writeToFile(filename: str, data: List[dict], write_header=False):
+    def writeToFile(filename: str, data: List[dict[str, Any]], write_header: bool=False) -> None:
         mode = 'a'
         if write_header:
             mode = 'w'
@@ -53,20 +55,7 @@ class GtfsProfile:
                     writer.writerows(data)
 
     @staticmethod
-    def writeToFile(filename: str, data: List[dict], write_header=False):
-        mode = 'a'
-        if write_header:
-            mode = 'w'
-
-        if len(data) > 0:
-            with open(filename, mode) as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=data[0].keys())
-                if write_header:
-                    writer.writeheader()
-                if data[0][list(data[0].keys())[0]] is not None:
-                    writer.writerows(data)
-    @staticmethod
-    def writeToZipFile(archive, filename: str, data: List[dict], write_header=False):
+    def writeToZipFile(archive: zipfile.ZipFile, filename: str, data: List[dict[str, Any]], write_header: bool=False) -> None:
         mode = 'a'
         if write_header:
             mode = 'w'
@@ -82,7 +71,7 @@ class GtfsProfile:
                 csvfile.close()
 
     @staticmethod
-    def getOptionalMultilingualString(multilingual_string: MultilingualString | List[MultilingualString]):
+    def getOptionalMultilingualString(multilingual_string: MultilingualString | List[MultilingualString] | None) -> str | None:
         if isinstance(multilingual_string, List):
             if len(multilingual_string) > 0:
                 multilingual_string = multilingual_string[0]
@@ -95,14 +84,14 @@ class GtfsProfile:
         return None
 
     @staticmethod
-    def getOptionalPrivateCode(private_code: Union[PrivateCodeStructure, PrivateCode, PublicCodeStructure]):
+    def getOptionalPrivateCode(private_code: PrivateCodeStructure | PrivateCode | PublicCodeStructure | None) -> str | None:
         if private_code is not None:
             return private_code.value
 
         return None
 
     @staticmethod
-    def projectVehicleModeToRouteType(vehicle_mode: AllVehicleModesOfTransportEnumeration):
+    def projectVehicleModeToRouteType(vehicle_mode: AllVehicleModesOfTransportEnumeration) -> int:
         if vehicle_mode == AllVehicleModesOfTransportEnumeration.TRAM:
             return 0
         elif vehicle_mode == AllVehicleModesOfTransportEnumeration.METRO:
@@ -128,7 +117,7 @@ class GtfsProfile:
         return 0
 
     @staticmethod
-    def getInfoLinkWithUrl(info_links: InfoLinksRelStructure):
+    def getInfoLinkWithUrl(info_links: InfoLinksRelStructure | None) -> str | None:
         if info_links is not None:
             # TODO: we would like to sort this based on some kind of priority, based on type_of_info_link
             for info_link in info_links.info_link:
@@ -136,12 +125,12 @@ class GtfsProfile:
         return None
 
     @staticmethod
-    def getOptionalPresentation(presentation: PresentationStructure, attrib: str):
+    def getOptionalPresentation(presentation: PresentationStructure | None, attrib: str) -> str | None:
         if presentation is not None:
             op=getattr(presentation, attrib, '')
             if op is not None:
                 if hasattr(op, 'hex'): # TODO: check why sometimes we don't get hex.
-                    return op.hex()
+                    return str(op.hex())
                 else:
                     return op
         return None
@@ -160,12 +149,18 @@ class GtfsProfile:
         gtfs_id_lookup[dmo.id] = original_id
         return original_id
 
-    def getOriginalGtfsIdFromRef(vor: VersionOfObjectRefStructure) -> str:
+    @staticmethod
+    def getOriginalGtfsIdFromRef(vor: VersionOfObjectRefStructure | str) -> str: # TODO: refactor, this is not correct
         global gtfs_id_lookup
-        return gtfs_id_lookup.get(vor.ref, vor.ref)
+        if hasattr(vor, "ref"):
+            return gtfs_id_lookup.get(vor.ref, vor.ref)
+        else:
+            return gtfs_id_lookup.get(vor, vor)
+
+        # return gtfs_id_lookup.get(getattr(vor, "ref", vor), vor)
 
     @staticmethod
-    def projectAuthorityToAgency(authority: Authority) -> dict:
+    def projectAuthorityToAgency(authority: Authority) -> dict[str, Any]:
         agency = {'agency_id': GtfsProfile.getOriginalGtfsId(authority, 'agency_id'),
                   'agency_name': GtfsProfile.getOptionalMultilingualString(authority.name) or GtfsProfile.getOptionalMultilingualString(authority.short_name),
                   'agency_url': GtfsProfile.getOrNone(authority, "contact_details.url") or defaults["authority"],  # TODO: FrameDefaults
@@ -178,7 +173,7 @@ class GtfsProfile:
         return agency
     
     @staticmethod
-    def getOrNone(object, attr, default=None):
+    def getOrNone(object: T, attr: str, default: Any=None) -> Any | None:
         if object is None:
             return None
         try:
@@ -188,7 +183,7 @@ class GtfsProfile:
         return default
 
     @staticmethod
-    def projectOperatorToAgency(operator: Operator) -> dict:
+    def projectOperatorToAgency(operator: Operator) -> dict[str, Any]:
         agency = {'agency_id': GtfsProfile.getOriginalGtfsId(operator, 'agency_id'),
                   'agency_name': GtfsProfile.getOptionalMultilingualString(operator.name) or GtfsProfile.getOptionalMultilingualString(operator.short_name),
                   'agency_url': GtfsProfile.getOrNone(operator, "contact_details.url") or 'http://openov.nl/', # TODO: FrameDefaults
@@ -201,7 +196,7 @@ class GtfsProfile:
         return agency
 
     @staticmethod
-    def projectBrandingToAgency(branding: Branding) -> dict:
+    def projectBrandingToAgency(branding: Branding) -> dict[str, Any]:
         agency = {'agency_id': GtfsProfile.getOriginalGtfsId(branding, 'agency_id'),
                   'agency_name': GtfsProfile.getOptionalMultilingualString(branding.name) or GtfsProfile.getOptionalMultilingualString(branding.short_name),
                   'agency_url': GtfsProfile.getOrNone(branding, 'url') or 'http://openov.nl/', # TODO: FrameDefaults
@@ -226,7 +221,7 @@ class GtfsProfile:
     #              }
 
     @staticmethod
-    def projectJourneyMeetingToTransfer(journey_meeting: JourneyMeeting):
+    def projectJourneyMeetingToTransfer(journey_meeting: JourneyMeeting) -> Generator[dict[str, Any], None, None]:
         # TODO: Technically we need to take into AvailabityCondition
 
         for connecting_stop_point_ref in journey_meeting.connecting_stop_point_ref:
@@ -259,7 +254,7 @@ class GtfsProfile:
             yield transfer
 
     @staticmethod
-    def projectServiceJourneyInterchangeToTransfer(service_journey_interchange: ServiceJourneyInterchange):
+    def projectServiceJourneyInterchangeToTransfer(service_journey_interchange: ServiceJourneyInterchange) -> dict[str, Any]:
         # TODO: Technically we need to take into a account both visit number and AvailabityCondition
 
         from_stop_id = None
@@ -298,8 +293,10 @@ class GtfsProfile:
         min_transfer_time = None
         if service_journey_interchange.minimum_transfer_time:
             min_transfer_time = to_seconds(service_journey_interchange.minimum_transfer_time)
-        else:
+        elif service_journey_interchange.standard_transfer_time:
             min_transfer_time = to_seconds(service_journey_interchange.standard_transfer_time)
+        else:
+            min_transfer_time = None
 
         # TODO
         transfer = {'from_stop_id': GtfsProfile.getOriginalGtfsIdFromRef(from_stop_id),
@@ -309,14 +306,17 @@ class GtfsProfile:
                     'from_trip_id': GtfsProfile.getOriginalGtfsIdFromRef(from_trip_id),
                     'to_trip_id': GtfsProfile.getOriginalGtfsIdFromRef(to_trip_id),
                     'transfer_type': transfer_type,
-                    'min_transfer_time': int(min_transfer_time)
+                    'min_transfer_time': (mtt := int(min_transfer_time)) if min_transfer_time is not None else ''
                     }
 
         return transfer
 
     @staticmethod
-    def projectInterchangeRuleToTransfer(interchange_rule: InterchangeRule):
+    def projectInterchangeRuleToTransfer(interchange_rule: InterchangeRule) -> dict[str, Any]:
         # TODO: Technically we need to take into a account AvailabilityCondition
+
+        assert interchange_rule.feeder_filter is not None, f"{interchange_rule} does not have a FeedFilter"
+        assert interchange_rule.distributor_filter is not None, f"{interchange_rule} does not have a DistributorFilter"
 
         from_stop_id = None
         if interchange_rule.feeder_filter.stop_place_ref is not None:
@@ -363,14 +363,15 @@ class GtfsProfile:
         if interchange_rule.stay_seated == True:
             transfer_type = 4
 
-        elif interchange_rule.stay_seated == False:
+        elif interchange_rule.stay_seated is False:
             transfer_type = 5
 
-        min_transfer_time = None
         if interchange_rule.minimum_transfer_time:
             min_transfer_time = to_seconds(interchange_rule.minimum_transfer_time)
-        else:
+        elif interchange_rule.standard_transfer_time:
             min_transfer_time = to_seconds(interchange_rule.standard_transfer_time)
+        else:
+            min_transfer_time = None
 
         # TODO
         transfer = {'from_stop_id': GtfsProfile.getOriginalGtfsIdFromRef(from_stop_id) if from_stop_id is not None else None,
@@ -380,22 +381,21 @@ class GtfsProfile:
                     'from_trip_id': GtfsProfile.getOriginalGtfsIdFromRef(from_trip_id) if from_trip_id is not None else None,
                     'to_trip_id': GtfsProfile.getOriginalGtfsIdFromRef(to_trip_id) if to_trip_id is not None else None,
                     'transfer_type': transfer_type,
-                    'min_transfer_time': int(min_transfer_time)
+                    'min_transfer_time': (mtt := int(min_transfer_time)) if min_transfer_time is not None else ''
                     }
 
         return transfer
 
     @staticmethod
-    def projectLineToRoute(line: Line):
+    def projectLineToRoute(line: Line) -> dict[str, Any]:
         if line.branding_ref is not None:
-            agency_id = line.branding_ref
+            agency_id = line.branding_ref.ref
         elif line.operator_ref is not None:
-            agency_id = line.operator_ref
+            agency_id = line.operator_ref.ref
         elif line.authority_ref is not None:
-            agency_id = line.authority_ref
+            agency_id = line.authority_ref.ref
         else:
-            warnings.warn(f"Can't handle {line.id} because no agency can be found.")
-            return
+            assert False, f"Can't handle {line.id} because no agency can be found."
 
         route = {'route_id': GtfsProfile.getOriginalGtfsId(line, 'route_id'),
                  'agency_id': GtfsProfile.getOriginalGtfsIdFromRef(agency_id),
@@ -414,21 +414,21 @@ class GtfsProfile:
         return route
 
     @staticmethod
-    def getTariffZoneFromScheduledStopPoint(tariff_zones: TariffZoneRefsRelStructure):
-        if tariff_zones and len(tariff_zones.tariff_zone_ref) > 0:
+    def getTariffZoneFromScheduledStopPoint(tariff_zones: TariffZoneRefsRelStructure | None) -> str:
+        if tariff_zones and len(tariff_zones.tariff_zone_ref) > 0 and tariff_zones.tariff_zone_ref[0].ref is not None:
             return tariff_zones.tariff_zone_ref[0].ref
 
         return ''
 
     @staticmethod
-    def getStopAreaFromScheduledStopPoint(scheduled_stop_point: ScheduledStopPoint):
-        if scheduled_stop_point.stop_areas and len(scheduled_stop_point.stop_areas.stop_area_ref) > 0:
+    def getStopAreaFromScheduledStopPoint(scheduled_stop_point: ScheduledStopPoint) -> str:
+        if scheduled_stop_point.stop_areas and len(scheduled_stop_point.stop_areas.stop_area_ref) > 0 and scheduled_stop_point.stop_areas.stop_area_ref[0].ref is not None:
             return scheduled_stop_point.stop_areas.stop_area_ref[0].ref
 
         return ''
 
     @staticmethod
-    def getWheelchairAccess(accessibility_assessment: AccessibilityAssessment):
+    def getWheelchairAccess(accessibility_assessment: AccessibilityAssessment | None) -> int:
         if accessibility_assessment is not None:
             if accessibility_assessment.mobility_impaired_access == LimitationStatusEnumeration.TRUE:
                 return 1
@@ -438,7 +438,7 @@ class GtfsProfile:
         return 0
 
     @staticmethod
-    def projectScheduledStopPointToStop(scheduled_stop_point: ScheduledStopPoint, parent: StopPlace | StopArea, transformer: Transformer = None):
+    def projectScheduledStopPointToStop(scheduled_stop_point: ScheduledStopPoint, parent: StopPlace | StopArea | None, transformer: Transformer | None = None) -> dict[str, Any] | None:
         # TODO: parent_station could be obtained from StopPlace or StopArea
 
         if scheduled_stop_point.location is None:
@@ -461,7 +461,7 @@ class GtfsProfile:
                 'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(scheduled_stop_point.tariff_zones),
                 'stop_url': scheduled_stop_point.url or '',
                 'location_type': 0,
-                'parent_station': GtfsProfile.getOriginalGtfsId(parent, 'stop_id') if parent is not None else None,
+                'parent_station': (parent_station := GtfsProfile.getOriginalGtfsId(parent, 'stop_id')) if parent is not None else None,
                 'stop_timezone': '',
                 'wheelchair_boarding': '',
                 'level_id': '',
@@ -471,7 +471,7 @@ class GtfsProfile:
         return stop
 
     @staticmethod
-    def projectStopEntranceToStop(stop_entrance: StopPlaceEntrance, parent: StopPlace, transformer: Transformer = None):
+    def projectStopEntranceToStop(stop_entrance: StopPlaceEntrance, parent: StopPlace, transformer: Transformer | None = None) -> dict[str, Any]:
         # TODO: parent_station could be obtained from StopPlace or StopArea
 
         if stop_entrance.centroid is None or stop_entrance.centroid.location is None:
@@ -504,12 +504,13 @@ class GtfsProfile:
         return stop
 
     @staticmethod
-    def temporaryDayTypeServiceId(day_type: DayType):
-        GtfsProfile.getOriginalGtfsId(day_type, 'service_id')
+    def temporaryDayTypeServiceId(day_type: DayType) -> str:
+        return GtfsProfile.getOriginalGtfsId(day_type, 'service_id')
 
     @staticmethod
-    def getCalendarAndCalendarDates(service_id, availability_condition: AvailabilityCondition):
+    def getCalendarAndCalendarDates(service_id: str, availability_condition: AvailabilityCondition) -> Generator[tuple[dict[str, Any] | Literal[None], dict[str, Any] | Literal[None]], None, None]:
         if availability_condition.valid_day_bits is not None:
+            assert availability_condition.from_date is not None, f"{availability_condition.id} must have a FromDate when ValidDayBits are used."
             operational_dates = [availability_condition.from_date.to_datetime() + datetime.timedelta(days=i) for i in range(0, len(availability_condition.valid_day_bits)) if availability_condition.valid_day_bits[i] == '1']
             for date in operational_dates:
                 yield tuple((None, {'service_id': service_id, 'date': str(date.date()).replace('-', ''), 'exception_type': 1 if (True if availability_condition.is_available is None else availability_condition.is_available) else 2},))
@@ -533,26 +534,27 @@ class GtfsProfile:
             warnings.warn("This availability condition does not match the GTFS profile")
 
     @staticmethod
-    def getCalendarDates(service_id, dates: List[datetime.datetime], is_available: bool = True):
+    def getCalendarDates(service_id: str, dates: List[datetime.datetime], is_available: bool = True) -> Generator[dict[str, Any], None, None]:
         exception_type = 1 if is_available else 2
         for date in dates:
             yield {'service_id': service_id, 'date': str(date).replace('-', ''), 'exception_type': exception_type}
 
     @staticmethod
-    def getLineRef(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern):
+    def getLineRef(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern | None) -> LineRefStructure | None:
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None:
             if isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, LineRefStructure):
                 return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
-            else:
-                pass
-        else:
+
+        elif service_journey_pattern is not None:
             if service_journey.journey_pattern_ref.ref == service_journey_pattern.id:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteView):
                     if isinstance(service_journey_pattern.route_ref_or_route_view.flexible_line_ref_or_line_ref_or_line_view, LineRefStructure):
                         return service_journey_pattern.route_ref_or_route_view.flexible_line_ref_or_line_ref_or_line_view
 
+        return None
+
     @staticmethod
-    def projectServiceJourneyToTrip(service_journey: ServiceJourney | TemplateServiceJourney, service_journey_pattern: ServiceJourneyPattern) -> dict:
+    def projectServiceJourneyToTrip(service_journey: ServiceJourney | TemplateServiceJourney, service_journey_pattern: ServiceJourneyPattern | None) -> dict[str, Any]:
         trip = {'route_id': GtfsProfile.getOriginalGtfsIdFromRef(GtfsProfile.getLineRef(service_journey, service_journey_pattern)),
                 'service_id': GtfsProfile.getOriginalGtfsIdFromRef(service_journey.day_types.day_type_ref[0]),  # TODO: Guard for duplicates, and AvailabilityCondition
                 'trip_id': GtfsProfile.getOriginalGtfsId(service_journey, 'trip_id'),
@@ -568,7 +570,7 @@ class GtfsProfile:
         return trip
 
     @staticmethod
-    def projectTemplateServiceJourneyToFrequency(template_service_journey: TemplateServiceJourney) -> dict:
+    def projectTemplateServiceJourneyToFrequency(template_service_journey: TemplateServiceJourney) -> Generator[dict[str, Any], None, None]:
         for frequency_group in template_service_journey.frequency_groups.headway_journey_group_ref_or_headway_journey_group_or_rhythmical_journey_group_ref_or_rhythmical_journey_group:
             if isinstance(frequency_group, HeadwayJourneyGroup):
                 first_day_offset = None
@@ -607,16 +609,19 @@ class GtfsProfile:
                 yield frequency
 
     @staticmethod
-    def addDayOffset(time, day_offset):
+    def addDayOffset(time: datetime.time, day_offset: int | None) -> str:
+        if time is None:
+            return ''
+
         if day_offset is None:
-            return time
+            return str(time)
 
         h, m, s = str(time).split(':')
-        h = int(h) + (24 * day_offset)
-        return f"{h:02d}:{m}:{s}"
+        h_i = int(h) + (24 * day_offset)
+        return f"{h_i:02d}:{m}:{s}"
 
     @staticmethod
-    def projectServiceJourneyToStopTimes(service_journey: ServiceJourney | TemplateServiceJourney) -> List[dict]:
+    def projectServiceJourneyToStopTimes(service_journey: ServiceJourney | TemplateServiceJourney) -> Generator[dict[str, Any], None, None]:
         for call in service_journey.calls.call:
             if call.arrival is None:
                 call.arrival = call.departure
@@ -645,11 +650,12 @@ class GtfsProfile:
             yield stop_time
 
     @staticmethod
-    def projectStopAreaStop(stop_area: StopArea, transformer: Transformer = None) -> dict:
+    def projectStopAreaStop(stop_area: StopArea, transformer: Transformer | None = None) -> dict[str, Any]:
         # TODO: parent_station could be obtained from StopPlace or StopArea
         if transformer:
             latitude, longitude = transformer.transform(stop_area.centroid.location.pos.value[0], stop_area.centroid.location.pos.value[1])
         else:
+            assert stop_area.centroid.location is not None, f'StopArea without coordinate {stop_area.id}'
             project_location_4326(stop_area.centroid.location)
             latitude, longitude = stop_area.centroid.location.latitude, stop_area.centroid.location.longitude
 
@@ -672,18 +678,14 @@ class GtfsProfile:
         return stop
 
     @staticmethod
-    def projectStopPlaceToStop(stop_place: StopPlace, transformer: Transformer = None) -> dict:
+    def projectStopPlaceToStop(stop_place: StopPlace, transformer: Transformer | None = None) -> dict[str, Any]:
         # TODO: Maybe remove?
         if transformer:
             latitude, longitude = transformer.transform(stop_place.centroid.location.pos.value[0], stop_place.centroid.location.pos.value[1])
         else:
-            if not stop_place.centroid:  # TODO this is a bad fix for a bad data problem. The correct way would be to omit this kind of StopPlace or to feed the coordinates from the SceduledStopPlace via PSA
-                latitude = 0
-                longitude = 0
-                log_once(logging.WARNING,"gtfsprofile: StopPlace",f'Warning: StopPlace without coordinate {stop_place.public_code} - {stop_place.name}.')
-            else:
-                project_location_4326(stop_place.centroid.location)
-                latitude, longitude = stop_place.centroid.location.latitude, stop_place.centroid.location.longitude
+            assert stop_place.centroid.location is not None, f'StopPlace without coordinate {stop_place.public_code} - {stop_place.name}'
+            project_location_4326(stop_place.centroid.location)
+            latitude, longitude = stop_place.centroid.location.latitude, stop_place.centroid.location.longitude
 
         stop = {'stop_id': GtfsProfile.getOriginalGtfsId(stop_place, 'stop_id'),
                 'stop_code': GtfsProfile.getOptionalPrivateCode(stop_place.public_code),
@@ -704,15 +706,15 @@ class GtfsProfile:
         return stop
 
     @staticmethod
-    def projectQuayStop(stop_place: StopPlace, with_quays = False, transformer: Transformer = None) -> List[dict]:
+    def projectQuayStop(stop_place: StopPlace, with_quays: bool = False, transformer: Transformer | None = None) -> Generator[dict[str, Any], None, None]:
         # TODO: parent_station could be obtained from StopPlace or StopArea
         if transformer:
             latitude, longitude = transformer.transform(stop_place.centroid.location.pos.value[0], stop_place.centroid.location.pos.value[1])
         else:
+            assert stop_place.centroid.location is not None, f'StopPlace without coordinate {stop_place.public_code} - {stop_place.name}'
             project_location_4326(stop_place.centroid.location)
             latitude, longitude = stop_place.centroid.location.latitude, stop_place.centroid.location.longitude
 
-        result = []
         stop = {'stop_id': GtfsProfile.getOriginalGtfsId(stop_place, 'stop_id'),
                 'stop_code': GtfsProfile.getOptionalPrivateCode(stop_place.public_code),
                 'stop_name': GtfsProfile.getOptionalMultilingualString(stop_place.name) or GtfsProfile.getOptionalMultilingualString(stop_place.short_name),
@@ -735,6 +737,8 @@ class GtfsProfile:
             for quay in stop_place.quays.taxi_stand_ref_or_quay_ref_or_quay:
                 if not isinstance(quay, Quay):
                     continue
+
+                assert quay.centroid.location is not None, f"{quay.id}, GTFS requires a location per Quay"
 
                 if transformer:
                     latitude, longitude = transformer.transform(quay.centroid.location.pos.value[0],
@@ -764,10 +768,10 @@ class GtfsProfile:
         #    print(stop_place.id)
 
     @staticmethod
-    def projectRouteLinksToShapes(route: Route, route_links: List[RouteLink], transformer: Transformer = None) -> List[dict]:
+    def projectRouteLinksToShapes(route: Route, route_links: List[RouteLink], transformer: Transformer | None = None) -> Generator[dict[str, Any], None, None]:
         sequence = 0
-        distance = 0
-        distance_keep = 0
+        distance: Decimal = Decimal(0)
+        distance_keep: Decimal = Decimal(0)
 
         for route_link in route_links[0:-1]:
             # TODO: handle variants (posList, pos array)
@@ -785,16 +789,19 @@ class GtfsProfile:
                         'shape_pt_lat': round(latitude, 7),
                         'shape_pt_lon': round(longitude, 7),
                         'shape_pt_sequence': sequence,
-                        'shape_dist_traveled': distance
+                        'shape_dist_traveled': (d := distance) if distance > 0 else ''
                 }
 
                 sequence += 1
-                distance = ''
+                distance = Decimal(-1)
 
                 yield shape_point
 
-            distance_keep += route_link.distance
-            distance = distance_keep
+            if route_link.distance is not None and distance_keep >= 0:
+                distance_keep += route_link.distance
+                distance = distance_keep
+            else:
+                distance_keep = Decimal(-1)
 
         l = route_links[-1].line_string.pos_or_point_property_or_pos_list[0].value
         dimensions = route_links[-1].line_string.srs_dimension or 2
@@ -809,19 +816,19 @@ class GtfsProfile:
                            'shape_pt_lat': round(latitude, 7),
                            'shape_pt_lon': round(longitude, 7),
                            'shape_pt_sequence': sequence,
-                           'shape_dist_traveled': distance
+                           'shape_dist_traveled': (d := distance) if distance > 0 else ''
                            }
 
             sequence += 1
-            distance = ''
+            distance = Decimal(-1)
 
             yield shape_point
 
     @staticmethod
-    def projectServiceLinksToShapes(service_journey_pattern: ServiceJourneyPattern, service_links: List[ServiceLink], transformer: Transformer = None) -> List[dict]:
+    def projectServiceLinksToShapes(service_journey_pattern: ServiceJourneyPattern, service_links: List[ServiceLink], transformer: Transformer | None = None) -> Generator[dict[str, Any], None, None]:
         sequence = 0
-        distance = 0
-        distance_keep = 0
+        distance: Decimal = Decimal(0)
+        distance_keep: Decimal = Decimal(0)
 
         for route_link in service_links[0:-1]:
             # TODO: handle variants (posList, pos array)
@@ -838,16 +845,19 @@ class GtfsProfile:
                         'shape_pt_lat': round(latitude, 7),
                         'shape_pt_lon': round(longitude, 7),
                         'shape_pt_sequence': sequence,
-                        'shape_dist_traveled': distance
+                        'shape_dist_traveled': (d := distance) if distance > 0 else ''
                 }
 
                 sequence += 1
-                distance = ''
+                distance = Decimal(-1)
 
                 yield shape_point
 
-            distance_keep += route_link.distance
-            distance = distance_keep
+            if route_link.distance is not None and distance_keep >= 0:
+                distance_keep += route_link.distance
+                distance = distance_keep
+            else:
+                distance_keep = Decimal(-1)
 
         l = service_links[-1].line_string.pos_or_point_property_or_pos_list[0].value
         dimensions = service_links[-1].line_string.srs_dimension or 2
@@ -862,10 +872,10 @@ class GtfsProfile:
                            'shape_pt_lat': round(latitude, 7),
                            'shape_pt_lon': round(longitude, 7),
                            'shape_pt_sequence': sequence,
-                           'shape_dist_traveled': distance
+                           'shape_dist_traveled': (d := distance) if distance > 0 else ''
                            }
 
             sequence += 1
-            distance = ''
+            distance = Decimal(-1)
 
             yield shape_point

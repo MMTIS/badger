@@ -9,6 +9,15 @@ import traceback
 from lxml import etree
 from netexio.dbaccess import open_netex_file
 from typing import Any, IO
+from configuration import work_dir
+
+def get_absolute_path(file_name : str, work_dir :str) -> str:
+    if os.path.isabs(file_name):
+        # If the file_name is already an absolute path, use it as is
+        return file_name
+    else:
+        # If the file_name is a relative path, prepend it with the work_dir
+        return os.path.join(work_dir, file_name)
 
 
 def check_xsd_validity(xsd_file: str) -> bool:
@@ -42,6 +51,7 @@ def validate_xml(xml_file: IO[Any], xmlschema: etree.XMLSchema) -> bool:
 
 
 def main(folder: str, xsd_schema: str) -> None:
+    xsd_schema=get_absolute_path(xsd_schema,work_dir)
     xmlschema = etree.XMLSchema(etree.parse(xsd_schema))
     for root, dirs, files in os.walk(folder):
         for filename in files:

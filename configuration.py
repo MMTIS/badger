@@ -1,7 +1,7 @@
 # CONFIGURATION:
 import logging
 from typing import Any
-
+import os
 # Logging
 log_dict: dict[str, list[Any]] = (
     {}
@@ -29,8 +29,9 @@ defaults["version"] = 1
 
 input_dir = "d:/input"  # the standard directory for files to load (depreciated)
 processing_data = "d:/aux_testing_processing"   #the root folder for processing
-list_scripts = "./tool_scripts/list_scripts.txt"  # place where the list processing scripts are stored
-gtfs_validator = "./gtfs-validator-7.0.0-cli.jar"  # location of the gtfs validator.jar.
+work_dir = os.path.dirname(os.path.abspath(__file__))
+list_scripts = os.path.join(work_dir,"tools/tool_scripts/list_scripts.txt")  # place where the list processing scripts are stored, based from program folder
+gtfs_validator = os.path.join(work_dir,"tools/gtfs-validator-cli.jar")  # location of the gtfs validator.jar, based from program folder.
 
 # ftp connection information for the ftp upload tool
 ftpconns = {

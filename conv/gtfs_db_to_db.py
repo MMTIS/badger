@@ -1,18 +1,17 @@
 import logging
 
 from utils.aux_logging import prepare_logger, log_all
-from netex import DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, AvailabilityCondition, \
-    DayType, DayTypeAssignment, UicOperatingPeriod, Version, StopArea, InterchangeRule
+from netex import DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, Version, StopArea, InterchangeRule
 from netexio.database import Database
-from netexio.dbaccess import setup_database, write_objects, load_local, copy_table
+from netexio.dbaccess import setup_database, load_local, copy_table
 from netexio.pickleserializer import MyPickleSerializer
 from utils.utils import get_interesting_classes
-from transformers.gtfs import GTFS_CLASSES, gtfs_operator_line_memory, gtfs_calls_generator, \
-    apply_availability_conditions_via_day_type_ref, gtfs_sj_processing, gtfs_generate_deprecated_version
+from utils.profiles import GTFS_CLASSES
+from transformers.gtfs import gtfs_operator_line_memory, gtfs_sj_processing, gtfs_generate_deprecated_version
 from transformers.projection import reprojection_update
 
 
-def main(source_database_file: str, target_database_file: str, clean_database: bool = True):
+def main(source_database_file: str, target_database_file: str, clean_database: bool = True) -> None:
     classes = get_interesting_classes(GTFS_CLASSES)
 
     with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
@@ -22,9 +21,12 @@ def main(source_database_file: str, target_database_file: str, clean_database: b
 
         with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
             # Copy tables that we don't change as-is.
-            copy_table(db_read, db_write,
-                       [DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea,
-                        InterchangeRule, Version], clean=True)
+            copy_table(
+                db_read,
+                db_write,
+                [DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea, InterchangeRule, Version],
+                clean=True,
+            )
 
             # Flatten the Operator, Authority, Branding, ResponsibilitySet; Provides Line and Operator
             gtfs_operator_line_memory(db_read, db_write, {})
@@ -44,6 +46,8 @@ def main(source_database_file: str, target_database_file: str, clean_database: b
                 gtfs_generate_deprecated_version(db_write)
 
         # Our target database must be reprojected to WGS84            apply_availability_conditions_via_day_type_ref(db_read, db_write)
+
+        db_write.block_until_done()
 
         reprojection_update(db_write, crs_to="urn:ogc:def:crs:EPSG::4326")
 

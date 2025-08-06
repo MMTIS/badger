@@ -2,8 +2,10 @@
 # from operator import attrgetter
 from typing import Any
 
+from transformers.defaults import set_default
 
-def resolve_attr(obj: Any, attr: str) -> Any:
+
+def resolve_attr(obj: Any, attr: list[str | int]) -> Any:
     for name in attr:
         if isinstance(name, int):
             obj = obj[name]
@@ -12,17 +14,32 @@ def resolve_attr(obj: Any, attr: str) -> Any:
     return obj
 
 
-def update_attr(obj: Any, attr: str, value: Any) -> Any:
+def update_attr(obj: Any, attr: list[str | int], value: Any | None) -> Any:
+    parent = None
+    parent_name = None
     for name in attr[0:-1]:
         if isinstance(name, int):
             obj = obj[name]
         else:
+            if not obj.__class__.__name__.endswith("RelStructure"):  # TODO: Figure out how to skip empty objects
+                parent = obj
+                parent_name = name
+            if obj is None:
+                return None  # TODO: when there is a list op elements, the first time this already causes the removal of the entire structure, that is not what we want
             obj = getattr(obj, name)
 
     name = attr[-1]
     if isinstance(name, int):
-        obj[name] = value
+        if value is None:
+            # For a list, remove the parent
+            if parent_name is not None:
+                set_default(parent, parent_name)
+        else:
+            obj[name] = value
     else:
-        setattr(obj, name, value)
+        if value is None:
+            set_default(obj, name)
+        else:
+            setattr(obj, name, value)
 
     return obj

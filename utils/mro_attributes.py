@@ -23,7 +23,7 @@ def hasdefault(field: dataclasses.Field[typing.Any]) -> typing.Any:
 
 
 def unembed(
-    fields: dict[str, dataclasses.Field[typing.Any]]
+    fields: dict[str, dataclasses.Field[typing.Any]],
 ) -> typing.Iterable[tuple[str, dataclasses.Field[typing.Any]]]:
     all_references = []
     all_classes = []

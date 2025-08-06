@@ -3,13 +3,14 @@ import hashlib
 from decimal import Decimal
 from typing import List, Dict, Generator
 
-import utils.refs
-import utils.utils
 from netex import Codespace, ServiceLink, RouteLink, RoutePoint, RoutePointRefStructure, TimingLink, PointRefStructure, \
     TimingPoint, ScheduledStopPoint, TimingPointVersionStructure, ScheduledStopPointRefStructure, Route, \
     PointProjection, ServiceJourneyPattern, StopPointInJourneyPattern, PosList, ServiceLinkRefStructure
 from netexio.database import Database
 from netexio.dbaccess import load_local
+
+from utils.refs import getId, getRef
+from utils.utils import project
 
 
 class RoutesProfile:
@@ -20,7 +21,7 @@ class RoutesProfile:
                 if isinstance(projection, PointProjection):
                     if projection.project_to_point_ref:
                         if projection.project_to_point_ref.name_of_ref_class == 'RoutePoint':
-                            yield utils.utils.project(projection.project_to_point_ref, RoutePointRefStructure)
+                            yield project(projection.project_to_point_ref, RoutePointRefStructure)
 
     @staticmethod
     def projectRouteToServiceLinks(db: Database, sjp: ServiceJourneyPattern, route: Route, route_point_projection: Dict[str, RoutePointRefStructure], generator_defaults: dict) -> Generator[ServiceLink, None, ServiceJourneyPattern]:
@@ -32,7 +33,7 @@ class RoutesProfile:
         if route.points_in_sequence:
             links_in_sequence = [por.onward_route_link_ref for por in route.points_in_sequence.point_on_route if por.onward_route_link_ref]
             # TODO: #142
-            route_links_in_sequence: List[RouteLink] = [load_local(db, RouteLink, filter=lis.ref, cursor=True, limit=1, cache=False)[0] for lis in links_in_sequence]
+            route_links_in_sequence: List[RouteLink] = [load_local(db, RouteLink, filter_id=lis.ref, cursor=True, limit=1, cache=False)[0] for lis in links_in_sequence]
             route_i = 0
 
             if sjp.points_in_sequence:
@@ -71,10 +72,10 @@ class RoutesProfile:
                             object_id = m.hexdigest()[0:8].upper()
                             combined_route_links[0].line_string.id = "LineString_" + object_id
 
-                            sl = ServiceLink(id=refs.getId(ServiceLink, generator_defaults['codespace'], id=object_id),
+                            sl = ServiceLink(id=getId(ServiceLink, generator_defaults['codespace'], id=object_id),
                                              version=route.version,
                                              distance=combined_route_links[0].distance,
-                                             from_point_ref=utils.project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=utils.project(to_ssp, ScheduledStopPointRefStructure),
+                                             from_point_ref=project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
                                              line_string=combined_route_links[0].line_string,
                                              derived_from_object_ref=combined_route_links[0].id,
                                              derived_from_version_ref_attribute=combined_route_links[0].version)
@@ -110,17 +111,17 @@ class RoutesProfile:
                                 object_id = m.hexdigest()[0:8].upper()
                                 line_string.id = "LineString_" + object_id
 
-                                sl = ServiceLink(id=refs.getId(ServiceLink, generator_defaults['codespace'], id=object_id),
+                                sl = ServiceLink(id=getId(ServiceLink, generator_defaults['codespace'], id=object_id),
                                                  version=route.version,
                                                  distance=distance,
-                                                 from_point_ref=utils.project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=utils.project(to_ssp, ScheduledStopPointRefStructure),
+                                                 from_point_ref=project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
                                                  line_string=line_string,
                                                  derived_from_object_ref=route.id,
                                                  derived_from_version_ref_attribute=route.version)
 
 
                         if sl:
-                            spijps[i].onward_service_link_ref = refs.getRef(sl, ServiceLinkRefStructure)
+                            spijps[i].onward_service_link_ref = getRef(sl, ServiceLinkRefStructure)
 
                             # TODO: Decide when to remove these things, when they are outside of the profile
                             spijps[i].onward_timing_link_ref = None
@@ -131,7 +132,7 @@ class RoutesProfile:
 
     @staticmethod
     def projectServiceLinkToRouteLink(service_link: ServiceLink, route_point_refs: Dict[str, RoutePointRefStructure]) -> RouteLink:
-        route_link: RouteLink = utils.project(service_link, RouteLink)
+        route_link: RouteLink = project(service_link, RouteLink)
 
         # Because the input has 'non-compatible from and to' we have to project these as well
         # here we do assume that all points have been taken care of for us.
@@ -142,7 +143,7 @@ class RoutesProfile:
 
     @staticmethod
     def projectTimingLinkToRouteLink(timing_link: TimingLink, route_point_refs: Dict[str, RoutePointRefStructure]) -> RouteLink:
-        route_link: RouteLink = utils.project(timing_link, RouteLink)
+        route_link: RouteLink = project(timing_link, RouteLink)
 
         # Because the input has 'non-compatible from and to' we have to project these as well
         # here we do assume that all points have been taken care of for us.
@@ -168,19 +169,19 @@ class RoutesProfile:
         timing_points_index = refs.getIndex(timing_points)
 
         for route_point in route_points_index:
-            route_point_refs[route_point.id] = refs.getRef(route_point)
+            route_point_refs[route_point.id] = getRef(route_point)
 
         for service_link in service_links:
-            route_point: RoutePoint = utils.project(timing_points_index[service_link.from_point_ref.ref], RoutePoint)
+            route_point: RoutePoint = project(timing_points_index[service_link.from_point_ref.ref], RoutePoint)
             if route_point.id not in route_points_index:
                 route_points_index[route_point.id] = route_point
-                route_point_refs[route_point.id] = refs.getRef(route_point)
+                route_point_refs[route_point.id] = getRef(route_point)
 
         for timing_link in timing_links:
-            route_point: RoutePoint = utils.project(timing_points_index[timing_link.from_point_ref.ref], RoutePoint)
+            route_point: RoutePoint = project(timing_points_index[timing_link.from_point_ref.ref], RoutePoint)
             if route_point.id not in route_points_index:
                 route_points_index[route_point.id] = route_point
-                route_point_refs[route_point.id] = refs.getRef(route_point)
+                route_point_refs[route_point.id] = getRef(route_point)
 
         for service_link in service_links:
             route_link = RoutesProfile.projectServiceLinkToRouteLink(service_link, route_point_refs)

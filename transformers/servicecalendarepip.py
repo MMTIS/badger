@@ -19,7 +19,7 @@ class ServiceCalendarEPIPFrame:
     codespace: Codespace
 
     @staticmethod
-    def mapDayOfWeekToWeekday(day_of_week: DayOfWeekEnumeration) -> List[int]:
+    def mapDayOfWeekToWeekday(day_of_week: DayOfWeekEnumeration) -> list[int]:
         match day_of_week:
             case DayOfWeekEnumeration.EVERYDAY:
                 return [-1]
@@ -43,14 +43,15 @@ class ServiceCalendarEPIPFrame:
             case DayOfWeekEnumeration.WEEKEND:
                 # This option is deprecated due to its conflicts within different locales
                 return [dateutil.rrule.SA, dateutil.rrule.SU]
+        return [-1]
 
     @staticmethod
-    def mapDaysOfWeekToByWeekday(days_of_week: List[DayOfWeekEnumeration]):
+    def mapDaysOfWeekToByWeekday(days_of_week: List[DayOfWeekEnumeration]) -> Set[int]:
         byweekday = set([])
         for day_of_week in days_of_week:
             mapping = ServiceCalendarEPIPFrame.mapDayOfWeekToWeekday(day_of_week)
             if mapping[0] == -1:
-                return []
+                return {}
             else:
                 byweekday = byweekday.union(mapping)
         return byweekday
@@ -68,7 +69,7 @@ class ServiceCalendarEPIPFrame:
             warnings.warn(f"AvailabilityCondition {availability_condition.id} has multiple DayTypes, we cannot handle this (yet), as we don't know the intention. Only the first DayType is being evaluated.")
 
         if availability_condition.day_types is None or len(availability_condition.day_types.day_type_ref_or_day_type) == 0:
-            if len(availability_condition.valid_day_bits) > 0:
+            if availability_condition.valid_day_bits and availability_condition.from_date and len(availability_condition.valid_day_bits) > 0:
                 operational_dates = [availability_condition.from_date.to_datetime() + timedelta(days=i) for i in range(0, len(availability_condition.valid_day_bits)) if availability_condition.valid_day_bits[i] == '1']
             else:
                 warnings.warn(
@@ -138,8 +139,8 @@ class ServiceCalendarEPIPFrame:
         for service_journey in service_journeys:
             acs = []
 
+            ac: ValidityConditionsRelStructure
             for ac in service_journey.validity_conditions_or_valid_between:
-                ac: ValidityConditionsRelStructure
                 for a in ac.choice:
                     if isinstance(a, AvailabilityConditionRef):
                         acs.append(availability_conditions[a.ref])
