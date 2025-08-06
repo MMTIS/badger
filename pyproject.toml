@@ -14,6 +14,8 @@ dependencies = [
     "numpy",
     "pandas",
     "pyproj",
+    "pyside6",
+    "shiboken6",
     "folium",
     "paramiko",
     "types-paramiko",
