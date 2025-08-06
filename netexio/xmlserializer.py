@@ -40,11 +40,14 @@ class MyXmlSerializer(Serializer):
     def encode_key(id: str | None, version: str | None, clazz: type[T], include_clazz: bool = False) -> bytes:
         return ((id or '') + "-" + (version or 'any')).encode("utf-8")
 
-    def marshall(self, obj: Any, clazz: type[T]) -> str:
+    def marshall(self, obj: Any, clazz: type[T], pretty_print=False) -> str:
+        self.serializer.config.pretty_print = pretty_print
         if isinstance(obj, str):
             return obj
         elif isinstance(obj, etree._Element):
             return cast(str, etree.tostring(obj, encoding="unicode"))
+        elif pretty_print:
+            return self.serializer.render(obj, self.ns_map)
         else:
             return self.serializer.render(obj, self.ns_map).replace("\n", "")
 

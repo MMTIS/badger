@@ -9,13 +9,15 @@ import threading
 import queue
 import os
 import cloudpickle
-from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator
+from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator, Iterator, Tuple
 from enum import IntEnum
+from PySide6.QtCore import QObject, Signal
 
 from netex import (
     EntityStructure,
     EntityInVersionStructure,
     VersionOfObjectRefStructure,
+    MultilingualString,
 )
 import utils.netex_monkeypatching  # noqa: F401
 
@@ -24,6 +26,7 @@ from netexio.dbaccess import update_embedded_referencing
 from netexio.serializer import Serializer
 from utils.utils import get_object_name
 from configuration import defaults
+
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 Tver = TypeVar("Tver", bound=EntityInVersionStructure)
@@ -59,6 +62,11 @@ class Referencing:
     version: str
 
 
+class TaskQueueDebug(queue.Queue):
+    def put(self, item, block = True, timeout = None):
+        print(item[:-1])
+        super(TaskQueueDebug, self).put(item, block, timeout)
+
 class Database:
     task_queue: queue.Queue[tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]] | None
     writer_thread: threading.Thread | None
@@ -69,7 +77,7 @@ class Database:
         serializer: Serializer,
         readonly: bool = True,
         logger: Logger | None = None,
-        initial_size: int = defaults.get('forced_db_size',4 * 1024**3),
+        initial_size: int = defaults.get('forced_db_size', 4 * 1024**3),
         growth_size: int | None = None,
         max_size: int = 36 * 1024**3,
         batch_size: int = 10_000,
@@ -93,7 +101,7 @@ class Database:
 
     def __enter__(self) -> Database:
         if self.multithreaded:
-            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024, lock = False, readahead = False)
+            self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024, lock=False, readahead=False)
 
         elif self.readonly:
             self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024)
@@ -236,6 +244,8 @@ class Database:
         delete_key_value_task: list[tuple[lmdb._Database, Any, Any]],
         total_size: int,
     ) -> None:
+        print(f"drop_task: {len(drop_task)}  clear_task:  {len(clear_task)}  delete_tasks: {len(delete_tasks)}  delete_key_value_task: {len(delete_key_value_task)}  batch: {len(batch)}")
+
         """Processes a batch of writes and deletions, retrying if needed."""
         while True:
             try:
@@ -277,11 +287,12 @@ class Database:
         assert self.readonly is False, "Database is in read only mode"
         with self.lock:
             if self.task_queue is None:
-                self.task_queue = queue.Queue(maxsize=1000)  # Shared queue
+                self.task_queue = queue.Queue(maxsize=10000)  # Shared queue
+                # self.task_queue = TaskQueueDebug(maxsize=10000)  # Shared queue
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
-    def open_db(self, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
+    def open_database(self, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
         name: str = get_object_name(klass)
 
         if name in self.dbs:
@@ -325,9 +336,8 @@ class Database:
         object_version: str
         path: str | None
 
-        key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
-
         if delete_embedding:
+            key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
             self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, None))
 
         for (
@@ -340,6 +350,8 @@ class Database:
             object_version,
             path,
         ) in update_embedded_referencing(self.serializer, obj):
+            if obj.__class__.__name__ == 'DestinationDisplay':
+                pass
             if embedding:
                 embedding_inverse_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
                 embedding_inverse_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
@@ -367,6 +379,12 @@ class Database:
                 # TODO: This won't work because of out of order behavior
                 # self.task_queue.put((LmdbActions.DELETE_PREFIX, self.db_referencing, key_prefix))
 
+                # By skipping these, we effectively save 4 rows per object.
+                if path.endswith("data_source_ref_attribute") or path.endswith("responsibility_set_ref_attribute"):
+                    continue
+
+                # When an object embeds more sub-objects, it will create more references, the path makes them unique,
+                # TODO: one could argue that we could aggregate all paths, so we have at most two writes per reference.
                 ref_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
                 ref_value = cloudpickle.dumps((get_object_name(object_class), object_id, object_version, path))
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing, ref_key, ref_value))
@@ -404,10 +422,9 @@ class Database:
 
         self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
 
-
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
-        db_handle = self.open_db(klass)
+        db_handle = self.open_database(klass)
         if db_handle is None:
             return
 
@@ -422,8 +439,11 @@ class Database:
             version = obj.version if hasattr(obj, "version") else None
             key = self.serializer.encode_key(obj.id, version, klass)
             value = self.serializer.marshall(obj, klass)
+            # print(obj.id)
 
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
+
+            # TODO: Debug the embedded generation
             self._insert_embedding_on_queue(obj, delete_embedding)
 
     def insert_one_object(self, object: Tid, delete_embedding=False) -> None:
@@ -445,7 +465,7 @@ class Database:
         assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
-            db_handle = self.open_db(klass)
+            db_handle = self.open_database(klass)
             if db_handle is None:
                 return
 
@@ -498,7 +518,7 @@ class Database:
         assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
-            db_handle = self.open_db(klass, delete=True)
+            db_handle = self.open_database(klass, delete=True)
             if db_handle is None:
                 return
 
@@ -515,7 +535,7 @@ class Database:
         if self.readonly:
             return
 
-        db_handle = self.open_db(klass)
+        db_handle = self.open_database(klass)
         if db_handle is None:
             return
 
@@ -555,7 +575,7 @@ class Database:
                 self._reopen_dbs()
 
     def get_random(self, clazz: type[Tid]) -> Tid | None:
-        db_handle = self.open_db(clazz)
+        db_handle = self.open_database(clazz)
         if db_handle is None:
             return None
 
@@ -574,7 +594,7 @@ class Database:
         return None  # If DB is empty
 
     def get_single(self, clazz: type[Tid], id: str, version: str | None = None) -> Tid | None:
-        db = self.open_db(clazz, readonly=True)
+        db = self.open_database(clazz, readonly=True)
         if db is None:
             return None
 
@@ -609,11 +629,11 @@ class Database:
         target._start_writer_if_needed()
         assert target.task_queue is not None, "Task queue must not be none"
 
-        src_db = self.open_db(klass)
+        src_db = self.open_database(klass)
         if src_db is None:
             return
 
-        dst_db = target.open_db(klass)
+        dst_db = target.open_database(klass)
         if dst_db is None:
             return
 
@@ -745,3 +765,50 @@ class Database:
                 tables.add(self.get_class_by_name(klass))
 
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
+
+    def list_databases(self) -> Generator[tuple[str, type[Tid]], None, None]:
+        with self.env.begin() as txn:
+            for key, _ in txn.cursor():
+                if not key.startswith(b"_"):
+                    key = key.decode("utf-8")
+                    yield key, self.serializer.name_object[key]  # Check if key is correct, or self.serializer.name_object[key]
+
+    def get_raw_value_by_key(self, clazz: type[Tid], key: bytes) -> Optional[bytes]:
+        """Fetches the raw value for a given key from the database."""
+        db = self.open_database(clazz)
+        if not db:
+            return None
+        with self.env.begin(db=db, buffers=True) as txn:
+            raw_value = txn.get(key)
+            if raw_value:
+                return raw_value
+
+            # This handles an alternative in case the version is not added.
+            cursor = txn.cursor()
+            if cursor.set_range(key):
+                for key_alt, raw_value in cursor:
+                    if bytes(key_alt).startswith(key):
+                        return raw_value
+                    return None
+
+            return None
+
+    def check_object_by_key(self, clazz: type[Tid], key: bytes) -> bool:
+        db = self.open_database(clazz)
+        if not db:
+            return False
+        with self.env.begin(db=db) as txn:
+            value = txn.get(key)
+            if value:
+                return True
+
+            # This handles an alternative in case the version is not added.
+            cursor = txn.cursor()
+            if cursor.set_range(key):
+                for key_alt, _value in cursor:
+                    if not bytes(key_alt).startswith(key):
+                        return False
+                    return True
+
+        return False
+
