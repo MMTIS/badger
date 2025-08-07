@@ -11,7 +11,7 @@ from utils.profiles import SWISS_CLASSES
 
 
 def main(swiss_zip_file: str, database: str, clean_database: bool = True) -> None:
-    for file in open_netex_file(swiss_zip_file):
+    for file, real_filename in open_netex_file(swiss_zip_file):
         if file.name.endswith(".xml"):
             if not check_if_swiss_file(file):
                 print("File names do not fit Swiss data:. So no Swiss data")
@@ -23,7 +23,7 @@ def main(swiss_zip_file: str, database: str, clean_database: bool = True) -> Non
         setup_database(db, classes, clean_database)
 
         log_all(logging.INFO, f"Starting to load {swiss_zip_file}")
-        for file in open_netex_file(swiss_zip_file):
+        for file, real_filename in open_netex_file(swiss_zip_file):
             log_all(logging.INFO, f"Inserting {file.name}")
             insert_database(db, classes, file)
 
