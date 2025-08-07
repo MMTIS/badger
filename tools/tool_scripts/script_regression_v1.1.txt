@@ -93,7 +93,7 @@
         {"step":0,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":1,"script": "download_input_file", "args": "%%dir%%"},
         {"step":2,"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02-sncf.zip"},
-        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.lmdb "},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%dir%%/02-sncf.zip] %%dir%%/03-import.lmdb "},
         {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.lmdb %%dir%%/04-netex-database.lmdb"},
         {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
         {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.lmdb "},
