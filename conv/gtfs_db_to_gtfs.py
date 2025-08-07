@@ -29,6 +29,8 @@ from netex import (
     Quay,
     FareScheduledStopPoint,
     ScheduledStopPointRef,
+    LevelRef,
+    Level,
 )
 from netexio.pickleserializer import MyPickleSerializer
 from utils.refs import getIndex
@@ -67,6 +69,7 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
             agencies[agency['agency_id']] = agency
 
         stop_places = getIndex(load_local(db_read, StopPlace))
+        levels = {}
         quay_to_sp = {}
         stop_place: StopPlace | None
         for stop_place in stop_places.values():
@@ -77,6 +80,11 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
                         quay_to_sp[quay.id] = stop_place
                     else:
                         quay_to_sp[quay.ref] = stop_place
+
+            if stop_place.levels:
+                for level in stop_place.levels.level_ref_or_level:
+                    if isinstance(level, Level):
+                        levels[level.id] = GtfsProfile.projectLevelToLevel(level)
 
         psas = {}
         psa: PassengerStopAssignment
@@ -149,6 +157,9 @@ def extract(archive: zipfile.ZipFile, database: str) -> None:
         GtfsProfile.writeToZipFile(archive, 'agency.txt', [y for x, y in agencies.items() if x in used_agencies], write_header=True)
         GtfsProfile.writeToZipFile(archive, 'routes.txt', list(routes.values()), write_header=True)
         GtfsProfile.writeToZipFile(archive, 'stops.txt', list(stops.values()), write_header=True)
+
+        if len(levels) > 0:
+            GtfsProfile.writeToZipFile(archive, 'levels.txt', list(levels.values()), write_header=True)
 
         # GTFS Calendar and GTFS Calendar Dates
         # A trip in GTFS points to a single service_id, this is analogue to ServiceJourney and DayTypeRef.
