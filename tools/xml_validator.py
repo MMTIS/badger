@@ -60,7 +60,7 @@ def main(folder: str, xsd_schema: str) -> None:
             if filename.endswith(".xml") or filename.endswith(
                 ".xml.gz"
             ):  # TODO zips are not processed (because might be GTFS)
-                for sub_file in open_netex_file(file_full_path):
+                for sub_file, real_filename in open_netex_file(file_full_path):
                     validate_xml(sub_file, xmlschema)
 
             if filename.endswith(".xsd"):

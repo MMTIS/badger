@@ -30,6 +30,25 @@
         {"step":11,"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
         ]
 },
+
+             {
+    "block": "netex2epipgtfsuicfix",
+    "description": "Script to transform a downloaded file from a general netex to an epip and gtfs",
+    "scripts": [
+        {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.zip"},
+        {"step":4,"script": "conv.netex_to_db", "args": "[%%dir%%/03.zip] %%dir%%/04.lmdb"},
+        {"step":5,"script": "conv.epip_db_to_db", "args": "%%dir%%/04.lmdb %%dir%%/05.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_xml", "args": "%%dir%%/05.lmdb %%dir%%/06-%%block%%-netex.xml.gz"},
+        {"step":7,"script": "tools.xml_validator", "args": "%%dir%%/06-%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
+        {"step":8,"script": "conv.netex_to_db", "args": "[%%dir%%/06-%%block%%-netex.xml.gz]  %%dir%%/08.lmdb"},
+        {"step":9,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.lmdb %%dir%%/09.lmdb"},
+        {"step":10,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.lmdb %%dir%%/%%block%%-gtfs.zip"},
+        {"step":11,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/11-%%block%%-map.html 1"},
+        {"step":12,"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
+        ]
+},
 {
     "block": "gtfs2epip",
     "description": "Script to transform a downloaded  GTFS file into epip",

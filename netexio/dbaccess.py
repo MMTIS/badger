@@ -931,11 +931,11 @@ def recursive_attributes(obj: Tid, depth: List[int | str]) -> Generator[tuple[An
                     mydepth.pop()
 
 
-def open_netex_file(filename: str) -> Generator[IO[Any], None, None]:
+def open_netex_file(filename: str) -> Generator[tuple[IO[Any], str], None, None]:
     if filename.endswith(".xml.gz"):
-        yield igzip_threaded.open(filename, "rb", compresslevel=3, threads=3)  # type: ignore
+        yield igzip_threaded.open(filename, "rb", compresslevel=3, threads=3), filename  # type: ignore
     elif filename.endswith(".xml"):
-        yield open(filename, "rb")
+        yield open(filename, "rb"), filename
     elif filename.endswith(".zip"):
         import zipfile
 
@@ -943,7 +943,7 @@ def open_netex_file(filename: str) -> Generator[IO[Any], None, None]:
         for zipfilename in zip.filelist:
             l_zipfilename = zipfilename.filename.lower()
             if l_zipfilename.endswith(".xml.gz") or l_zipfilename.endswith(".xml"):
-                yield zip.open(zipfilename)
+                yield zip.open(zipfilename), zipfilename
 
 
 def all_subclasses(cls):

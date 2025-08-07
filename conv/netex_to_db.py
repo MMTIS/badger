@@ -23,7 +23,7 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
             setup_database(db, classes, clean_database)
 
         for filename in filenames:
-            for sub_file in open_netex_file(filename):
+            for sub_file, real_filename in open_netex_file(filename):
                 insert_database(db, classes, sub_file)
 
         db.block_until_done()
