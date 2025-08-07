@@ -295,7 +295,6 @@
         {"step":4,"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"step":5,"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
         {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% schema/netex/xsd/NeTEx_publication.xsd"},
-        {"step":6,"script": "tools.xml_validator", "args": "%%inputfilepath%% ../schema/netex/xsd/NeTEx_publication.xsd"},
         {"step":7,"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.lmdb %%dir%%/07-netex-database.lmdb"},
         {"step":8,"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.lmdb %%dir%%/08-%%block%%-netex.xml.gz"},
         {"step":9,"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.lmdb "},
