@@ -30,17 +30,6 @@ def modify_xml_content(root, file_path, outfile=None):
             if match is not None:
                 ref.attrib['nameOfRefClass'] = 'UicOperatingPeriod'
 
-    # Convert the modified XML back to a string
-    modified_xml = ET.tostring(root, encoding='utf-8', xml_declaration=True)
-
-    # Write the modified XML back to the same file if it is an xml outfile is set and we write directly to it
-    if outfile is None:
-        outfile = file_path
-    with open(outfile, 'wb') as f:
-        f.write(modified_xml)
-    print(f'Modified {outfile}')
-
-
 def modify_xml_file(file_name, output_filename):
     print(file_name)
     for f, real_filename in open_netex_file(file_name):
