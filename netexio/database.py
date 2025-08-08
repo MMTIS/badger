@@ -9,15 +9,13 @@ import threading
 import queue
 import os
 import cloudpickle
-from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator, Iterator, Tuple
+from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator
 from enum import IntEnum
-from PySide6.QtCore import QObject, Signal
 
 from netex import (
     EntityStructure,
     EntityInVersionStructure,
     VersionOfObjectRefStructure,
-    MultilingualString,
 )
 import utils.netex_monkeypatching  # noqa: F401
 
@@ -63,9 +61,10 @@ class Referencing:
 
 
 class TaskQueueDebug(queue.Queue):
-    def put(self, item, block = True, timeout = None):
+    def put(self, item, block=True, timeout=None):
         print(item[:-1])
         super(TaskQueueDebug, self).put(item, block, timeout)
+
 
 class Database:
     task_queue: queue.Queue[tuple[LmdbActions, Optional[lmdb._Database], Optional[Any], Optional[Any]]] | None
@@ -244,7 +243,10 @@ class Database:
         delete_key_value_task: list[tuple[lmdb._Database, Any, Any]],
         total_size: int,
     ) -> None:
-        print(f"drop_task: {len(drop_task)}  clear_task:  {len(clear_task)}  delete_tasks: {len(delete_tasks)}  delete_key_value_task: {len(delete_key_value_task)}  batch: {len(batch)}")
+        print(
+            f"drop_task: {len(drop_task)}  clear_task:  {len(clear_task)}  delete_tasks: {len(delete_tasks)}  delete_key_value_task:"
+            f" {len(delete_key_value_task)}  batch: {len(batch)}"
+        )
 
         """Processes a batch of writes and deletions, retrying if needed."""
         while True:
@@ -793,22 +795,54 @@ class Database:
 
             return None
 
-    def check_object_by_key(self, clazz: type[Tid], key: bytes) -> bool:
-        db = self.open_database(clazz)
-        if not db:
-            return False
-        with self.env.begin(db=db) as txn:
+    def _check_object_via_embedding(self, clazz: type[Tid], key: bytes):
+        with self.env.begin(db=self.db_embedding_inverse, buffers=True, write=False) as txn:
             value = txn.get(key)
             if value:
                 return True
-
-            # This handles an alternative in case the version is not added.
+            key = self.serializer.encode_key_by_key(key, clazz)
             cursor = txn.cursor()
-            if cursor.set_range(key):
+            if cursor.set_range(key):  # Position cursor at the first key >= prefix
                 for key_alt, _value in cursor:
                     if not bytes(key_alt).startswith(key):
                         return False
                     return True
+        return False
+
+    @staticmethod
+    def _check_object_by_key_without_version(txn: lmdb.Transaction, key: bytes):
+        # This handles an alternative in case the version is not added.
+        cursor = txn.cursor()
+        if cursor.set_range(key):
+            for key_alt, _value in cursor:
+                if not bytes(key_alt).startswith(key):
+                    return False
+                return True
 
         return False
 
+    def check_object_by_key(self, clazz: type[Tid], key: bytes) -> bool:
+        if clazz.__name__ == 'TypeOfPlace':
+            pass
+        db = self.open_database(clazz)
+        if not db:
+            if self._check_object_via_embedding(clazz, key):
+                return True
+
+            return False
+
+        with self.env.begin(db=db, buffers=True, write=False) as txn:
+            value = txn.get(key)
+            if value:
+                return True
+
+            if b'TYPEOFPLACE' in key:
+                pass
+
+            if self._check_object_via_embedding(clazz, key):
+                return True
+
+            if self._check_object_by_key_without_version(txn, key):
+                return True
+
+        return False

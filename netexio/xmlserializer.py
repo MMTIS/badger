@@ -12,6 +12,8 @@ from xsdata.formats.dataclass.serializers.config import SerializerConfig
 
 from lxml import etree
 
+from utils.utils import get_object_name
+
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 
@@ -39,6 +41,10 @@ class MyXmlSerializer(Serializer):
     @staticmethod
     def encode_key(id: str | None, version: str | None, clazz: type[T], include_clazz: bool = False) -> bytes:
         return ((id or '') + "-" + (version or 'any')).encode("utf-8")
+
+    @staticmethod
+    def encode_key_by_key(key: bytes, clazz: type[T]) -> bytes:
+        return get_object_name(clazz).encode('utf-8') + b'-' + key
 
     def marshall(self, obj: Any, clazz: type[T], pretty_print=False) -> str:
         self.serializer.config.pretty_print = pretty_print
