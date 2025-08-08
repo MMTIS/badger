@@ -1,5 +1,3 @@
-import logging
-import shutil
 from io import BytesIO
 
 from utils.aux_logging import *
@@ -7,11 +5,7 @@ from netexio.dbaccess import open_netex_file
 from isal import igzip_threaded
 import os
 import xml.etree.ElementTree as ET
-import gzip
 import zipfile
-import tempfile
-from configuration import processing_data
-
 
 def modify_xml_content(root, file_path, outfile=None):
     # Define the namespace
@@ -58,6 +52,10 @@ def modify_xml_file(file_name, output_filename):
 
 
 def main(infile: str, outfile: str) -> None:
+    try:
+        os.remove(outfile)
+    except FileNotFoundError:
+        pass
     modify_xml_file(infile, outfile)
 
 
