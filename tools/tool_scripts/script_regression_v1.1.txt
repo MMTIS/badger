@@ -448,6 +448,23 @@
         {"step":14,"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
   },
+
+
+       {
+       "block": "swiss-prod-filter",
+       "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
+    "description":"Filter",
+    "scripts": [
+        {"step":0,"script": "clean_tmp", "args": "%%dir%%"},
+        {"step":1,"script": "set_defaults", "args": "forced_db_size=70000000000;authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"step":2,"script": "download_input_file", "args": "%%dir%%"},
+        {"step":3,"script": "conv.swiss_to_db.py", "args": "[%%inputfilepath%%] %%dir%%/03-swiss-import.lmdb"},
+        {"step":4,"script": "conv.filter_db_to_db", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/14-netex.lmdb  Operator ch:1:Operator:151" },
+        {"step":5,"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.lmdb %%dir%%/04-netex-database.lmdb"},
+        {"step":6,"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.lmdb %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"step":7,"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"}
+        ]
+  },
           {
     "block": "filter_test",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
