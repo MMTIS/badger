@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from logging import Logger
 import random
 from types import TracebackType
@@ -100,6 +101,13 @@ class Database:
 
     def __enter__(self) -> Database:
         if self.multithreaded:
+            self.max_size = self.max_size
+            self.lock = threading.Lock()
+
+            # Threaded writer infrastructure
+            self.task_queue = None
+            self.writer_thread = None
+
             self.env = lmdb.open(self.path, max_dbs=self.max_dbs, readonly=self.readonly, max_readers=1024, lock=False, readahead=False)
 
         elif self.readonly:
@@ -178,7 +186,7 @@ class Database:
             delete_tasks: list[tuple[lmdb._Database, Any]] = []
             drop_tasks: list[lmdb._Database] = []
             clear_tasks: list[lmdb._Database] = []
-            delete_embedding_task: list[str] = []
+            delete_embedding_task: list[tuple[Any, Any]] = []
             delete_key_value_task: list[tuple[lmdb._Database, Any, Any]] = []
 
             total_size = 0
@@ -206,7 +214,8 @@ class Database:
 
                         case LmdbActions.DELETE_EMBEDDING_REFERENCES:
                             assert key is not None, "Key must not be none"
-                            delete_embedding_task.append(key)
+                            assert value is not None, "Value must not be none"
+                            delete_embedding_task.append((key, value, ))
 
                         case LmdbActions.DELETE_KEY_VALUE:
                             assert key is not None, "Key must not be none"
@@ -233,19 +242,25 @@ class Database:
             self.task_queue = None
             self.writer_thread = None
 
+    @staticmethod
+    def debug_time(label, start_time):
+        elapsed = time.perf_counter() - start_time
+        print(f"[DEBUG] {label}: {elapsed:.4f} s")
+        return time.perf_counter()
+
     def _process_batch(
         self,
         batch: list[tuple[lmdb._Database, Any, Any]],
         delete_tasks: list[tuple[lmdb._Database, Any]],
         clear_task: list[lmdb._Database],
         drop_task: list[lmdb._Database],
-        delete_embedding_task: list[str],
+        delete_embedding_task: list[tuple[Any, Any]],
         delete_key_value_task: list[tuple[lmdb._Database, Any, Any]],
         total_size: int,
     ) -> None:
         print(
             f"drop_task: {len(drop_task)}  clear_task:  {len(clear_task)}  delete_tasks: {len(delete_tasks)}  delete_key_value_task:"
-            f" {len(delete_key_value_task)}  batch: {len(batch)}"
+            f" {len(delete_key_value_task)}  delete_embedding_task: {len(delete_embedding_task)}  batch: {len(batch)}"
         )
 
         """Processes a batch of writes and deletions, retrying if needed."""
@@ -253,12 +268,15 @@ class Database:
             try:
                 with self.env.begin(write=True) as txn:
                     # Process drops
+                    # start = time.perf_counter()
                     for db_handle1 in drop_task:
                         txn.drop(db=db_handle1, delete=True)
+                    # start = Database.debug_time("drop_task", start)
 
                     # Process clears
                     for db_handle1 in clear_task:
                         txn.drop(db=db_handle1, delete=False)
+                    # start = Database.debug_time("clear_task", start)
 
                     # Process deletions
                     for db_handle1, prefix in delete_tasks:
@@ -268,21 +286,30 @@ class Database:
                                 cursor.delete()
                                 if not cursor.next():
                                     break
+                    # start = Database.debug_time("delete_task", start)
 
                     for db_handle1, key, value in delete_key_value_task:
                         txn.delete(key, value, db_handle1)
+                    # start = Database.debug_time("delete_key_value_task", start)
 
-                    for global_key in delete_embedding_task:
-                        self.delete_all_references_and_embeddings(txn, global_key)
+                    if len(delete_embedding_task) > 15 and False:
+                        self.delete_all_references_and_embeddings_batch(txn, delete_embedding_task)
+                    else:
+                        for global_key, global_value in delete_embedding_task:
+                            self.delete_all_references_and_embeddings(txn, global_key, global_value)
+                    # start = Database.debug_time("delete_embedding_task", start)
 
                     # Process insertions
                     for db_handle1, key, value in batch:
                         txn.put(key, value, db=db_handle1, dupdata=False)
+                    # start = Database.debug_time("batch", start)
 
                 break  # Success, exit loop
             except lmdb.MapFullError:
                 print("LMDB full, resizing...")
+                # start = time.perf_counter()
                 self._resize_env(total_size)
+                # Database.debug_time("resize", start)
 
     def _start_writer_if_needed(self) -> None:
         """Starts the writer thread if it's not already running."""
@@ -340,7 +367,8 @@ class Database:
 
         if delete_embedding:
             key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
-            self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, None))
+            value = cloudpickle.dumps((get_object_name(obj.__class__), obj.id, getattr(obj, "version", "any")))
+            self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, value))
 
         for (
             embedding,
@@ -352,8 +380,8 @@ class Database:
             object_version,
             path,
         ) in update_embedded_referencing(self.serializer, obj):
-            if obj.__class__.__name__ == 'DestinationDisplay':
-                pass
+            # TODO: It must be possible to not compute the embedded_inverse_value and embedding_key, we already know it.
+
             if embedding:
                 embedding_inverse_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
                 embedding_inverse_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
@@ -448,6 +476,19 @@ class Database:
             # TODO: Debug the embedded generation
             self._insert_embedding_on_queue(obj, delete_embedding)
 
+    def redo_all_embedding_and_references(self):
+        self._start_writer_if_needed()
+        start = time.perf_counter()
+        self.drop([], True)
+        start = Database.debug_time("drop_embedding_references", start)
+        for db_name, clazz in self.list_databases():
+            db = self.open_database(clazz, readonly=True)
+            with self.env.begin(db=db) as txn:
+                for key, value in txn.cursor():
+                    obj = self.serializer.unmarshall(value, clazz)
+                    self._insert_embedding_on_queue(obj, False)
+        start = Database.debug_time("recreated all embeddings and references", start)
+
     def insert_one_object(self, object: Tid, delete_embedding=False) -> None:
         return self.insert_objects_on_queue(object.__class__, [object], delete_embedding=delete_embedding)
 
@@ -473,7 +514,13 @@ class Database:
 
             self.task_queue.put((LmdbActions.CLEAR, db_handle, None, None))
 
-    def delete_all_references_and_embeddings(self, txn: lmdb.Transaction, key: str) -> None:
+
+    def delete_all_references_and_embeddings(self, txn: lmdb.Transaction, key: str, value: bytes) -> None:
+        # Wat zou het kosten als we het huidige object deserialiseren, vervolgens de embedding berekenen, en in plaats van wegschrijven die keys verwijderen?
+        # Alterrnative idea: batch process the entire operation, so the sequential scans ran be reeused for all elements
+
+        start = time.perf_counter()
+        check_parent_clazz, check_parent_id, check_parent_version, = cloudpickle.loads(value)
         with txn.cursor(self.db_embedding_inverse) as cursor_embedding_inverse, txn.cursor(self.db_embedding) as cursor_embedding:
             while True:
                 value = cursor_embedding.pop(key)
@@ -487,11 +534,16 @@ class Database:
                 if cursor_embedding_inverse.set_range(inv_key):
                     for inv_value in cursor_embedding_inverse.iternext_dup():
                         parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
-                        parent_class: type[Any] = self.get_class_by_name(parent_clazz)
+                        # parent_class: type[Any] = self.get_class_by_name(parent_clazz)
 
-                        check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
-                        if check_key == key:
+                        # check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
+                        # if check_key == key:
+                        #     cursor_embedding_inverse.delete()
+
+                        if check_parent_id == parent_id and check_parent_version == parent_version and check_parent_clazz == parent_clazz:
                             cursor_embedding_inverse.delete()
+
+        # start = Database.debug_time("delete embedding", start)
 
         with txn.cursor(self.db_referencing_inwards) as cursor_referencing_inwards, txn.cursor(self.db_referencing) as cursor_referencing:
             while True:
@@ -506,11 +558,18 @@ class Database:
                 if cursor_referencing_inwards.set_range(inv_key):
                     for inv_value in cursor_referencing_inwards.iternext_dup():
                         parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
-                        parent_class = self.get_class_by_name(parent_clazz)
+                        # parent_class = self.get_class_by_name(parent_clazz)
 
-                        check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
-                        if check_key == key:
+                        # check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
+                        # if check_key == key:
+                        #    cursor_referencing_inwards.delete()
+
+                        if check_parent_id == parent_id and check_parent_version == parent_version and check_parent_clazz == parent_clazz:
                             cursor_referencing_inwards.delete()
+
+
+        # start = Database.debug_time("delete referencing", start)
+
 
     def drop(self, classes: list[type[Tid]], embedding: bool = False) -> None:
         if self.readonly:
@@ -615,6 +674,23 @@ class Database:
 
                         # TODO: What about handling the validity too here?
                         return self.serializer.unmarshall(value, clazz)
+
+        return None
+
+    def get_single_by_key(self, clazz: type[Tid], prefix: bytes) -> Tid | None:
+        db = self.open_database(clazz, readonly=True)
+        if db is None:
+            return None
+
+        with self.env.begin(write=False, buffers=True, db=db) as txn:
+            cursor = txn.cursor()
+            if cursor.set_range(prefix):  # Position cursor at the first key >= prefix
+                for key, value in cursor:
+                    if not bytes(key).startswith(prefix):
+                        break  # Stop when keys no longer match the prefix
+
+                    # TODO: What about handling the validity too here?
+                    return self.serializer.unmarshall(value, clazz)
 
         return None
 
@@ -822,8 +898,6 @@ class Database:
         return False
 
     def check_object_by_key(self, clazz: type[Tid], key: bytes) -> bool:
-        if clazz.__name__ == 'TypeOfPlace':
-            pass
         db = self.open_database(clazz)
         if not db:
             if self._check_object_via_embedding(clazz, key):

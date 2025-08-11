@@ -24,7 +24,6 @@ def main(source_database_file: str):
                 if not source_db.check_object_by_key(object_clazz, lookup_key):
                     print(needle)
 
-
 if __name__ == "__main__":
     import argparse
     import traceback

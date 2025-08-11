@@ -22,6 +22,7 @@ dependencies = [
     "folium",
     "paramiko",
     "types-paramiko",
+    "tqdm",
     "xsdata[cli,soap,lxml]>=24.12",
 ]
 requires-python = ">=3.12"
