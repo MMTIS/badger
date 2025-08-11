@@ -6,16 +6,22 @@ from pathlib import Path
 from netexio.pickleserializer import MyPickleSerializer
 
 
-def benchmark_lmdb(path: str):
+def benchmark_lmdb(path: str) -> None:
     env = lmdb.open(path, readonly=True, lock=False, readahead=False, max_dbs=128)
 
     results = []
 
     serializer = MyPickleSerializer(compression=True)
+    total_entries = 0
+    total_elapsed = 0.0
 
     with env.begin() as txn_db:
         for db_name, _ in txn_db.cursor():
             if db_name == b'_metadata':
+                continue
+
+            clazz = serializer.name_object.get(db_name, None)
+            if clazz is None:
                 continue
 
             with env.begin() as txn:
@@ -23,7 +29,6 @@ def benchmark_lmdb(path: str):
                 stat = txn.stat(db)
                 entries = stat["entries"]
 
-                clazz = serializer.name_object.get(db_name, None)
                 start_time = time.perf_counter()
 
                 with txn.cursor(db) as cursor, tqdm(
@@ -41,12 +46,26 @@ def benchmark_lmdb(path: str):
                 elapsed = time.perf_counter() - start_time
                 results.append((db_name.decode('utf-8'), entries, elapsed))
 
+                if db_name[0] != ord('_'):
+                    total_entries += entries
+                    total_elapsed += elapsed
+
     # Markdown-tabel printen
     print("\n### LMDB Benchmark Results")
     print("| Database | Entries | Time (s) |")
-    print("|----------|---------|----------|")
+    print("|----------|--------:|---------:|")
     for name, entries, elapsed in results:
-        print(f"| {name} | {entries} | {elapsed:.4f} |")
+        if name[0] != '_':
+            print(f"| {name} | {entries} | {elapsed:.4f} |")
+
+    print(f"| Total: | {total_entries} | {total_elapsed:.4f} |")
+
+    print("\n## Metadata")
+    print("| Database | Entries | Time (s) |")
+    print("|----------|--------:|---------:|")
+    for name, entries, elapsed in results:
+        if name[0] == '_':
+            print(f"| {name} | {entries} | {elapsed:.4f} |")
 
 
 if __name__ == "__main__":
