@@ -46,7 +46,7 @@ class MyXmlSerializer(Serializer):
     def encode_key_by_key(key: bytes, clazz: type[T]) -> bytes:
         return get_object_name(clazz).encode('utf-8') + b'-' + key
 
-    def marshall(self, obj: Any, clazz: type[T], pretty_print=False) -> str:
+    def marshall(self, obj: Any, clazz: type[T], pretty_print: bool = False) -> str:
         self.serializer.config.pretty_print = pretty_print
         if isinstance(obj, str):
             return obj
