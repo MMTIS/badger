@@ -22,7 +22,7 @@
         {"step":0,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":1,"script": "set_defaults", "args": "forced_db_size=70000000000;authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
         {"step":2,"script": "download_input_file", "args": "%%dir%%"},
-        {"step":3,"script": "conv.netex_to_db.py", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
+        {"step":3,"script": "conv.swiss_to_db.py", "args": "%%inputfilepath%% %%dir%%/03.lmdb"},
         {"step":4,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
         {"step":5,"script": "conv.gtfs_db_to_gtfs.py", "args": "%%dir%%/04.lmdb %%dir%%/%%block%%-gtfs-zip"},
         {"step":6,"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs-zip %%dir%%"}
