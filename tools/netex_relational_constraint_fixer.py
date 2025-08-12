@@ -52,7 +52,8 @@ def main(source_database_file: str):
                         obj = source_db.serializer.unmarshall(value, clazz)
                         if obj.id in all_ids:
                             # We cannot be sure it is unique
-                            all_ids[obj.id] = None
+                            if clazz != all_ids[obj.id]:
+                                all_ids[obj.id] = None
                         else:
                             all_ids[obj.id] = clazz
 
@@ -60,10 +61,12 @@ def main(source_database_file: str):
                 with txn.cursor() as cursor:
                     for key, value in cursor:
                         clazz, ref, version, path = cloudpickle.loads(value)
+                        clazz = source_db.serializer.name_object[clazz]
                         if ref in all_ids:
-                            all_ids[ref] = None
+                            if clazz != all_ids[obj.id]:
+                                all_ids[ref] = None
                         else:
-                            all_ids[ref] = source_db.serializer.name_object[clazz]
+                            all_ids[ref] = clazz
 
     with (Database(source_database_file, MyPickleSerializer(compression=True), readonly=False) as source_db):
         # Group by key

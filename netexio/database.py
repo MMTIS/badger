@@ -23,6 +23,7 @@ import utils.netex_monkeypatching  # noqa: F401
 from netexio.activelrucache import ActiveLRUCache
 from netexio.dbaccess import update_embedded_referencing
 from netexio.serializer import Serializer
+from netexio.signaledcursor import SignaledCursor
 from utils.utils import get_object_name
 from configuration import defaults
 
@@ -96,6 +97,8 @@ class Database:
         self.serializer = serializer
         self.max_dbs = len(self.serializer.name_object) + 2
         self.multithreaded = multithreaded
+        self.resize_version = 0
+        self.resize_done_event = threading.Event()
 
         self.cache = ActiveLRUCache(100)
 
@@ -165,14 +168,19 @@ class Database:
     def _resize_env(self, min_increase: int = 0) -> None:
         """Ensures LMDB grows by at least growth_size or min_increase."""
         with self.lock:
-            current_size = self.env.info()["map_size"]
-            increase = max(self.growth_size, int(min_increase))  # Ensure enough space
-            self.initial_size = min(current_size + increase, self.max_size)
-            if self.initial_size > current_size:
-                print(f"Resizing LMDB from {current_size} to {self.initial_size} bytes")
-                self.env.set_mapsize(self.initial_size)
-            else:
-                raise RuntimeError("LMDB reached max map size, cannot grow further.")
+            self.resize_version += 1
+            self.resize_done_event.clear()
+
+        current_size = self.env.info()["map_size"]
+        increase = max(self.growth_size, int(min_increase))  # Ensure enough space
+        self.initial_size = min(current_size + increase, self.max_size)
+        if self.initial_size > current_size:
+            print(f"Resizing LMDB from {current_size} to {self.initial_size} bytes")
+            self.env.set_mapsize(self.initial_size)
+        else:
+            raise RuntimeError("LMDB reached max map size, cannot grow further.")
+
+        self.resize_done_event.set()
 
     def _writer(self) -> None:
         """Handles both inserts and deletions from the queue, with retry on failure."""
@@ -273,11 +281,13 @@ class Database:
                         txn.drop(db=db_handle1, delete=True)
                     # start = Database.debug_time("drop_task", start)
 
+                with self.env.begin(write=True) as txn:
                     # Process clears
                     for db_handle1 in clear_task:
                         txn.drop(db=db_handle1, delete=False)
                     # start = Database.debug_time("clear_task", start)
 
+                with self.env.begin(write=True) as txn:
                     # Process deletions
                     for db_handle1, prefix in delete_tasks:
                         cursor = txn.cursor(db=db_handle1)
@@ -288,6 +298,7 @@ class Database:
                                     break
                     # start = Database.debug_time("delete_task", start)
 
+                with self.env.begin(write=True) as txn:
                     for db_handle1, key, value in delete_key_value_task:
                         txn.delete(key, value, db_handle1)
                     # start = Database.debug_time("delete_key_value_task", start)
@@ -299,6 +310,7 @@ class Database:
                             self.delete_all_references_and_embeddings(txn, global_key, global_value)
                     # start = Database.debug_time("delete_embedding_task", start)
 
+                with self.env.begin(write=True) as txn:
                     # Process insertions
                     for db_handle1, key, value in batch:
                         txn.put(key, value, db=db_handle1, dupdata=False)
@@ -307,8 +319,10 @@ class Database:
                 break  # Success, exit loop
             except lmdb.MapFullError:
                 print("LMDB full, resizing...")
+
                 # start = time.perf_counter()
                 self._resize_env(total_size)
+
                 # Database.debug_time("resize", start)
 
     def _start_writer_if_needed(self) -> None:
@@ -483,10 +497,19 @@ class Database:
         start = Database.debug_time("drop_embedding_references", start)
         for db_name, clazz in self.list_databases():
             db = self.open_database(clazz, readonly=True)
-            with self.env.begin(db=db) as txn:
-                for key, value in txn.cursor():
-                    obj = self.serializer.unmarshall(value, clazz)
-                    self._insert_embedding_on_queue(obj, False)
+            cursor = SignaledCursor(
+                env=self.env,
+                db=db,
+                clazz=clazz,
+                db_instance=self
+            )
+            for obj in cursor:
+                self._insert_embedding_on_queue(obj, False)
+
+            # with self.env.begin(db=db) as txn:
+            #     for key, value in txn.cursor():
+            #         obj = self.serializer.unmarshall(value, clazz)
+            #         self._insert_embedding_on_queue(obj, False)
         start = Database.debug_time("recreated all embeddings and references", start)
 
     def insert_one_object(self, object: Tid, delete_embedding=False) -> None:
@@ -845,11 +868,15 @@ class Database:
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
 
     def list_databases(self) -> Generator[tuple[str, type[Tid]], None, None]:
+        # Materialise, otherwise we have long running transactions
+        databases = []
         with self.env.begin() as txn:
             for key, _ in txn.cursor():
                 if not key.startswith(b"_"):
                     key = key.decode("utf-8")
-                    yield key, self.serializer.name_object[key]  # Check if key is correct, or self.serializer.name_object[key]
+                    databases.append((key, self.serializer.name_object[key],))  # Check if key is correct, or self.serializer.name_object[key]
+
+        yield from databases
 
     def get_raw_value_by_key(self, clazz: type[Tid], key: bytes) -> Optional[bytes]:
         """Fetches the raw value for a given key from the database."""
@@ -909,9 +936,6 @@ class Database:
             value = txn.get(key)
             if value:
                 return True
-
-            if b'TYPEOFPLACE' in key:
-                pass
 
             if self._check_object_via_embedding(clazz, key):
                 return True
