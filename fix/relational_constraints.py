@@ -99,7 +99,7 @@ def main(source_database_file: str):
                     changed = True
 
             if changed:
-                source_db.insert_one_object(parent_obj, False)
+                source_db.insert_one_object(parent_obj, False, False)
 
     with (Database(source_database_file, MyPickleSerializer(compression=True), readonly=False) as source_db):
         source_db.redo_all_embedding_and_references()

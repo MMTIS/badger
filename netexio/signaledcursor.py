@@ -1,16 +1,12 @@
-import threading
-
-
 class SignaledCursor:
-    def __init__(self, env, db, clazz, db_instance):
-        self.env = env
-        self.db = db
+    def __init__(self, clazz, db_instance, readonly=True):
         self.clazz = clazz
         self.db_instance = db_instance
         self.last_seen_version = db_instance.resize_version
+        self.readonly = readonly
 
     def __iter_cursor_from_key(self, start_key=None):
-        with self.env.begin(db=self.db) as txn:
+        with self.db_instance.env.begin(db=self.db_instance.open_database(self.clazz, readonly=self.readonly)) as txn:
             cursor = txn.cursor()
             if start_key is not None:
                 if cursor.set_key(start_key):

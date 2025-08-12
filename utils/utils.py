@@ -4,7 +4,7 @@ import netex
 import warnings
 import re
 from typing import TypeVar, Iterable, Any
-from xsdata.models.datatype import XmlDuration
+from xsdata.models.datatype import XmlDuration, XmlTime
 from netex import VersionFrameDefaultsStructure, EntityStructure, VersionOfObjectRefStructure
 
 T = TypeVar("T")
@@ -56,6 +56,10 @@ def to_seconds(xml_duration: XmlDuration) -> int:
     if xml_duration.months is not None and xml_duration.months > 0:
         warnings.warn("Duration is bigger than a month!")
     return int((((xml_duration.days or 0) * 24 + (xml_duration.hours or 0)) * 3600) + ((xml_duration.minutes or 0) * 60) + (xml_duration.seconds or 0))
+
+
+def to_seconds_xmltime(xml_time: XmlTime, offset: int = None) -> int:
+    return int((((offset or 0) * 24 + (xml_time.hour)) * 3600) + ((xml_time.minute or 0) * 60) + (xml_time.second or 0))
 
 
 def dontsetifnone(clazz: type[T], attr: str, value: Any) -> T | None:

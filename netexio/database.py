@@ -223,7 +223,12 @@ class Database:
                         case LmdbActions.DELETE_EMBEDDING_REFERENCES:
                             assert key is not None, "Key must not be none"
                             assert value is not None, "Value must not be none"
-                            delete_embedding_task.append((key, value, ))
+                            delete_embedding_task.append(
+                                (
+                                    key,
+                                    value,
+                                )
+                            )
 
                         case LmdbActions.DELETE_KEY_VALUE:
                             assert key is not None, "Key must not be none"
@@ -466,7 +471,7 @@ class Database:
 
         self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
 
-    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False) -> None:
+    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False, update_embedding=True) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
         db_handle = self.open_database(klass)
         if db_handle is None:
@@ -488,21 +493,16 @@ class Database:
             self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
 
             # TODO: Debug the embedded generation
-            self._insert_embedding_on_queue(obj, delete_embedding)
+            if update_embedding or delete_embedding:
+                self._insert_embedding_on_queue(obj, delete_embedding)
 
     def redo_all_embedding_and_references(self):
         self._start_writer_if_needed()
-        start = time.perf_counter()
+        # start = time.perf_counter()
         self.drop([], True)
-        start = Database.debug_time("drop_embedding_references", start)
+        # start = Database.debug_time("drop_embedding_references", start)
         for db_name, clazz in self.list_databases():
-            db = self.open_database(clazz, readonly=True)
-            cursor = SignaledCursor(
-                env=self.env,
-                db=db,
-                clazz=clazz,
-                db_instance=self
-            )
+            cursor = SignaledCursor(clazz=clazz, db_instance=self)
             for obj in cursor:
                 self._insert_embedding_on_queue(obj, False)
 
@@ -510,10 +510,10 @@ class Database:
             #     for key, value in txn.cursor():
             #         obj = self.serializer.unmarshall(value, clazz)
             #         self._insert_embedding_on_queue(obj, False)
-        start = Database.debug_time("recreated all embeddings and references", start)
+        # start = Database.debug_time("recreated all embeddings and references", start)
 
-    def insert_one_object(self, object: Tid, delete_embedding=False) -> None:
-        return self.insert_objects_on_queue(object.__class__, [object], delete_embedding=delete_embedding)
+    def insert_one_object(self, object: Tid, delete_embedding=False, update_embedding=True) -> None:
+        return self.insert_objects_on_queue(object.__class__, [object], delete_embedding=delete_embedding, update_embedding=update_embedding)
 
     def insert_raw_on_queue(self, objects: Iterable[tuple[lmdb._Database, bytes, bytes]]) -> None:
         """Places a hybrid list of encoded pairs in the shared queue for writing, starting writer if needed."""
@@ -537,13 +537,16 @@ class Database:
 
             self.task_queue.put((LmdbActions.CLEAR, db_handle, None, None))
 
-
     def delete_all_references_and_embeddings(self, txn: lmdb.Transaction, key: str, value: bytes) -> None:
         # Wat zou het kosten als we het huidige object deserialiseren, vervolgens de embedding berekenen, en in plaats van wegschrijven die keys verwijderen?
         # Alterrnative idea: batch process the entire operation, so the sequential scans ran be reeused for all elements
 
-        start = time.perf_counter()
-        check_parent_clazz, check_parent_id, check_parent_version, = cloudpickle.loads(value)
+        # start = time.perf_counter()
+        (
+            check_parent_clazz,
+            check_parent_id,
+            check_parent_version,
+        ) = cloudpickle.loads(value)
         with txn.cursor(self.db_embedding_inverse) as cursor_embedding_inverse, txn.cursor(self.db_embedding) as cursor_embedding:
             while True:
                 value = cursor_embedding.pop(key)
@@ -590,9 +593,7 @@ class Database:
                         if check_parent_id == parent_id and check_parent_version == parent_version and check_parent_clazz == parent_clazz:
                             cursor_referencing_inwards.delete()
 
-
         # start = Database.debug_time("delete referencing", start)
-
 
     def drop(self, classes: list[type[Tid]], embedding: bool = False) -> None:
         if self.readonly:
@@ -874,7 +875,12 @@ class Database:
             for key, _ in txn.cursor():
                 if not key.startswith(b"_"):
                     key = key.decode("utf-8")
-                    databases.append((key, self.serializer.name_object[key],))  # Check if key is correct, or self.serializer.name_object[key]
+                    databases.append(
+                        (
+                            key,
+                            self.serializer.name_object[key],
+                        )
+                    )  # Check if key is correct, or self.serializer.name_object[key]
 
         yield from databases
 
