@@ -63,7 +63,7 @@ def main(source_database_file: str):
                         clazz, ref, version, path = cloudpickle.loads(value)
                         clazz = source_db.serializer.name_object[clazz]
                         if ref in all_ids:
-                            if clazz != all_ids[obj.id]:
+                            if clazz != all_ids[ref]:
                                 all_ids[ref] = None
                         else:
                             all_ids[ref] = clazz
@@ -99,11 +99,9 @@ def main(source_database_file: str):
                     changed = True
 
             if changed:
-                # print(parent_obj.id, needles)
                 source_db.insert_one_object(parent_obj, False)
 
     with (Database(source_database_file, MyPickleSerializer(compression=True), readonly=False) as source_db):
-        # source_db._resize_env(2*1024**3)
         source_db.redo_all_embedding_and_references()
 
 
