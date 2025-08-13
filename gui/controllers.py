@@ -82,13 +82,13 @@ class PerspectiveController(QObject):
         incoming_refs = [
             (self.database.get_class_by_name(parent_class), parent_id, parent_version)
             for parent_id, parent_version, parent_class, path in load_referencing_inwards(
-                self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version
+                self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version if hasattr(lmdbo.obj, 'version') else ''
             )
         ]
         outgoing_refs = [
             (self.database.get_class_by_name(reference_class), reference_id, reference_version)
             for reference_id, reference_version, reference_class, path in load_referencing(
-                self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version
+                self.database, lmdbo.obj.__class__, lmdbo.obj.id, lmdbo.obj.version if hasattr(lmdbo.obj, 'version') else ''
             )
         ]
         # Pass the database object to the view so the model can perform lazy checks.
