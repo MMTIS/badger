@@ -87,8 +87,8 @@
 
              {
     "block": "fr_sncf_ter",
-    "url":"https://eu.ftp.opendatasoft.com/sncf/horaires/export-ter-netex-last.zip",
-    "download_url":"https://eu.ftp.opendatasoft.com/sncf/horaires/export-ter-netex-last.zip",
+    "url":"https://transport.data.gouv.fr/datasets/horaires-sncf",
+    "download_url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-opendata-sncf-netex.zip",
     "scripts": [
         {"step":0,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":1,"script": "download_input_file", "args": "%%dir%%"},
