@@ -20,7 +20,7 @@ def benchmark_lmdb(path: str) -> None:
             if db_name == b'_metadata':
                 continue
 
-            clazz = serializer.name_object.get(db_name, None)
+            clazz = serializer.name_object.get(db_name.decode('utf-8'), None)
             if clazz is None:
                 continue
 
@@ -31,9 +31,15 @@ def benchmark_lmdb(path: str) -> None:
 
                 start_time = time.perf_counter()
 
-                with txn.cursor(db) as cursor, tqdm(
-                    total=entries, desc=db_name.decode('utf-8'), bar_format="{desc:<25} {bar} {n_fmt:>6}/{total_fmt:<6} [{elapsed}<{remaining}]", unit="entry"
-                ) as pbar:
+                with (
+                    txn.cursor(db) as cursor,
+                    tqdm(
+                        total=entries,
+                        desc=db_name.decode('utf-8'),
+                        bar_format="{desc:<25} {bar} {n_fmt:>6}/{total_fmt:<6} [{elapsed}<{remaining}]",
+                        unit="entry",
+                    ) as pbar,
+                ):
                     if db_name[0] == ord('_'):
                         for _, value in cursor:
                             cloudpickle.loads(value)  # deserialiseer

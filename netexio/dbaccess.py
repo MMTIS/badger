@@ -891,44 +891,50 @@ def insert_database(
                 last_version_stack.pop()
 
 
+from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def _dc_field_names(cls: type) -> tuple[str, ...]:
+    return tuple(cls.__dataclass_fields__.keys())
+
 def recursive_attributes(obj: Tid, depth: List[int | str]) -> Generator[tuple[Any, list[int | str]], None, None]:
     # We skip data_source_ref_attribute and  responsibility_set_ref_attribute later in the pipeline
-    data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
-    if data_source_ref_attribute:
-        yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + ["data_source_ref_attribute"]
+    # data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
+    # if data_source_ref_attribute:
+    #     yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + ["data_source_ref_attribute"]
 
-    responsibility_set_ref_attribute = getattr(obj, "responsibility_set_ref_attribute", None)
-    if responsibility_set_ref_attribute:
-        yield ResponsibilitySetRef(ref=responsibility_set_ref_attribute), depth + ["responsibility_set_ref_attribute"]
+    # responsibility_set_ref_attribute = getattr(obj, "responsibility_set_ref_attribute", None)
+    # if responsibility_set_ref_attribute:
+    #     yield ResponsibilitySetRef(ref=responsibility_set_ref_attribute), depth + ["responsibility_set_ref_attribute"]
 
-    mydepth: list[int | str] = depth.copy()
+    mydepth = depth
     mydepth.append(0)
-    for key in obj.__dataclass_fields__.keys():
+    for key in _dc_field_names(obj.__class__):
         mydepth[-1] = key
         v = getattr(obj, key, None)
         if v is not None:
             # print(v)
-            if issubclass(v.__class__, VersionOfObjectRef) or issubclass(v.__class__, VersionOfObjectRefStructure):
+            if v.__class__ in netex.set_ref_types:
                 yield v, mydepth
 
             else:
                 if hasattr(v, "__dataclass_fields__") and v.__class__.__name__ in netex.set_all:  # type: ignore
                     if hasattr(v, "id"):
-                        yield v, mydepth
+                        yield v, list(mydepth)
                     yield from recursive_attributes(v, mydepth)
                 elif v.__class__ in (list, tuple):
                     mydepth.append(0)
-                    for j in range(0, len(v)):
+                    for j, x in enumerate(v):
                         mydepth[-1] = j
-                        x = v[j]
                         if x is not None:
-                            if issubclass(x.__class__, VersionOfObjectRef) or issubclass(x.__class__, VersionOfObjectRefStructure):
-                                yield x, mydepth  # TODO: mydepth result is incorrect when list() but not as iterator
+                            if x.__class__ in netex.set_ref_types:
+                                yield x, list(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
                             elif hasattr(x, "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
                                 if hasattr(x, "id"):
-                                    yield x, mydepth
+                                    yield x, list(mydepth)
                                 yield from recursive_attributes(x, mydepth)
                     mydepth.pop()
+    mydepth.pop()
 
 
 def open_netex_file(filename: str) -> Generator[tuple[IO[Any], str], None, None]:

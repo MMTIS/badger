@@ -22,13 +22,11 @@ def fix_calls(service_journey: ServiceJourney):
             if service_journey.calls.call[i].arrival
             else service_journey.calls.call[i].departure.day_offset or 0
         )
-        departure_time = (
-            service_journey.calls.call[i].departure.time if service_journey.calls.call[i].departure else service_journey.calls.call[i - 1].arrival.time
-        )
+        departure_time = service_journey.calls.call[i].departure.time if service_journey.calls.call[i].departure else service_journey.calls.call[i].arrival.time
         departure_day_offset = (
             service_journey.calls.call[i].departure.day_offset
             if service_journey.calls.call[i].departure
-            else service_journey.calls.call[i - 1].arrival.day_offset or 0
+            else service_journey.calls.call[i].arrival.day_offset or 0
         )
         if departure_time < arrival_time and departure_day_offset <= arrival_day_offset:
             changed |= True
@@ -91,12 +89,12 @@ def fix_passing_times(service_journey: ServiceJourney):
         departure_time = (
             service_journey.passing_times.timetabled_passing_time[i].departure_time
             if service_journey.passing_times.timetabled_passing_time[i].departure_time
-            else service_journey.passing_times.timetabled_passing_time[i - 1].arrival_time
+            else service_journey.passing_times.timetabled_passing_time[i].arrival_time
         )
         departure_day_offset = (
             service_journey.passing_times.timetabled_passing_time[i].departure_day_offset
             if service_journey.passing_times.timetabled_passing_time[i].departure_time
-            else service_journey.passing_times.timetabled_passing_time[i - 1].arrival_day_offset
+            else service_journey.passing_times.timetabled_passing_time[i].arrival_day_offset
         ) or 0
         if departure_time < arrival_time and departure_day_offset <= arrival_day_offset:
             changed |= True

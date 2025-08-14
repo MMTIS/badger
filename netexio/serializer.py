@@ -7,6 +7,24 @@ import netex
 
 netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
 
+def _all_subclasses(cls):
+    seen = set()
+    stack = [cls]
+    while stack:
+        c = stack.pop()
+        for s in c.__subclasses__():
+            if s not in seen:
+                seen.add(s)
+                stack.append(s)
+    return seen
+
+
+netex.set_ref_types = frozenset(
+    {netex.VersionOfObjectRef, netex.VersionOfObjectRefStructure}
+    | _all_subclasses(netex.VersionOfObjectRef)
+    | _all_subclasses(netex.VersionOfObjectRefStructure)
+)
+
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 

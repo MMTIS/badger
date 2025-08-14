@@ -101,7 +101,7 @@ class LMDBObject(QObject):
 
     def get_id_version(self) -> Optional[tuple[Any, Any]]:
         if self._obj is not None:
-            return self._obj.id, self._obj.version
+            return self._obj.id, self._obj.version if hasattr(self._obj, 'version') else None
 
         # Optimization: parse id/version from key instead of loading the object.
         # This is much faster and avoids a DB read when just displaying the list.
