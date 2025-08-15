@@ -5,7 +5,7 @@ import gzip
 
 import netex
 from netex import LocationStructure2, LineString, ScheduledStopPoint, Polygon, MultiSurface, RouteLink, PosList, Route, \
-    Line
+    Line, ServiceJourney, LinkSequenceProjection
 from netexio.database import Database, Tid
 from netexio.dbaccess import recursive_attributes, load_referencing
 from netexio.pickleserializer import MyPickleSerializer
@@ -251,7 +251,7 @@ def main(database: str, output_filename: str) -> None:
 
 
         """
-        for clazz in db_read.tables(exclusively=set((RouteLink,))):
+        for clazz in db_read.tables(exclusively=set((RouteLink, ServiceJourney))):
             class_name = get_object_name(clazz)
             src_db = db_read.open_database(clazz, readonly=True)
             if not src_db:
@@ -261,7 +261,12 @@ def main(database: str, output_filename: str) -> None:
                 cursor = src_txn.cursor()
 
                 for key, value in cursor:
-                    for feature in to_feature(reprojection(db_read.serializer.unmarshall(value, clazz), "EPSG:3857"), class_name):
+                    obj = db_read.serializer.unmarshall(value, clazz)
+                    if class_name == 'ServiceJourney' and (obj.link_sequence_projection_ref_or_link_sequence_projection is None or not isinstance(obj.link_sequence_projection_ref_or_link_sequence_projection, LinkSequenceProjection)):
+                        continue
+
+                    for feature in to_feature(reprojection(obj, "EPSG:3857"), class_name):
+                        # print(clazz, bytes(key))
                         # print(feature)
 
                         for x, y in feature['geometry']['coordinates']:
@@ -277,7 +282,6 @@ def main(database: str, output_filename: str) -> None:
                                 tile_index[(zoom, tile_x, tile_y_tms)].append(newfeature)
 
                                 # print(newfeature)
-
 
     with MBtiles(output_filename, mode="w") as out:
         for (z, x, y), features in tile_index.items():
@@ -303,13 +307,13 @@ def main(database: str, output_filename: str) -> None:
                     {
                         "count": 2,
                         "geometry": "LineString",
-                        "layer": "RouteLink"
+                        "layer": "ServiceJourney"
                     }
                 ]
             }),
             "json": json.dumps({
                 "vector_layers": [{
-                    "id": "RouteLink",
+                    "id": "ServiceJourney",
                     "description": "Layer with route links",
                     "minzoom": 8,
                     "maxzoom": 18,

@@ -9,7 +9,6 @@ import lmdb
 import threading
 import queue
 import os
-import cloudpickle
 from typing import TypeVar, Iterable, Any, Optional, Type, Literal, Generator
 from enum import IntEnum
 
@@ -19,6 +18,7 @@ from netex import (
     VersionOfObjectRefStructure,
 )
 import utils.netex_monkeypatching  # noqa: F401
+import netexio.binaryserializer
 
 from netexio.activelrucache import ActiveLRUCache
 from netexio.dbaccess import update_embedded_referencing
@@ -372,7 +372,7 @@ class Database:
             name_bytes = name.encode("utf-8")
             self.dbs[name] = self.env.open_db(name_bytes)
 
-    def _insert_embedding_on_queue(self, obj: Tid, delete_embedding: bool) -> None:
+    def _insert_embedding_on_queue_legacy(self, obj: Tid, delete_embedding: bool) -> None:
         assert obj.id is not None, "Object must have an id"
         assert self.task_queue is not None, "Task queue must not be none"
 
@@ -440,6 +440,77 @@ class Database:
 
                 ref_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
                 ref_value = cloudpickle.dumps((get_object_name(parent_class), parent_id, parent_version, path))
+                self.task_queue.put((LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value))
+
+
+    def _insert_embedding_on_queue(self, obj: Tid, delete_embedding: bool) -> None:
+        assert obj.id is not None, "Object must have an id"
+        assert self.task_queue is not None, "Task queue must not be none"
+
+        parent_class: type[Tid]
+        parent_id: str
+        parent_version: str
+        object_class: type[Tid]
+        object_id: str
+        object_version: str
+        path: tuple[int, ...] | None
+
+        if delete_embedding:
+            key = self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+            value = cloudpickle.dumps((get_object_name(obj.__class__), obj.id, getattr(obj, "version", "any")))
+            self.task_queue.put((LmdbActions.DELETE_EMBEDDING_REFERENCES, None, key, value))
+
+        for (
+            embedding,
+            parent_class,
+            parent_id,
+            parent_version,
+            object_class,
+            object_id,
+            object_version,
+            path,
+        ) in netexio.binaryserializer.update_embedded_referencing(self.serializer, obj):
+            # TODO: It must be possible to not compute the embedded_inverse_value and embedding_key, we already know it.
+
+            if embedding:
+                embedding_inverse_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
+                embedding_inverse_value = netexio.binaryserializer.serialize_relation(netexio.binaryserializer.class_to_idx(parent_class), parent_id, parent_version, path)
+                self.task_queue.put(
+                    (
+                        LmdbActions.WRITE,
+                        self.db_embedding_inverse,
+                        embedding_inverse_key,
+                        embedding_inverse_value,
+                    )
+                )
+
+                embedding_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
+                embedding_value = netexio.binaryserializer.serialize_relation(netexio.binaryserializer.class_to_idx(object_class), object_id, object_version, path)
+                self.task_queue.put(
+                    (
+                        LmdbActions.WRITE,
+                        self.db_embedding,
+                        embedding_key,
+                        embedding_value,
+                    )
+                )
+
+            else:
+                # TODO: This won't work because of out of order behavior
+                # self.task_queue.put((LmdbActions.DELETE_PREFIX, self.db_referencing, key_prefix))
+
+                # By skipping these, we effectively save 4 rows per object.
+                # if path.endswith("data_source_ref_attribute") or path.endswith("responsibility_set_ref_attribute"):
+                #     continue
+
+                # When an object embeds more sub-objects, it will create more references, the path makes them unique,
+                # TODO: one could argue that we could aggregate all paths, so we have at most two writes per reference.
+                ref_key = self.serializer.encode_key(parent_id, parent_version, parent_class, include_clazz=True)
+                ref_value = netexio.binaryserializer.serialize_relation(netexio.binaryserializer.class_to_idx(object_class), object_id, object_version, path)
+                self.task_queue.put((LmdbActions.WRITE, self.db_referencing, ref_key, ref_value))
+
+                ref_key = self.serializer.encode_key(object_id, object_version, object_class, include_clazz=True)
+                ref_value = netexio.binaryserializer.serialize_relation(netexio.binaryserializer.class_to_idx(parent_class), parent_id, parent_version, path)
                 self.task_queue.put((LmdbActions.WRITE, self.db_referencing_inwards, ref_key, ref_value))
 
     def insert_metadata_on_queue(self, objects: Iterable[tuple[str, str, Any]]) -> None:
@@ -543,23 +614,25 @@ class Database:
 
         # start = time.perf_counter()
         (
-            check_parent_clazz,
+            check_parent_clazz_idx,
             check_parent_id,
             check_parent_version,
-        ) = cloudpickle.loads(value)
+        ) = netexio.binaryserializer.deserialize_relation(value)
+        check_parent_clazz = self.serializer.name_object[netexio.binaryserializer.idx_to_class_name(check_parent_clazz_idx)]
         with txn.cursor(self.db_embedding_inverse) as cursor_embedding_inverse, txn.cursor(self.db_embedding) as cursor_embedding:
             while True:
                 value = cursor_embedding.pop(key)
                 if not value:
                     break
 
-                clazz, ref, version, path = cloudpickle.loads(value)
-                check_class: type[Any] = self.get_class_by_name(clazz)
+                clazz_idx, ref, version, path = netexio.binaryserializer.deserialize_relation(value)
+                check_class: type[Any] = self.serializer.name_object[netexio.binaryserializer.idx_to_class_name(check_parent_clazz_idx)]
                 inv_key = self.serializer.encode_key(ref, version, check_class, True)
 
                 if cursor_embedding_inverse.set_range(inv_key):
                     for inv_value in cursor_embedding_inverse.iternext_dup():
-                        parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
+                        parent_clazz_idx, parent_id, parent_version, embedding_path = netexio.binaryserializer.deserialize_relation(inv_value)
+                        parent_clazz: type[Any] = self.serializer.name_object[netexio.binaryserializer.idx_to_class_name(parent_clazz_idx)] # TODO: Voelt alsof we hier ook gewoon de int kunnen houden
                         # parent_class: type[Any] = self.get_class_by_name(parent_clazz)
 
                         # check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
@@ -577,13 +650,14 @@ class Database:
                 if not value:
                     break
 
-                clazz, ref, version, path = cloudpickle.loads(value)
-                check_class = self.get_class_by_name(clazz)
+                clazz_idx, ref, version, path = netexio.binaryserializer.deserialize_relation(value)
+                check_class: type[Any] = self.serializer.name_object[netexio.binaryserializer.idx_to_class_name(clazz_idx)]
                 inv_key = self.serializer.encode_key(ref, version, check_class, True)
 
                 if cursor_referencing_inwards.set_range(inv_key):
                     for inv_value in cursor_referencing_inwards.iternext_dup():
-                        parent_clazz, parent_id, parent_version, embedding_path = cloudpickle.loads(inv_value)
+                        parent_clazz_idx, parent_id, parent_version, embedding_path = netexio.binaryserializer.deserialize_relation(inv_value)
+                        parent_clazz: type[Any] = self.serializer.name_object[netexio.binaryserializer.idx_to_class_name(parent_clazz_idx)] # TODO: Voelt alsof we hier ook gewoon de int kunnen houden
                         # parent_class = self.get_class_by_name(parent_clazz)
 
                         # check_key = self.serializer.encode_key(parent_id, parent_version, parent_class, True)
@@ -850,8 +924,8 @@ class Database:
         with self.env.begin(write=False, buffers=True, db=self.db_referencing) as txn:
             cursor = txn.cursor()
             for _key, value in cursor:
-                klass, *_ = cloudpickle.loads(value)
-                tables.add(self.get_class_by_name(klass))
+                klass_idx, *_ = netexio.binaryserializer.deserialize_relation(value)
+                tables.add(netexio.binaryserializer.idx_to_class_name(klass_idx))
 
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
 
@@ -863,8 +937,8 @@ class Database:
         with self.env.begin(write=False, buffers=True, db=self.db_embedding_inverse) as txn:
             cursor = txn.cursor()
             for _key, value in cursor:
-                klass, *_ = cloudpickle.loads(value)
-                tables.add(self.get_class_by_name(klass))
+                klass_idx, *_ = netexio.binaryserializer.deserialize_relation(value)
+                tables.add(netexio.binaryserializer.idx_to_class_name(klass_idx))
 
         return sorted(list(tables.intersection(exclusively)), key=lambda v: v.__name__)
 

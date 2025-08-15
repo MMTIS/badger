@@ -1,17 +1,10 @@
-import lmdb
-import cloudpickle
-import time
-from tqdm import tqdm
 from pathlib import Path
 
-import netex
-from netex import Line, ServiceJourney
-from netexio.attributes import resolve_attr
-from netexio.binaryserializer import get_numeric_path, serialize_relation, deserialize_relation
+from netex import ServiceJourney
+from netexio.binaryserializer import recursive_attributes, navigate_object
 from netexio.database import Database
-from netexio.dbaccess import load_local, load_referencing_inwards, load_referencing
+from netexio.dbaccess import load_local
 from netexio.pickleserializer import MyPickleSerializer
-from transformers.references import split_path
 
 
 def benchmark_lmdb(path: str) -> None:
@@ -35,9 +28,14 @@ def benchmark_lmdb(path: str) -> None:
                     print(clazz_name, parent_id, parent_version, path)
     """
 
-    with Database("/mnt/storage/compressed/wsf.lmdb", serializer=MyPickleSerializer(compression=True)) as source_db:
+    with Database(path, serializer=MyPickleSerializer(compression=True)) as source_db:
         sj = load_local(source_db, ServiceJourney, 1)[0]
+        for x, path1 in recursive_attributes(sj, []):
+            print("A", x)
+            print("B", navigate_object(sj, path1))
 
+
+        """
         for parent_id, parent_version, parent_class, path in load_referencing(source_db, ServiceJourney, sj.id, sj.version):
             split = split_path(path)
             attribute = resolve_attr(sj, split)
@@ -48,7 +46,7 @@ def benchmark_lmdb(path: str) -> None:
             print('our', len(serialized))
             clazz_idx, resolved_id, resolved_version, resolved_path = deserialize_relation(serialized)
             print(clazz_idx, resolved_id, resolved_version, resolved_path)
-
+        """
 if __name__ == "__main__":
     import sys
 

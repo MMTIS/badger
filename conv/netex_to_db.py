@@ -5,7 +5,6 @@ from netexio.dbaccess import setup_database, open_netex_file, insert_database
 from netexio.pickleserializer import MyPickleSerializer
 from utils.utils import get_interesting_classes
 from utils.aux_logging import *
-from netexio.dbaccess import check_referencing
 
 def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
     # if filenames is not a list of str  => error

@@ -1,8 +1,9 @@
 import lmdb
-import cloudpickle
 import time
 from tqdm import tqdm
 from pathlib import Path
+
+import netexio.binaryserializer
 from netexio.pickleserializer import MyPickleSerializer
 
 
@@ -21,8 +22,8 @@ def benchmark_lmdb(path: str) -> None:
                 continue
 
             clazz = serializer.name_object.get(db_name.decode('utf-8'), None)
-            if clazz is None:
-                continue
+            # if clazz is None:
+            #    continue
 
             with env.begin() as txn:
                 db = env.open_db(db_name, txn=txn)
@@ -42,7 +43,7 @@ def benchmark_lmdb(path: str) -> None:
                 ):
                     if db_name[0] == ord('_'):
                         for _, value in cursor:
-                            cloudpickle.loads(value)  # deserialiseer
+                            netexio.binaryserializer.deserialize_relation(value) # deserialiseer
                             pbar.update(1)
                     else:
                         for _, value in cursor:
