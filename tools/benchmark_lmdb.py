@@ -61,7 +61,7 @@ def benchmark_lmdb(path: str) -> None:
     print("| Database | Entries | Time (s) |")
     print("|----------|--------:|---------:|")
     for name, entries, elapsed in results:
-        if name[0] != '_':
+        if name[0] != b'_':
             print(f"| {name} | {entries} | {elapsed:.4f} |")
 
     print(f"| Total: | {total_entries} | {total_elapsed:.4f} |")
@@ -70,7 +70,7 @@ def benchmark_lmdb(path: str) -> None:
     print("| Database | Entries | Time (s) |")
     print("|----------|--------:|---------:|")
     for name, entries, elapsed in results:
-        if name[0] == '_':
+        if name[0] == b'_':
             print(f"| {name} | {entries} | {elapsed:.4f} |")
 
 
