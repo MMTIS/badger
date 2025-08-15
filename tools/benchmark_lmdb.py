@@ -22,8 +22,8 @@ def benchmark_lmdb(path: str) -> None:
                 continue
 
             clazz = serializer.name_object.get(db_name.decode('utf-8'), None)
-            # if clazz is None:
-            #    continue
+            if clazz is not None:
+                continue
 
             with env.begin() as txn:
                 db = env.open_db(db_name, txn=txn)

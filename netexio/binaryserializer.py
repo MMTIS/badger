@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
+from cloudpickle import cloudpickle
+
 if TYPE_CHECKING:
     from netexio.database import Tid
     from netexio.serializer import Serializer
@@ -16,6 +18,9 @@ LENGTH_FORMAT = ">H"  # uint16 length
 PATH_LEN_FORMAT = ">B"  # uint8
 PATH_INDEX_FORMAT = ">H"  # uint16 per attribuut index
 
+HEADER_SIZE = struct.calcsize(HEADER_FORMAT)
+LENGTH_SIZE = struct.calcsize(LENGTH_FORMAT)
+PATH_LEN_SIZE = struct.calcsize(PATH_LEN_FORMAT)
 
 def serialize_relation(
         class_id: int,
@@ -23,6 +28,8 @@ def serialize_relation(
         version: str,
         path_indices: Tuple[int, ...]
 ) -> bytes:
+    return cloudpickle.dumps((class_id, object_id, version, path_indices))
+    """
     obj_id_bytes = object_id.encode("utf-8")
     ver_bytes = version.encode("utf-8") if version else b''
 
@@ -39,8 +46,9 @@ def serialize_relation(
         b''.join(struct.pack(PATH_INDEX_FORMAT, idx) for idx in path_indices)
     ]
     return b''.join(parts)
+    """
 
-
+"""
 def deserialize_relation(data: bytes) -> Tuple[int, str, str, Tuple[int, ...]]:
     offset = 0
 
@@ -69,7 +77,42 @@ def deserialize_relation(data: bytes) -> Tuple[int, str, str, Tuple[int, ...]]:
     )
 
     return class_id, object_id, version, path_indices
+"""
 
+def deserialize_relation(data: bytes) -> Tuple[int, str, str, Tuple[int, ...]]:
+    """
+    mv = memoryview(data)
+    offset = 0
+
+    # class_id
+    class_id = struct.unpack_from(HEADER_FORMAT, mv, offset)[0]
+    offset += HEADER_SIZE
+
+
+    # object_id
+    obj_len = struct.unpack_from(LENGTH_FORMAT, mv, offset)[0]
+    offset += LENGTH_SIZE
+    object_id = mv[offset:offset + obj_len].tobytes().decode("utf-8")
+    offset += obj_len
+
+    # version
+    ver_len = struct.unpack_from(LENGTH_FORMAT, mv, offset)[0]
+    offset += LENGTH_SIZE
+    version = mv[offset:offset + ver_len].tobytes().decode("utf-8")
+    offset += ver_len
+
+    # path
+    path_len = struct.unpack_from(PATH_LEN_FORMAT, mv, offset)[0]
+    offset += PATH_LEN_SIZE
+    if path_len:
+        path_indices = struct.unpack_from(f"<{path_len}H", mv, offset)
+    else:
+        path_indices = ()
+
+    return class_id, object_id, version, path_indices
+    """
+    
+    return cloudpickle.loads(data)
 
 def get_numeric_path(obj: Tid, target: Any, path: list[int] | None = None) -> list[int] | None:
     """Find the numeric path to `target` inside `obj`."""
