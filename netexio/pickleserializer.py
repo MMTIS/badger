@@ -47,16 +47,17 @@ class MyPickleSerializer(Serializer):
         obj_name = get_object_name(clazz).upper()
         encoded_bytes = bytearray()
 
-        if include_clazz:
-            encoded_bytes.extend(MyPickleSerializer.encode_string(obj_name, obj_name, False))
-            encoded_bytes.append(MyPickleSerializer.SEPARATOR)
-
         if id is not None:
             encoded_bytes.extend(MyPickleSerializer.encode_string(id, obj_name))
             encoded_bytes.append(MyPickleSerializer.SEPARATOR)
 
         if version is not None and version != "any":
             encoded_bytes.extend(MyPickleSerializer.encode_string(version, obj_name))
+            encoded_bytes.append(MyPickleSerializer.SEPARATOR)
+
+        if include_clazz:
+            # encoded_bytes.extend(MyPickleSerializer.encode_string(obj_name, obj_name, False))
+            encoded_bytes.extend(netex.__all__.index(clazz.__name__).to_bytes(4, 'little'))
 
         return bytes(encoded_bytes)
 

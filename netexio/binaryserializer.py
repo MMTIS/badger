@@ -1,7 +1,11 @@
 from __future__ import annotations
+
+import logging
 from typing import TYPE_CHECKING, Any
 
 from cloudpickle import cloudpickle
+
+from utils.aux_logging import log_once
 
 if TYPE_CHECKING:
     from netexio.database import Tid
@@ -211,6 +215,38 @@ def navigate_object(obj: Any, path_indices: Tuple[int, ...]) -> Any:
         else:
             raise TypeError(f"Cannot navigate into object of type {type(obj)}")
     return obj
+
+def only_embedding(serializer: Serializer, deserialized: Tid) -> Generator[bytes, None, None]:
+    assert deserialized.id is not None, "deserialised.id must not be none"
+
+    for obj, path in recursive_attributes(deserialized, []):
+        if hasattr(obj, "id") and obj.id is not None:
+            if obj.__class__ in serializer.interesting_classes:
+                assert obj.id is not None, "Object.id must not be none"
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+
+def only_references(serializer: Serializer, deserialized: Tid) -> Generator[tuple[type[Tid], str, str], None, None]:
+    assert deserialized.id is not None, "deserialised.id must not be none"
+
+    for obj, path in recursive_attributes(deserialized, []):
+        if hasattr(obj, "ref"):
+            assert obj.ref is not None, "Object ref must not be none"
+            if obj.name_of_ref_class is None:
+                # Hack, because NeTEx does not define the default name of ref class yet
+                if obj.__class__.__name__.endswith("RefStructure"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                elif obj.__class__.__name__.endswith("Ref"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+
+            if obj.name_of_ref_class not in serializer.name_object:
+                log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
+                continue
+
+            yield (
+                serializer.name_object[obj.name_of_ref_class],  # The object that the reference is towards
+                obj.ref,
+                getattr(obj, "version", "any"),
+            )
 
 def update_embedded_referencing(serializer: Serializer, deserialized: Tid) -> Generator[tuple[bool, type[Tid], str, str, type[Tid], str, str, str], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"

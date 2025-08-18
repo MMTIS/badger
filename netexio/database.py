@@ -101,6 +101,7 @@ class Database:
         self.resize_done_event = threading.Event()
 
         self.cache = ActiveLRUCache(100)
+        self.last_entry = 0
 
     def __enter__(self) -> Database:
         if self.multithreaded:
@@ -135,11 +136,12 @@ class Database:
                 subdir=True,
             )
 
-        self.db_embedding: lmdb._Database = self.env.open_db(b"_embedding", create=not self.readonly, dupsort=True)
-        self.db_embedding_inverse: lmdb._Database = self.env.open_db(b"_embedding_inverse", create=not self.readonly, dupsort=True)
-        self.db_referencing: lmdb._Database = self.env.open_db(b"_referencing", create=not self.readonly, dupsort=True)
-        self.db_referencing_inwards: lmdb._Database = self.env.open_db(b"_referencing_inwards", create=not self.readonly, dupsort=True)
-        self.db_metadata: lmdb._Database = self.env.open_db(b"_metadata", create=not self.readonly)
+        # self.db_embedding: lmdb._Database = self.env.open_db(b"_embedding", create=not self.readonly, dupsort=True)
+        # self.db_embedding_inverse: lmdb._Database = self.env.open_db(b"_embedding_inverse", create=not self.readonly, dupsort=True)
+        # self.db_referencing: lmdb._Database = self.env.open_db(b"_referencing", create=not self.readonly, dupsort=True)
+        # self.db_referencing_inwards: lmdb._Database = self.env.open_db(b"_referencing_inwards", create=not self.readonly, dupsort=True)
+        # self.db_metadata: lmdb._Database = self.env.open_db(b"_metadata", create=not self.readonly)
+        # self.db_idx: lmdb._Database = self.env.open_db(b"_id_idx", create=not self.readonly)
 
         return self
 
@@ -318,7 +320,7 @@ class Database:
                 with self.env.begin(write=True) as txn:
                     # Process insertions
                     for db_handle1, key, value in batch:
-                        txn.put(key, value, db=db_handle1, dupdata=False)
+                        txn.put(key, value, db=db_handle1)
                     # start = Database.debug_time("batch", start)
 
                 break  # Success, exit loop
@@ -340,7 +342,7 @@ class Database:
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
-    def open_database(self, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
+    def open_database(self, txn, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
         name: str = get_object_name(klass)
 
         if name in self.dbs:
@@ -349,13 +351,13 @@ class Database:
             name_bytes = name.encode("utf-8")
             try:
                 # Try opening in read-only mode first to isolate the issue
-                db = self.env.open_db(name_bytes, create=False)
+                db = self.env.open_db(name_bytes, create=False, txn=txn)
             except lmdb.Error as e:
                 if self.readonly or delete or readonly:
                     return None
                 if "MDB_NOTFOUND" in str(e):
                     print(f"Database {name} does not exist, creating it.")
-                    db = self.env.open_db(name_bytes, create=True)
+                    db = self.env.open_db(name_bytes, create=True, txn=txn)
                 else:
                     raise  # Reraise other LMDB errors
             except Exception as ex:
@@ -542,7 +544,7 @@ class Database:
 
         self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
 
-    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False, update_embedding=True) -> None:
+    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False, update_embedding=False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
         db_handle = self.open_database(klass)
         if db_handle is None:
@@ -557,11 +559,21 @@ class Database:
         for obj in objects:
             assert obj.id is not None, "Object must have an id"
             version = obj.version if hasattr(obj, "version") else None
-            key = self.serializer.encode_key(obj.id, version, klass)
+            # TODO: belangrijkste verschil hier, we moeten onderscheid gaan maken tussen overschrijven en nieuwe objecten een nieuw object krijgt een nieuwe uint32 een oude moet de entry overschrijven
+            key = self.serializer.encode_key(obj.id, version, klass, include_clazz=True)
             value = self.serializer.marshall(obj, klass)
             # print(obj.id)
 
-            self.task_queue.put((LmdbActions.WRITE, db_handle, key, value))
+            idx = self.last_entry.to_bytes(4, 'little')
+            self.task_queue.put((LmdbActions.WRITE, self.db_idx, key, idx))
+            self.task_queue.put((LmdbActions.WRITE, db_handle, idx, value))
+            self.last_entry += 1
+
+            for embedding_key in netexio.binaryserializer.only_embedding(self.serializer, obj):
+                embedded_idx = self.last_entry.to_bytes(4, 'little')
+                self.task_queue.put((LmdbActions.WRITE, self.db_idx, embedding_key, idx))
+                # self.task_queue.put((LmdbActions.WRITE, self.db_embedding, embedded_idx, idx))
+                self.last_entry += 1
 
             # TODO: Debug the embedded generation
             if update_embedding or delete_embedding:
@@ -945,7 +957,7 @@ class Database:
     def list_databases(self) -> Generator[tuple[str, type[Tid]], None, None]:
         # Materialise, otherwise we have long running transactions
         databases = []
-        with self.env.begin() as txn:
+        with self.env.begin(write=False) as txn:
             for key, _ in txn.cursor():
                 if not key.startswith(b"_"):
                     key = key.decode("utf-8")
