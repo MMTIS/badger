@@ -195,6 +195,8 @@ def download(folder: str, url: str, regex: str = '', forced: bool = False) -> st
         # Get the filename from the URL
         filename = os.path.basename(url)
         # work around for swiss data, where it is "permalink"
+        if filename == "resource":
+            filename = "resource.xml.gz"
         if filename == "permalink":
             filename = "swiss.zip"
         if "?" in filename:  # for data from mobigo, that is fetched by an aspx script with parameters
