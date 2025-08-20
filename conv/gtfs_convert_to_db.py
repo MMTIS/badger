@@ -3066,8 +3066,6 @@ class GtfsNeTexProfile(CallsProfile):
                 yield template_service_journey
 
     def database(self, con: Database) -> None:
-        con.insert_objects_on_queue(Line, self.lines)
-
         # This still sucks :-) shape is in every ServiceJourney now
         # in order to solve it, we must find the route point that matches the
         # shape point exactly, but if the GTFS shape is provided as an abstract
@@ -3087,6 +3085,8 @@ class GtfsNeTexProfile(CallsProfile):
 
         con.insert_objects_on_queue(Operator, self.getOperators())
 
+        con.insert_objects_on_queue(Line, self.lines)
+
         stop_areas = self.getStopAreas()
         con.insert_objects_on_queue(StopArea, stop_areas)
         con.insert_objects_on_queue(ScheduledStopPoint, self.getScheduledStopPoints(stop_areas))
@@ -3100,8 +3100,8 @@ class GtfsNeTexProfile(CallsProfile):
 
         day_types, day_type_assignments, operating_periods = self.getDayTypes()
         con.insert_objects_on_queue(DayType, day_types)
-        con.insert_objects_on_queue(DayTypeAssignment, day_type_assignments)
         con.insert_objects_on_queue(OperatingPeriod, operating_periods)
+        con.insert_objects_on_queue(DayTypeAssignment, day_type_assignments)
 
         # availability_conditions = self.getAvailabilityConditions()
         # write_objects(con, availability_conditions, empty=True, many=True)
@@ -3140,6 +3140,7 @@ def main(database_gtfs: str, database_netex: str) -> None:
         assert gtfs.version.version is not None
         # db_write.insert_metadata_on_queue([("GTFS", gtfs.version.version, gtfs.frame_defaults)])
         gtfs.database(db_write)
+        pass
 
 
 if __name__ == '__main__':

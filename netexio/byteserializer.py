@@ -54,7 +54,6 @@ netex.set_ref_types = frozenset(
 # value: struct consisting of a class_idx: uint16_t and unique_idx: uint32_t, path_indices list[uint_8]
 import itertools
 import string
-import struct
 from pathlib import Path
 from types import TracebackType
 from typing import T, cast, Generator, Any, Optional, Type, Literal, Iterable
@@ -72,8 +71,8 @@ class BinarySerializer:
     SPECIAL_CHAR = ord("*")
     WORD_MASK = "#"
 
-    classes: list[type]
-    names: list[str]
+    # classes: list[type]
+    # names: list[str]
 
     @staticmethod
     def get_object_name(clazz: type[T]) -> str:
@@ -110,8 +109,8 @@ class BinarySerializer:
         return key.split(bytes([BinarySerializer.SEPARATOR]))
 
     def __init__(self, classes: list[type]):
-        self.classes = classes
         self.name_object = {BinarySerializer.get_object_name(x): x for x in classes}
+        self.classes = classes
 
 DB_CLASS_IDX = b'_class_idx'
 DB_UNRESOLVED = b'_unresolved'
@@ -168,10 +167,10 @@ class Database:
             raise
 
         with self.env.begin(write=True) as txn:
-            db_class_idx = self.env.open_db(DB_UNRESOLVED, create=True, txn=txn, integerkey=True)
-            for idx, clazz_name in enumerate(self.serializer.name_object.keys()):
+            db_class_idx = self.env.open_db(DB_CLASS_IDX, create=True, txn=txn, integerkey=True)
+            for idx, clazz in enumerate(self.serializer.name_object.values()):
+                clazz_name = self.serializer.get_object_name(clazz)
                 txn.put(idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'), db=db_class_idx)
-
 
     @staticmethod
     @lru_cache(maxsize=None)
@@ -246,6 +245,9 @@ class Database:
     def insert_objects_on_queue(self, klass: type[T], objects: Iterable[T], empty: bool = False) -> None:
         print(klass)
 
+        direct = 0
+        unresolved = 0
+
         if self.readonly:
             raise
 
@@ -254,7 +256,9 @@ class Database:
         with self.env.begin(write=True) as txn:
             db = self.env.open_db(class_idx.to_bytes(2, 'little'), txn=txn, create=True, integerkey=True)
             db_unresolved = self.env.open_db(DB_UNRESOLVED, txn=txn, create=True, integerkey=True, dupsort=True, integerdup=True)
-            db_idx = self.env.open_db(DB_ID_IDX, txn=txn, create=True, )
+            db_id_idx = self.env.open_db(DB_ID_IDX, txn=txn, create=True)
+            db_reference_forward = self.env.open_db(DB_REFERENCE_FORWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
+            db_reference_inward = self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
 
             if empty:
                 txn.drop(db=db, delete=False)
@@ -262,16 +266,21 @@ class Database:
             for obj in objects:
                 key = next(self.last_entry)
 
-                full_key = struct.pack("<HI", class_idx, key)
+                full_key = ((class_idx << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in self.only_references(obj):
                     unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
-                    txn.put(full_key, unresolved_value, db=db_unresolved)
+                    resolved_idx = txn.get(unresolved_value, db=db_id_idx)
+                    if resolved_idx:
+                        txn.put(full_key, resolved_idx, db=db_reference_forward)
+                        txn.put(resolved_idx, full_key, db=db_reference_inward)
+                    else:
+                        txn.put(full_key, unresolved_value, db=db_unresolved)
 
                 value = cast(bytes, lz4.frame.compress(cloudpickle.dumps(obj)))
                 txn.put(key.to_bytes(4, 'little'), value, db=db)
-                txn.put(self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), full_key, db=db_idx)
+                txn.put(self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), full_key, db=db_id_idx)
 
-
+    """
     def write_object(self, obj: T, idx: bytes | None = None) -> None:
         if self.readonly:
             raise
@@ -284,59 +293,80 @@ class Database:
         key = (idx if idx else next(self.last_entry)).to_bytes(4, 'little')
 
         with self.env.begin(write=True) as txn:
-            db_unresolved = self.env.open_db(DB_UNRESOLVED, txn=txn,create=True, integerkey=True, dupsort=True, integerdup=True)
+            db_unresolved = self.env.open_db(DB_UNRESOLVED, txn=txn, create=True, integerkey=True, dupsort=True, integerdup=True)
+            db_id_idx = self.env.open_db(DB_ID_IDX, txn=txn, create=True)
+            db_reference_forward = self.env.open_db(DB_REFERENCE_FORWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
+            db_reference_inward = self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
+
             full_key = struct.pack("<HI", class_idx, key)
             for referenced_class_idx, ref, version in Database.only_references(obj):
                 unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
-                txn.put(full_key, unresolved_value, db=db_unresolved)
+                resolved_idx = txn.get(unresolved_value, db=db_id_idx)
+                if resolved_idx:
+                    txn.put(full_key, resolved_idx, db=db_reference_forward)
+                    txn.put(resolved_idx, full_key, db=db_reference_inward)
+                else:
+                    txn.put(full_key, unresolved_value, db=db_unresolved)
 
             db = self.env.open_db(class_idx, txn=txn, create=True, integerkey=True)
             value = cast(bytes, lz4.frame.compress(cloudpickle.dumps(obj)))
             txn.put(key, value, db=db)
 
             db = self.env.open_db(DB_ID_IDX, txn=txn, create=True)
-            txn.put(obj.id.encode("utf-8"), full_key, db=db) # TODO: smart encoding key
+            txn.put(self.serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), full_key, db=db_id_idx)
+    """
 
     def resolve(self) -> None:
         if self.readonly:
             raise
 
-        with self.env.begin(write=True) as txn:
+        with (self.env.begin(write=True) as txn):
             db_unresolved = self.env.open_db(DB_UNRESOLVED, create=False, txn=txn, integerkey=True, dupsort=True, integerdup=True)
             db_id_idx = self.env.open_db(DB_ID_IDX, txn=txn, create=False)
-            db_reference_forward = self.env.open_db(DB_REFERENCE_FORWARD, create=False, txn=txn, integerkey=True, dupsort=True, integerdup=True)
-            db_reference_inward = self.env.open_db(DB_REFERENCE_INWARD, create=False, txn=txn, integerkey=True, dupsort=True, integerdup=True)
+            db_reference_forward = self.env.open_db(DB_REFERENCE_FORWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
+            db_reference_inward = self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
 
             if not db_unresolved or not db_id_idx:
                 return
 
-            unresolved_cursor = db_unresolved.cursor()
-            for idx, value in unresolved_cursor:
+            unresolved_cursor = txn.cursor(db=db_unresolved)
+            has_item = unresolved_cursor.first()
+            while has_item:
+                value = unresolved_cursor.value()
                 resolved_idx = txn.get(value, db=db_id_idx) # This will be the id + version + class check
                 if not resolved_idx:
                     parts = self.serializer.split_key(value)
-                    parts[-1] = ''
+                    parts[-1] = b''
                     prefix = bytes([BinarySerializer.SEPARATOR]).join(parts)
                     cursor = txn.cursor(db=db_id_idx)
                     if cursor.set_range(prefix): # This will be the id + version check
                         while bytes(cursor.key()).startswith(prefix):
-                            resolved_idx = cursor.key()
+                            resolved_idx = cursor.value()
                             break
 
                     if not resolved_idx:
                         parts.pop()
-                        parts[-1] = ''
+                        parts[-1] = b''
                         prefix = bytes([BinarySerializer.SEPARATOR]).join(parts)
-                        cursor = txn.cursor(db=db_id_idx)
                         if cursor.set_range(prefix): # This will be the id check
                             while bytes(cursor.key()).startswith(prefix):
-                                resolved_idx = cursor.key()
+                                resolved_idx = cursor.value()
                                 break
 
                 if resolved_idx:
-                    unresolved_cursor.delete()
+                    # print("resolved", value)
+                    idx = unresolved_cursor.key()
                     txn.put(idx, resolved_idx, db=db_reference_forward)
                     txn.put(resolved_idx, idx, db=db_reference_inward)
 
+                    # Because cursor.delete() does funky things.
+                    txn.delete(idx, value, db=db_unresolved)
+
+                else:
+                    print("unresolved", value)
+
+                has_item = unresolved_cursor.next()
+
 # _, _, interesting_classes = get_interesting_classes()
 # db = Database(Path("/tmp/test.lmdb"), BinarySerializer(classes=interesting_classes), readonly=False)
+
