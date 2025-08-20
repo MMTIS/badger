@@ -1,5 +1,6 @@
 import logging
 
+import lmdb
 from tqdm import tqdm
 
 from netexio.binaryserializer import only_references
@@ -18,9 +19,17 @@ def main(source_database_file: str):
 
     with (Database(source_database_file, MyPickleSerializer(compression=True), readonly=False) as source_db):
         for database_name, clazz in source_db.list_databases():
-            with source_db.env.begin(buffers=False, write=False) as txn_read:
-                # source_db.env.begin(buffers=False, write=True) as txn_write):
+            with (source_db.env.begin(buffers=False, write=False) as txn_read,
+                source_db.env.begin(buffers=False, write=True) as txn_write):
                 db_idx = source_db.env.open_db(b"_id_idx", txn=txn_read)
+                db_referencing: lmdb._Database = source_db.env.open_db(b"_referencing", create=True, dupsort=True, txn=txn_write)
+                db_referencing_inwards: lmdb._Database = source_db.env.open_db(b"_referencing_inwards", create=True, dupsort=True, txn=txn_write)
+
+                txn_write.drop(db=db_referencing)
+                txn_write.drop(db=db_referencing_inwards)
+
+                db_referencing: lmdb._Database = source_db.env.open_db(b"_referencing", create=True, dupsort=True, txn=txn_write)
+                db_referencing_inwards: lmdb._Database = source_db.env.open_db(b"_referencing_inwards", create=True, dupsort=True, txn=txn_write)
 
                 db = source_db.env.open_db(get_object_name(clazz).encode('utf-8'), txn=txn_read)
                 if not db:
@@ -46,12 +55,12 @@ def main(source_database_file: str):
                             key = source_db.serializer.encode_key(obj_id, obj_version, clazz, include_clazz=True)
 
                             value = cursor_idx.get(key)
-                            """
+
                             if not value:
                                 key_prefix = source_db.serializer.encode_key(obj_id, obj_version, clazz, False)
-                                if cursor.set_range(key_prefix):
-                                    while bytes(cursor.key()).startswith(key_prefix):
-                                        value = cursor.value()
+                                if cursor_idx.set_range(key_prefix):
+                                    while bytes(cursor_idx.key()).startswith(key_prefix):
+                                        value = cursor_idx.value()
                                         break
 
                                 if value:
@@ -60,12 +69,12 @@ def main(source_database_file: str):
                                     # update the xml here too
 
                             if value:
-                                pass
-                                # txn_write.put(idx, value, db=source_db.db_referencing)
-                                # txn_write.put(value, idx, db=source_db.db_referencing_inwards)
-                            """
-                        pbar.update(1)
+                                # pass
+                                txn_write.put(idx, value, db=db_referencing)
+                                txn_write.put(value, idx, db=db_referencing_inwards)
 
+                        pbar.update(1)
+                        """
                         # id = source_db.serializer.encode_key(obj.id, obj.version if hasattr(obj, 'version') else None, clazz)
                         # buffer.append(id)
                         # txn_write.put(id, obj_idx.to_bytes(4, 'little'))
@@ -96,7 +105,7 @@ def main(source_database_file: str):
             #            else:
             #                all_ids[ref] = clazz
 
-    """
+    
     with (Database(source_database_file, MyPickleSerializer(compression=True), readonly=False) as source_db):
         # Group by key
         for key, needles in missing_references.items():

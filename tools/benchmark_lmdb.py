@@ -3,6 +3,7 @@ import time
 from tqdm import tqdm
 from pathlib import Path
 
+import netex
 import netexio.binaryserializer
 from netexio.pickleserializer import MyPickleSerializer
 
@@ -24,7 +25,7 @@ def benchmark_lmdb(path: str) -> None:
     obj_idx = 0
 
     db_idx = env.open_db(b'_db_idx')
-    """
+
     db_names: list[tuple[bytes, type]] = []
     with env.begin() as txn_db:
         for db_name, _ in txn_db.cursor():
@@ -55,16 +56,20 @@ def benchmark_lmdb(path: str) -> None:
                 ) as pbar,
             ):
                 if db_name[0] == ord('_'):
-                    for _, value in cursor:
-                        netexio.binaryserializer.deserialize_relation(value) # deserialiseer
-                        pbar.update(1)
+                    for key, value in cursor:
+                        # netexio.binaryserializer.deserialize_relation(value) # deserialiseer
+                        # pbar.update(1)
+                        print(key)
                 else:
-                    for _, value in cursor:
-                        obj = serializer.unmarshall(value, clazz)
-                        id = serializer.encode_key(obj.id, obj.version if hasattr(obj, 'version') else None, clazz)
+                    for key, value in cursor:
+                        # obj = serializer.unmarshall(value, clazz)
+                        # id = serializer.encode_key(obj.id, obj.version if hasattr(obj, 'version') else None, clazz)
                         # buffer.append(id)
-                        txn_write.put(id, obj_idx.to_bytes(4, 'little'))
-                        obj_idx += 1
+                        # txn_write.put(id, obj_idx.to_bytes(4, 'little'))
+                        # obj_idx += 1
+                        # if db_name == b'db_idx':
+                        #    print(key, netex.__all__[int.from_bytes(key.split(b'-')[-1], 'little')])
+                        #else:
                         pbar.update(1)
 
             elapsed = time.perf_counter() - start_time
@@ -73,7 +78,7 @@ def benchmark_lmdb(path: str) -> None:
             if db_name[0] != ord('_'):
                 total_entries += entries
                 total_elapsed += elapsed
-    """
+
 
     with env.begin() as txn:
         stat = txn.stat(db_idx)
@@ -81,18 +86,18 @@ def benchmark_lmdb(path: str) -> None:
 
         start_time = time.perf_counter()
 
-        with (
-            txn.cursor(db_idx) as cursor,
-            tqdm(
-                total=entries,
-                desc="db_idx",
-                bar_format="{desc:<25} {bar} {n_fmt:>6}/{total_fmt:<6} [{elapsed}<{remaining}]",
-                unit="entry",
-            ) as pbar,
-        ):
-            for _, value in cursor:
+        with txn.cursor(db_idx) as cursor:
+            # tqdm(
+            #    total=entries,
+            #    desc="db_idx",
+            #    bar_format="{desc:<25} {bar} {n_fmt:>6}/{total_fmt:<6} [{elapsed}<{remaining}]",
+            #    unit="entry",
+            #) as pbar,
+        # :
+            for key, value in cursor:
                 value = int.from_bytes(value, 'little')
-                pbar.update(1)
+                print(key.decode('utf-8'))
+                #pbar.update(1)
 
 
 

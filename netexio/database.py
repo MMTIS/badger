@@ -15,7 +15,7 @@ from enum import IntEnum
 from netex import (
     EntityStructure,
     EntityInVersionStructure,
-    VersionOfObjectRefStructure,
+    VersionOfObjectRefStructure, Call, TimetabledPassingTime,
 )
 import utils.netex_monkeypatching  # noqa: F401
 import netexio.binaryserializer
@@ -130,18 +130,19 @@ class Database:
                 self.path,
                 max_dbs=self.max_dbs,
                 map_size=self.initial_size,
-                writemap=True,
+                writemap=False,
                 metasync=False,
                 sync=False,
                 subdir=True,
             )
 
-        # self.db_embedding: lmdb._Database = self.env.open_db(b"_embedding", create=not self.readonly, dupsort=True)
-        # self.db_embedding_inverse: lmdb._Database = self.env.open_db(b"_embedding_inverse", create=not self.readonly, dupsort=True)
-        # self.db_referencing: lmdb._Database = self.env.open_db(b"_referencing", create=not self.readonly, dupsort=True)
-        # self.db_referencing_inwards: lmdb._Database = self.env.open_db(b"_referencing_inwards", create=not self.readonly, dupsort=True)
-        # self.db_metadata: lmdb._Database = self.env.open_db(b"_metadata", create=not self.readonly)
-        # self.db_idx: lmdb._Database = self.env.open_db(b"_id_idx", create=not self.readonly)
+        # TODO: From LMDB perspecive this is wrong, the env.open_db must be called within the same transaction.
+        self.db_embedding: lmdb._Database = self.env.open_db(b"_embedding", create=not self.readonly, dupsort=True)
+        self.db_embedding_inverse: lmdb._Database = self.env.open_db(b"_embedding_inverse", create=not self.readonly, dupsort=True)
+        self.db_referencing: lmdb._Database = self.env.open_db(b"_referencing", create=not self.readonly, dupsort=True)
+        self.db_referencing_inwards: lmdb._Database = self.env.open_db(b"_referencing_inwards", create=not self.readonly, dupsort=True)
+        self.db_metadata: lmdb._Database = self.env.open_db(b"_metadata", create=not self.readonly)
+        self.db_id_idx: lmdb._Database = self.env.open_db(b"_id_idx", create=not self.readonly)
 
         return self
 
@@ -282,22 +283,25 @@ class Database:
         while True:
             try:
                 with self.env.begin(write=True) as txn:
+                    dbs = {}
                     # Process drops
                     # start = time.perf_counter()
-                    for db_handle1 in drop_task:
-                        txn.drop(db=db_handle1, delete=True)
+                    for klass in drop_task:
+                        txn.drop(db=self.open_database(txn, klass, readonly=False, dbs=dbs), delete=True)
                     # start = Database.debug_time("drop_task", start)
 
                 with self.env.begin(write=True) as txn:
+                    dbs = {}
                     # Process clears
-                    for db_handle1 in clear_task:
-                        txn.drop(db=db_handle1, delete=False)
+                    for klass in clear_task:
+                        txn.drop(db=self.open_database(txn, klass, readonly=False, dbs=dbs), delete=False)
                     # start = Database.debug_time("clear_task", start)
 
                 with self.env.begin(write=True) as txn:
+                    dbs = {}
                     # Process deletions
-                    for db_handle1, prefix in delete_tasks:
-                        cursor = txn.cursor(db=db_handle1)
+                    for klass, prefix in delete_tasks:
+                        cursor = txn.cursor(db=self.open_database(txn, klass, readonly=False, dbs=dbs))
                         if cursor.set_range(prefix):
                             while bytes(cursor.key()).startswith(prefix):
                                 cursor.delete()
@@ -305,22 +309,23 @@ class Database:
                                     break
                     # start = Database.debug_time("delete_task", start)
 
-                with self.env.begin(write=True) as txn:
-                    for db_handle1, key, value in delete_key_value_task:
-                        txn.delete(key, value, db_handle1)
+                # with self.env.begin(write=True) as txn:
+                #    for klass, key, value in delete_key_value_task:
+                #        txn.delete(key, value, db=self.open_database(txn, klass, readonly=False))
                     # start = Database.debug_time("delete_key_value_task", start)
 
-                    if len(delete_embedding_task) > 15 and False:
-                        self.delete_all_references_and_embeddings_batch(txn, delete_embedding_task)
-                    else:
-                        for global_key, global_value in delete_embedding_task:
-                            self.delete_all_references_and_embeddings(txn, global_key, global_value)
+                #    if len(delete_embedding_task) > 15 and False:
+                #        self.delete_all_references_and_embeddings_batch(txn, delete_embedding_task)
+                #    else:
+                #        for global_key, global_value in delete_embedding_task:
+                #            self.delete_all_references_and_embeddings(txn, global_key, global_value)
                     # start = Database.debug_time("delete_embedding_task", start)
 
                 with self.env.begin(write=True) as txn:
+                    dbs = {}
                     # Process insertions
-                    for db_handle1, key, value in batch:
-                        txn.put(key, value, db=db_handle1)
+                    for klass, key, value in batch:
+                        txn.put(key, value, db=self.open_database(txn, klass, readonly=False, dbs=dbs))
                     # start = Database.debug_time("batch", start)
 
                 break  # Success, exit loop
@@ -342,11 +347,14 @@ class Database:
                 self.writer_thread = threading.Thread(target=self._writer, args=(), daemon=True)
                 self.writer_thread.start()
 
-    def open_database(self, txn, klass: type[Tid], delete: bool = False, readonly: bool = False) -> lmdb._Database | None:
+    def open_database(self, txn, klass: type[Tid], delete: bool = False, readonly: bool = False, dbs: dict[str, lmdb._Database] = {}) -> lmdb._Database | None:
+        if isinstance(klass, bytes):
+            return self.env.open_db(klass, create=True, txn=txn)
+
         name: str = get_object_name(klass)
 
-        if name in self.dbs:
-            return self.dbs[name]
+        if name in dbs:
+            return dbs[name]
         else:
             name_bytes = name.encode("utf-8")
             try:
@@ -364,7 +372,7 @@ class Database:
                 print(f"Unexpected error: {ex}")
                 raise
 
-            self.dbs[name] = db
+            dbs[name] = db
             if delete:
                 del self.dbs[name]
             return db
@@ -520,10 +528,10 @@ class Database:
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
 
-        for id, version, obj in objects:
-            key = self.serializer.encode_key(id, version, obj.__class__, include_clazz=True)
-            value = self.serializer.marshall(obj, obj.__class__)
-            self.task_queue.put((LmdbActions.WRITE, self.db_metadata, key, value))
+        # for id, version, obj in objects:
+        #     key = self.serializer.encode_key(id, version, obj.__class__, include_clazz=True)
+        #     value = self.serializer.marshall(obj, obj.__class__)
+        #     self.task_queue.put((LmdbActions.WRITE, self.db_metadata, key, value))
 
     def get_metadata(self, id: str | None, version: str | None, klass: type[T]) -> Generator[T, None, None]:
         prefix = self.serializer.encode_key(id, version, klass, include_clazz=True)
@@ -542,19 +550,16 @@ class Database:
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
 
-        self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
+        # self.task_queue.put((LmdbActions.DELETE_KEY_VALUE, db, key, value))
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False, delete_embedding=False, update_embedding=False) -> None:
         """Places objects in the shared queue for writing, starting writer if needed."""
-        db_handle = self.open_database(klass)
-        if db_handle is None:
-            return
 
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
 
         if empty:
-            self.task_queue.put((LmdbActions.CLEAR, db_handle, None, None))
+            self.task_queue.put((LmdbActions.CLEAR, klass, None, None))
 
         for obj in objects:
             assert obj.id is not None, "Object must have an id"
@@ -565,15 +570,15 @@ class Database:
             # print(obj.id)
 
             idx = self.last_entry.to_bytes(4, 'little')
-            self.task_queue.put((LmdbActions.WRITE, self.db_idx, key, idx))
-            self.task_queue.put((LmdbActions.WRITE, db_handle, idx, value))
+            self.task_queue.put((LmdbActions.WRITE, b'_id_idx', key, idx))
+            self.task_queue.put((LmdbActions.WRITE, klass, idx, value))
             self.last_entry += 1
 
-            for embedding_key in netexio.binaryserializer.only_embedding(self.serializer, obj):
-                embedded_idx = self.last_entry.to_bytes(4, 'little')
-                self.task_queue.put((LmdbActions.WRITE, self.db_idx, embedding_key, idx))
+            # for embedding_key in netexio.binaryserializer.only_embedding(self.serializer, obj, {Call, TimetabledPassingTime}):
+            #    embedded_idx = self.last_entry.to_bytes(4, 'little')
+            #    self.task_queue.put((LmdbActions.WRITE, b'_id_idx', embedding_key, idx))
                 # self.task_queue.put((LmdbActions.WRITE, self.db_embedding, embedded_idx, idx))
-                self.last_entry += 1
+            #    self.last_entry += 1
 
             # TODO: Debug the embedded generation
             if update_embedding or delete_embedding:
@@ -613,12 +618,7 @@ class Database:
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
 
-        for klass in classes:
-            db_handle = self.open_database(klass)
-            if db_handle is None:
-                return
-
-            self.task_queue.put((LmdbActions.CLEAR, db_handle, None, None))
+        self.task_queue.put((LmdbActions.CLEAR, klass, None, None))
 
     def delete_all_references_and_embeddings(self, txn: lmdb.Transaction, key: str, value: bytes) -> None:
         # Wat zou het kosten als we het huidige object deserialiseren, vervolgens de embedding berekenen, en in plaats van wegschrijven die keys verwijderen?
@@ -689,11 +689,7 @@ class Database:
         assert self.task_queue is not None, "Task queue must not be none"
 
         for klass in classes:
-            db_handle = self.open_database(klass, delete=True)
-            if db_handle is None:
-                return
-
-            self.task_queue.put((LmdbActions.DROP, db_handle, None, None))
+            self.task_queue.put((LmdbActions.DROP, klass, None, None))
 
         if embedding:
             self.task_queue.put((LmdbActions.CLEAR, self.db_embedding, None, None))
@@ -706,14 +702,10 @@ class Database:
         if self.readonly:
             return
 
-        db_handle = self.open_database(klass)
-        if db_handle is None:
-            return
-
         self._start_writer_if_needed()
         assert self.task_queue is not None, "Task queue must not be none"
 
-        self.task_queue.put((LmdbActions.DELETE_PREFIX, db_handle, prefix, None))
+        self.task_queue.put((LmdbActions.DELETE_PREFIX, klass, prefix, None))
 
     def block_until_done(self) -> None:
         if self.readonly:

@@ -216,12 +216,12 @@ def navigate_object(obj: Any, path_indices: Tuple[int, ...]) -> Any:
             raise TypeError(f"Cannot navigate into object of type {type(obj)}")
     return obj
 
-def only_embedding(serializer: Serializer, deserialized: Tid) -> Generator[bytes, None, None]:
+def only_embedding(serializer: Serializer, deserialized: Tid, ignore: set[Tid]=set([])) -> Generator[bytes, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
-            if obj.__class__ in serializer.interesting_classes:
+            if obj.__class__ not in ignore and obj.__class__ in serializer.interesting_classes:
                 assert obj.id is not None, "Object.id must not be none"
                 yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
 
