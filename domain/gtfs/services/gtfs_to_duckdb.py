@@ -24,7 +24,7 @@ from domain.gtfs.model.tables import (
     frequencies_txt,
     pathways_txt,
 )
-from domain.gtfs.services.inference import create_feed_info, handle_single_agency, update_empty_enumerations
+from domain.gtfs.services.gtfs_inference import create_feed_info, handle_single_agency, update_empty_enumerations
 from utils.aux_logging import log_all
 
 
@@ -107,7 +107,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
 
 
 def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
-    con: duckdb.DuckDBPyConnection = duckdb.connect(database=database_file.resolve())
+    con: duckdb.DuckDBPyConnection = duckdb.connect(database=database_file)
 
     zf = zipfile.ZipFile(zip_file.resolve())
 
