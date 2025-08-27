@@ -4,7 +4,28 @@ from domain.netex import model as netex
 from domain.netex.services.model_typing import Tid
 from storage.interface import Serializer
 
+
 # from dataclasses import fields
+
+def _all_subclasses(cls: type[Any]) -> set[type[Any]]:
+    seen = set()
+    stack = [cls]
+    while stack:
+        c = stack.pop()
+        for s in c.__subclasses__():
+            if s not in seen:
+                seen.add(s)
+                stack.append(s)
+    return seen
+
+
+netex.set_ref_types = frozenset(  # type: ignore
+    {netex.VersionOfObjectRef, netex.VersionOfObjectRefStructure}
+    | _all_subclasses(netex.VersionOfObjectRef)
+    | _all_subclasses(netex.VersionOfObjectRefStructure)
+)
+
+netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
 
 
 @lru_cache(maxsize=None)
@@ -44,8 +65,10 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
                         mydepth[-1] = j
                         if x is not None:
                             if x.__class__ in netex.set_ref_types:  # type: ignore
-                                yield x, tuple(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
-                            elif hasattr(x, "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
+                                yield x, tuple(
+                                    mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
+                            elif hasattr(x,
+                                         "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
                                 if hasattr(x, "id"):
                                     yield x, tuple(mydepth)
                                 yield from recursive_attributes(x, mydepth)
@@ -59,6 +82,10 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
+            if obj.version_ref is not None and obj.version is None:
+                # Don't include external references
+                continue
+
             if obj.name_of_ref_class is None:
                 # Hack, because NeTEx does not define the default name of ref class yet
                 if obj.__class__.__name__.endswith("RefStructure"):

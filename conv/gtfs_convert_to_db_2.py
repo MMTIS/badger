@@ -1,16 +1,21 @@
 import logging
 from pathlib import Path
-import domain.netex.model
+from typing import cast
+
 from domain.gtfs.services.duckdb_to_storage import to_storage
 from storage.lmdb.core.implementation import LmdbStorage
+from storage.lmdb.core.references import resolve
 from storage.lmdb.serialization.byteserializer import ByteSerializer
 from utils.aux_logging import prepare_logger, log_all
-from domain.netex.services import monkey_patching  # noqa: F401
+from domain.netex.services.utils import get_boring_classes
 
 
 def main(database_gtfs: Path, database_netex: Path) -> None:
-    with LmdbStorage(database_netex, ByteSerializer(domain.netex.model.interesting_members), readonly=False) as storage:  # type: ignore
+    interesting_members = get_boring_classes()
+    with LmdbStorage(database_netex, ByteSerializer(interesting_members), readonly=False) as storage:  # type: ignore
         to_storage(database_gtfs, storage)
+        resolve(cast(LmdbStorage, storage))
+
 
 
 if __name__ == '__main__':

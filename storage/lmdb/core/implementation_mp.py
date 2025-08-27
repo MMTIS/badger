@@ -1,4 +1,3 @@
-from itertools import count
 from pathlib import Path
 from types import TracebackType
 from typing import Optional, Type, Literal, Iterable
@@ -8,49 +7,18 @@ import lmdb
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
-from domain.utils import get_object_name
 from storage.interface import Storage, Serializer
-
-DB_CLASS_IDX = b'_class_idx'
-DB_UNRESOLVED = b'_unresolved'
-DB_ID_IDX = b'_id_idx'
-DB_REFERENCE_FORWARD = b'_reference_forward'
-DB_REFERENCE_INWARD = b'_reference_inward'
+from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, \
+    DB_UNRESOLVED
 
 
-class LmdbStorage(Storage):
-    readonly: bool
-    max_dbs: int
-    initial_size: int
+class LmdbStorageMP(LmdbStorage):
     queue: mp.Queue  # type: ignore
     writer: mp.Process
 
     def __init__(self, path: Path, serializer: Serializer, readonly: bool = True):
-        if readonly and not path.exists():
-            raise
-
-        self.path = path
-        self.serializer = serializer
-        self.readonly = readonly
-        self.max_dbs = 128
-        self.initial_size = 4 * 1024**3
-        self.last_entry = count()  # TODO: change to context of DB
+        super().__init__(path, serializer, readonly)
         self.queue = mp.Queue()
-
-    def _populate_class_idx(self) -> None:
-        if self.readonly:
-            raise
-
-        with self.env.begin(write=True) as txn:
-            db_class_idx = self.env.open_db(key=DB_CLASS_IDX, txn=txn, create=True, integerkey=False)
-            for idx, clazz in enumerate(self.serializer.name_object.values()):
-                clazz_name = get_object_name(clazz)
-                txn.put(idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'), db=db_class_idx)
-
-            self.env.open_db(DB_UNRESOLVED, txn=txn, create=True, integerkey=True, dupsort=True, integerdup=True)
-            self.env.open_db(DB_ID_IDX, txn=txn, create=True)
-            self.env.open_db(DB_REFERENCE_FORWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
-            self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
 
     def __enter__(self) -> Storage:
         new_database = not self.path.exists()
@@ -110,7 +78,7 @@ class LmdbStorage(Storage):
                     if resolved_idx:
                         self.queue.put(
                             (
-                                DB_REFERENCE_FORWARD,
+                                DB_REFERENCE_OUTWARD,
                                 full_key,
                                 resolved_idx,
                             )
