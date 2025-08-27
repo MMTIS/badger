@@ -5,7 +5,7 @@ from pathlib import Path
 
 import netex
 import netexio.binaryserializer
-from netexio.pickleserializer import MyPickleSerializer
+# from netexio.pickleserializer import MyPickleSerializer
 
 
 def benchmark_lmdb(path: str) -> None:

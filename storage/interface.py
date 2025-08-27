@@ -7,6 +7,9 @@ from domain.netex.services.model_typing import Tid
 
 class Storage:
     @abstractmethod
+    def clean(self) -> None: ...
+
+    @abstractmethod
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None: ...
 
     @abstractmethod

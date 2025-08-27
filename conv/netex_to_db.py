@@ -1,10 +1,13 @@
-import logging
+from pathlib import Path
 
-from netexio.database import Database
-from netexio.dbaccess import setup_database, open_netex_file, insert_database
-from netexio.pickleserializer import MyPickleSerializer
-from utils.utils import get_interesting_classes
+from domain.netex.services.utils import get_boring_classes
+from storage.lmdb.core.implementation import LmdbStorage
+from storage.lmdb.core.references import resolve
+from storage.lmdb.serialization.byteserializer import ByteSerializer
+from storage.lxml.core.implementation import XmlStorage
+from storage.lxml.core.insert import insert_database, get_interesting_classes
 from utils.aux_logging import *
+
 
 def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
     # if filenames is not a list of str  => error
@@ -13,22 +16,21 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
         log_flush()
         exit(1)
 
-    with Database(database, MyPickleSerializer(compression=True), readonly=False,
-                  logger=logging.getLogger("script_runner")) as db:
-        classes = get_interesting_classes()
-
+    interesting_members = get_boring_classes()
+    with LmdbStorage(Path(database), ByteSerializer(interesting_members), readonly=False) as storage:
+        """
         if clean_database:
             print("Is cleaned!")
-            setup_database(db, classes, clean_database)
+            storage.clean()
+        """
 
+        interesting_classes = get_interesting_classes()
         for filename in filenames:
-            for sub_file, real_filename in open_netex_file(filename):
-                insert_database(db, classes, sub_file)
+            xml_storage = XmlStorage(Path(filename))
+            for sub_file, real_filename in xml_storage.open_netex_file():
+                insert_database(xml_storage, storage, interesting_classes, sub_file)
 
-        db.block_until_done()
-
-        # check_referencing(db)
-
+        resolve(storage)
 
 if __name__ == '__main__':
     import argparse

@@ -13,8 +13,14 @@ from xsdata.formats.dataclass.serializers import XmlSerializer
 from xsdata.formats.dataclass.serializers.config import SerializerConfig
 from xsdata.models.datatype import XmlDateTime, XmlTime, XmlDate, XmlDuration
 
+from domain.gtfs.services.duckdb_to_storage import to_storage
+from domain.gtfs.transform.transporttype import gtfsRouteTypeToNeTEx
+from storage.lmdb.core.implementation import LmdbStorage
+from storage.lmdb.serialization.byteserializer import ByteSerializer
 from transformers.callsprofile import CallsProfile
-from netexio.byteserializer import Database, BinarySerializer
+
+
+
 from pathlib import Path
 from netex import (
     Codespace,
@@ -175,21 +181,9 @@ def gtfs_date(d: str) -> datetime.datetime:
     return datetime.datetime(year=int(str(d)[0:4]), month=int(str(d)[4:6]), day=int(str(d)[6:8]))
 
 
-def date_to_xmldatetime(d: datetime.date) -> XmlDateTime:
-    x = datetime.datetime.combine(d, datetime.datetime.min.time())
-    return XmlDateTime.from_datetime(x)
-
-
-def date_to_xmldate(d: datetime.date) -> XmlDate:
-    return XmlDate.from_date(d)
 
 
 class GtfsNeTexProfile(CallsProfile):
-    @staticmethod
-    def getShortName(name: str) -> str:
-        if len(name) > 8:
-            return ''.join([x[0].upper() for x in name.split(' ')])
-        return name
 
     def getCodespaceAndDataSource(self) -> tuple[Codespace, DataSource, Version, VersionFrameDefaultsStructure]:
         feed_info_sql = """select * from feed_info limit 1;"""
@@ -262,70 +256,6 @@ class GtfsNeTexProfile(CallsProfile):
         # resource_frame.vehicles = VehiclesInFrameRelStructure(train_element_or_vehicle=getVehicles(codespace))
         return resource_frame
 
-    def get_agency_id(self, agency_id: str) -> str:
-        if ':Operator:' in agency_id:
-            return agency_id
-        else:
-            return getId(Operator, self.codespace, agency_id)
-
-    def getOperators(self, agency_sql: dict[str, str] = {'query': """select * from agency;"""}) -> list[Operator]:
-        results = []
-
-        with self.conn.cursor() as cur:
-            cur.execute(**agency_sql)
-            df = cur.df()
-
-            agency_ids = df.get('agency_id')
-            agency_names = df.get('agency_name')
-            agency_timezones = df.get('agency_timezone')
-            agency_langs = df.get('agency_lang')
-            agency_phones = df.get('agency_phone')
-            agency_urls = df.get('agency_url')
-            agency_emails = df.get('agency_email')
-
-            for i in range(0, len(agency_ids)):
-                language: str | None = get_or_none(agency_langs, i)
-                if language:
-                    languages = LocaleStructure.Languages(
-                        language_usage=[LanguageUsageStructure(language=language, language_use=[LanguageUseEnumeration.NORMALLY_USED])]
-                    )
-                else:
-                    languages = None
-
-                operator = Operator(
-                    id=self.get_agency_id(agency_ids[i]),
-                    private_codes=PrivateCodes(private_code=[PrivateCode(value=agency_ids[i], type_value="agency_id")]),
-                    version=self.version.version,
-                    name=MultilingualString(value=agency_names[i]),
-                    locale=Locale(time_zone=agency_timezones[i], languages=languages),
-                    customer_service_contact_details=ContactStructure(
-                        url=agency_urls[i], phone=get_or_none(agency_phones, i), email=get_or_none(agency_emails, i)
-                    ),
-                )
-                results.append(operator)
-
-        return results
-
-    @staticmethod
-    def gtfsRouteTypeToNeTEx(route_type: int | None) -> AllVehicleModesOfTransportEnumeration | None:
-        if route_type == 0:
-            return AllVehicleModesOfTransportEnumeration.TRAM
-        elif route_type == 1:
-            return AllVehicleModesOfTransportEnumeration.METRO
-        elif route_type == 2:
-            return AllVehicleModesOfTransportEnumeration.RAIL
-        elif route_type == 3:
-            return AllVehicleModesOfTransportEnumeration.BUS
-        elif route_type == 4:
-            return AllVehicleModesOfTransportEnumeration.WATER
-        elif route_type == 5 or route_type == 7:
-            return AllVehicleModesOfTransportEnumeration.FUNICULAR
-        elif route_type == 6:
-            return AllVehicleModesOfTransportEnumeration.CABLEWAY
-        elif route_type == 11:
-            return AllVehicleModesOfTransportEnumeration.TROLLEY_BUS
-
-        return None
 
     def getOperationalContexts(self) -> list[OperationalContext]:
         operational_contexts = []
@@ -340,445 +270,18 @@ class GtfsNeTexProfile(CallsProfile):
                 operational_context = OperationalContext(
                     id=getId(OperationalContext, self.codespace, df['route_type'][i]),
                     version=self.version.version,
-                    vehicle_mode=self.gtfsRouteTypeToNeTEx(df['route_type'][i]),
+                    vehicle_mode=gtfsRouteTypeToNeTEx(df['route_type'][i]),
                 )
                 operational_contexts.append(operational_context)
 
         return operational_contexts
 
-    def get_route_id(self, route_id: str) -> str:
-        if ':Line:' in route_id:
-            return route_id
-        else:
-            return getId(Line, self.codespace, route_id)
 
-    def getLines(self) -> list[Line]:
-        lines = []
 
-        lines_sql = """select routes.* from routes;"""
 
-        with self.conn.cursor() as cur:
-            cur.execute(lines_sql)
-            df = cur.df()
 
-            route_ids = df.get('route_id')
-            route_text_colors = df.get('route_text_color')
-            route_colors = df.get('route_color')
-            route_long_names = df.get('route_long_name')
-            route_short_names = df.get('route_short_name')
-            route_descs = df.get('route_desc')
-            route_types = df.get('route_type')
-            route_urls = df.get('route_url')
-            agency_ids = df.get('agency_id')
-
-            for i in range(0, len(route_ids)):
-                presentation = None
-                if get_or_none(route_colors, i) is not None or get_or_none(route_text_colors, i) is not None:
-                    presentation = PresentationStructure(
-                        colour=get_or_none(route_colors, i), text_colour=get_or_none(route_text_colors, i), background_colour=get_or_none(route_colors, i)
-                    )
-
-                agency_id = get_or_none(agency_ids, i)
-                operator_ref = None
-                if agency_id is not None:
-                    operator_ref = getFakeRef(self.get_agency_id(agency_id), OperatorRef, self.version.version)
-
-                line = Line(
-                    id=self.get_route_id(route_ids[i]),
-                    version=self.version.version,
-                    name=getRequiredString(route_long_names[i], route_short_names[i]),
-                    short_name=getOptionalString(get_or_none(route_short_names, i)),
-                    description=getOptionalString(get_or_none(route_descs, i)),
-                    transport_mode=self.gtfsRouteTypeToNeTEx(get_or_none(route_types, i)),
-                    presentation=presentation,
-                    url=get_or_none(route_urls, i),
-                    operator_ref=operator_ref,
-                    public_code=PublicCodeStructure(value=route_short_names[i]) if route_short_names[i] is not None else None,
-                    private_codes=PrivateCodes(private_code=[PrivateCode(value=route_ids[i], type_value="route_id")]),
-                )
-                lines.append(line)
-
-        return lines
-
-    def get_stop_id_sa(self, stop_id: str) -> str:
-        if ':StopArea:' in stop_id:
-            return stop_id
-        elif ':StopPlace:' in stop_id:
-            return stop_id.replace(':StopPlace:', ':StopArea:')
-        else:
-            return getId(StopArea, self.codespace, stop_id)
-
-    def getStopAreas(
-        self, stop_area_sql: dict[str, str] = {'query': """select distinct * from stops where location_type = 1 order by stop_id;"""}
-    ) -> list[StopArea]:
-        stop_areas = []
-
-        with self.conn.cursor() as cur:
-            cur.execute(**stop_area_sql)
-            df = cur.df()
-
-            stop_ids = df.get('stop_id')
-            stop_names = df.get('stop_name')
-            stop_lats = df.get('stop_lat')
-            stop_lons = df.get('stop_lon')
-            stop_codes = df.get('stop_code')
-            stop_descs = df.get('stop_desc')
-            # zone_ids = df.get('zone_id')
-            # stop_urls = df.get('stop_url')
-            # location_types = df.get('location_type')
-            # parent_stations = df.get('parent_station')
-            # wheelchair_boardings = df.get('wheelchair_boarding')
-            # stop_timezones = df.get('stop_timezone')
-            # platform_codes = df.get('platform_code')
-
-            for i in range(0, len(stop_ids)):
-                description = getOptionalString(get_or_none(stop_descs, i))
-
-                stop_area = StopArea(
-                    id=self.get_stop_id_sa(stop_ids[i]),
-                    version=self.version.version,
-                    name=MultilingualString(value=stop_names[i]),
-                    public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[i] is not None else None,
-                    description=[description] if description is not None else [],  # TODO: list insanity for description
-                    private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
-                    centroid=SimplePointVersionStructure(
-                        location=LocationStructure2(
-                            latitude=Decimal(str(stop_lats[i])), longitude=Decimal(str(stop_lons[i])), srs_name="urn:ogc:def:crs:EPSG::4326"
-                        )
-                    ),
-                )
-                stop_areas.append(stop_area)
-
-        return stop_areas
-
-    def get_stop_id(self, stop_id: str) -> str:
-        if ':ScheduledStopPoint:' in stop_id:
-            return stop_id
-        elif ':Quay:' in stop_id:
-            return stop_id.replace(':Quay:', ':ScheduledStopPoint:')
-        else:
-            return getId(ScheduledStopPoint, self.codespace, stop_id)
-
-    def getScheduledStopPoints(
-        self,
-        stop_areas_input: Iterable[StopArea],
-        scheduled_stop_points_sql: dict[str, str] = {
-            'query': """select distinct * from stops where location_type = 0 or location_type is null order by stop_id;"""
-        },
-    ) -> list[ScheduledStopPoint]:
-        stop_areas: dict[object, StopArea] = getIndex(stop_areas_input)
-
-        scheduled_stop_points: list[ScheduledStopPoint] = []
-        # passenger_stop_assignments: list[PassengerStopAssignment] = []
-
-        with self.conn.cursor() as cur:
-            cur.execute(**scheduled_stop_points_sql)
-            df = cur.df()
-
-            stop_ids = df.get('stop_id')
-            stop_names = df.get('stop_name')
-            stop_lats = df.get('stop_lat')
-            stop_lons = df.get('stop_lon')
-            stop_codes = df.get('stop_code')
-            stop_descs = df.get('stop_desc')
-            # zone_ids = df.get('zone_id')
-            stop_urls = df.get('stop_url')
-            # location_types = df.get('location_type')
-            parent_stations = df.get('parent_station')
-            # wheelchair_boardings = df.get('wheelchair_boarding')
-            # stop_timezones = df.get('stop_timezone')
-            platform_codes = df.get('platform_code')
-
-            for i in range(0, len(stop_ids)):
-                short_stop_code = None
-                platform_code = get_or_none(platform_codes, i)
-                if platform_code is not None:
-                    short_stop_code = PrivateCodeStructure(value=platform_code, type_value='platform_code')
-
-                location = LocationStructure2(
-                    longitude=Decimal(str(stop_lons[i])) if stop_lons[i] is not None else None,
-                    latitude=Decimal(str(stop_lats[i])) if stop_lats[i] is not None else None,
-                    srs_name="urn:ogc:def:crs:EPSG::4326",
-                )
-
-                my_stop_areas = None
-                parent_station = get_or_none(parent_stations, i)
-                if parent_station is not None:
-                    stop_area_ref = getId(StopArea, self.codespace, parent_station)
-                    if stop_area_ref not in stop_areas:
-                        # TODO: Implement the logger here too
-                        print(f"Parent {parent_station} not found, faking it.")
-                        my_stop_areas = StopAreaRefsRelStructure(stop_area_ref=[getFakeRef(stop_area_ref, StopAreaRefStructure, self.version.version)])
-                    else:
-                        my_stop_areas = StopAreaRefsRelStructure(
-                            stop_area_ref=[cast(StopAreaRefStructure, getRef(stop_areas[stop_area_ref], StopAreaRefStructure))]
-                        )
-
-                scheduled_stop_point = ScheduledStopPoint(
-                    id=self.get_stop_id(stop_ids[i]),
-                    version=self.version.version,
-                    name=MultilingualString(value=stop_names[i]),
-                    description=getOptionalString(get_or_none(stop_descs, i)),
-                    private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
-                    short_stop_code=short_stop_code,
-                    public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[i] is not None else None,
-                    url=get_or_none(stop_urls, i),
-                    location=location,
-                    stop_areas=my_stop_areas,
-                )
-                scheduled_stop_points.append(scheduled_stop_point)
-
-                """
-                stop_place_ref = None
-                if row['stopplacecoderef'] is not None:
-                    stop_place_ref = getFakeRef(row['stopplacecoderef'], StopPlaceRef, "any")
-
-                quay_ref = None
-                if row['quaycoderef'] is not None:
-                    quay_ref = getFakeRef(row['quaycoderef'], QuayRef, "any")
-
-                if stop_place_ref is not None or quay_ref is not None:
-                    passenger_stop_assignment = PassengerStopAssignment(
-                        scheduled_stop_point_ref=getRef(scheduled_stop_point, ScheduledStopPointRef),
-                        stop_place_ref=stop_place_ref,
-                        quay_ref=quay_ref, order=1)
-                    setIdVersion(passenger_stop_assignment, codespace, row['id'], version)
-                    passenger_stop_assignments.append(passenger_stop_assignment)
-                """
-
-        return scheduled_stop_points
 
     # TODO: implement
-    def getStopPlaces(
-        self, stop_places_sql: dict[str, str] = {'query': """select distinct * from stops order by coalesce(parent_station, '') asc, stop_id;"""}
-    ) -> tuple[list[StopPlace], list[PassengerStopAssignment]]:
-        stop_places = {}
-        passenger_stop_assignments = []
-        with self.conn.cursor() as cur:
-            cur.execute(**stop_places_sql)
-            df = cur.df()
-
-            stop_ids = df.get('stop_id')
-            stop_names = df.get('stop_name')
-            stop_lats = df.get('stop_lat')
-            stop_lons = df.get('stop_lon')
-            stop_codes = df.get('stop_code')
-            stop_descs = df.get('stop_desc')
-            zone_ids = df.get('zone_id')
-            stop_urls = df.get('stop_url')
-            location_types = df.get('location_type')
-            parent_stations = df.get('parent_station')
-            wheelchair_boardings = df.get('wheelchair_boarding')
-            stop_timezones = df.get('stop_timezone')
-            # platform_codes = df.get('platform_code')
-            level_ids = df.get('level_id')
-
-            for i in range(0, len(stop_ids)):
-                # Every stop that does not have a parent_station, will become a StopPlace
-                if parent_stations[i] is None:
-                    description = getOptionalString(stop_descs[i])
-
-                    stop_place = StopPlace(
-                        id=getId(StopPlace, self.codespace, stop_ids[i]),
-                        version=self.version.version,
-                        name=MultilingualString(value=stop_names[i]),
-                        public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[i] is not None else None,
-                        description=[description] if description else [],  # TODO: description list crazyness
-                        private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]) if location_types[i] == 1 else None,
-                        locale=Locale(time_zone=stop_timezones[i]) if stop_timezones[i] is not None else None,
-                        parent_zone_ref=ZoneRefStructure(ref=zone_ids[i], version_ref="EXTERNAL") if zone_ids[i] is not None else None,
-                        accessibility_assessment=(
-                            AccessibilityAssessment(
-                                id=getId(AccessibilityAssessment, self.codespace, 'StopPlace_' + stop_ids[i]),
-                                version=self.version.version,
-                                mobility_impaired_access=self.wheelchairToNeTEx(wheelchair_boardings[i]),
-                            )
-                            if not isinstance(wheelchair_boardings[i], NAType)
-                            else None
-                        ),
-                        info_links=(
-                            InfoLinksRelStructure(info_link=[InfoLink(type_of_info_link=[TypeOfInfoLinkEnumeration.RESOURCE], value=stop_urls[i])])
-                            if stop_urls[i] is not None
-                            else None
-                        ),
-                        centroid=SimplePointVersionStructure(
-                            location=LocationStructure2(
-                                latitude=Decimal(str(stop_lats[i])), longitude=Decimal(str(stop_lons[i])), srs_name="urn:ogc:def:crs:EPSG::4326"
-                            )
-                        ),
-                    )
-                    stop_places[stop_place.id] = stop_place
-                else:
-                    stop_place_id = getId(StopPlace, self.codespace, parent_stations[i])
-                    if stop_place_id in stop_places:
-                        stop_place = stop_places[getId(StopPlace, self.codespace, parent_stations[i])]
-                    else:
-                        description = getOptionalString(stop_descs[i])
-
-                        # Last resort, fake an instance if it does not exist.
-                        stop_place = StopPlace(
-                            id=stop_place_id,
-                            version=self.version.version,
-                            name=MultilingualString(value=stop_names[i]),
-                            public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[i] is not None else None,
-                            description=[description] if description else [],  # TODO: description list crazyness
-                            private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]) if location_types[i] == 1 else None,
-                            locale=Locale(time_zone=stop_timezones[i]) if stop_timezones[i] is not None else None,
-                            parent_zone_ref=ZoneRefStructure(ref=zone_ids[i], version_ref="EXTERNAL") if zone_ids[i] is not None else None,
-                            accessibility_assessment=(
-                                AccessibilityAssessment(
-                                    id=getId(AccessibilityAssessment, self.codespace, 'StopPlace_' + stop_ids[i]),
-                                    version=self.version.version,
-                                    mobility_impaired_access=self.wheelchairToNeTEx(wheelchair_boardings[i]),
-                                )
-                                if not isinstance(wheelchair_boardings[i], NAType)
-                                else None
-                            ),
-                            info_links=(
-                                InfoLinksRelStructure(info_link=[InfoLink(type_of_info_link=[TypeOfInfoLinkEnumeration.RESOURCE], value=stop_urls[i])])
-                                if stop_urls[i] is not None
-                                else None
-                            ),
-                            centroid=SimplePointVersionStructure(
-                                location=LocationStructure2(
-                                    latitude=Decimal(str(stop_lats[i])), longitude=Decimal(str(stop_lons[i])), srs_name="urn:ogc:def:crs:EPSG::4326"
-                                )
-                            ),
-                        )
-                        stop_places[stop_place_id] = stop_place
-
-                if location_types[i] == 1:
-                    # Nothing to do, we already created the StopPlace
-                    continue
-
-                if location_types[i] != location_types[i] or location_types[i] == 0 or location_types[i] == 4:
-                    # Stop or Platform or BoardingArea, to Quay
-                    if stop_place.quays is None:
-                        stop_place.quays = QuaysRelStructure()
-
-                    description = getOptionalString(stop_descs[i])
-
-                    quay = Quay(
-                        id=getId(Quay, self.codespace, stop_ids[i]),
-                        version=self.version.version,
-                        name=MultilingualString(value=stop_names[i]),
-                        public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[i] is not None else None,
-                        description=[description] if description else [],  # TODO: description list crazyness
-                        private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
-                        parent_zone_ref=ZoneRefStructure(ref=zone_ids[i], version_ref="EXTERNAL") if zone_ids[i] is not None else None,
-                        accessibility_assessment=(
-                            AccessibilityAssessment(
-                                id=getId(AccessibilityAssessment, self.codespace, stop_ids[i]),
-                                version=self.version.version,
-                                mobility_impaired_access=self.wheelchairToNeTEx(wheelchair_boardings[i]),
-                            )
-                            if not isinstance(wheelchair_boardings[i], NAType)
-                            else None
-                        ),
-                        info_links=(
-                            InfoLinksRelStructure(info_link=[InfoLink(type_of_info_link=[TypeOfInfoLinkEnumeration.RESOURCE], value=stop_urls[i])])
-                            if stop_urls[i] is not None
-                            else None
-                        ),
-                        centroid=SimplePointVersionStructure(
-                            location=LocationStructure2(
-                                latitude=Decimal(str(stop_lats[i])), longitude=Decimal(str(stop_lons[i])), srs_name="urn:ogc:def:crs:EPSG::4326"
-                            )
-                        ),
-                        level_ref=LevelRef(ref=level_ids[0], version=self.version.version) if level_ids[i] is not None else None,
-                    )
-
-                    stop_place.quays.taxi_stand_ref_or_quay_ref_or_quay.append(quay)
-
-                    passenger_stop_assignment = PassengerStopAssignment(
-                        id=getId(PassengerStopAssignment, self.codespace, stop_ids[i]),
-                        version=self.version.version,
-                        order=1,
-                        fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point=getFakeRef(
-                            getId(ScheduledStopPoint, self.codespace, stop_ids[i]), ScheduledStopPointRef, self.version.version
-                        ),
-                        taxi_stand_ref_or_quay_ref_or_quay=cast(Union[TaxiStandRef, QuayRef, Quay], getRef(quay)),
-                    )
-                    passenger_stop_assignments.append(passenger_stop_assignment)
-
-                elif location_types[i] == 2:
-                    # Entrance or Exit
-                    if stop_place.entrances is None:
-                        stop_place.entrances = SiteEntrancesRelStructure()
-
-                    description = getOptionalString(stop_descs[i])
-
-                    stop_place_entrance = StopPlaceEntrance(
-                        id=getId(StopPlaceEntrance, self.codespace, stop_ids[i]),
-                        version=self.version.version,
-                        name=MultilingualString(value=stop_names[i]),
-                        public_code=PublicCodeStructure(value=stop_codes[i]) if stop_codes[i] is not None else None,
-                        description=[description] if description else [],  # TODO: description list crazyness
-                        private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
-                        parent_zone_ref=ZoneRefStructure(ref=zone_ids[i], version_ref="EXTERNAL") if zone_ids[i] is not None else None,
-                        accessibility_assessment=(
-                            AccessibilityAssessment(
-                                id=getId(AccessibilityAssessment, self.codespace, stop_ids[i]),
-                                version=self.version.version,
-                                mobility_impaired_access=self.wheelchairToNeTEx(wheelchair_boardings[i]),
-                            )
-                            if not isinstance(wheelchair_boardings[i], NAType)
-                            else None
-                        ),
-                        info_links=(
-                            InfoLinksRelStructure(info_link=[InfoLink(type_of_info_link=[TypeOfInfoLinkEnumeration.RESOURCE], value=stop_urls[i])])
-                            if stop_urls[i] is not None
-                            else None
-                        ),
-                        centroid=SimplePointVersionStructure(
-                            location=LocationStructure2(
-                                latitude=Decimal(str(stop_lats[i])), longitude=Decimal(str(stop_lons[i])), srs_name="urn:ogc:def:crs:EPSG::4326"
-                            )
-                        ),
-                        level_ref=LevelRef(ref=level_ids[0], version=self.version.version) if level_ids[i] is not None else None,
-                    )
-
-                    stop_place.entrances.parking_entrance_ref_or_entrance_ref_or_entrance.append(stop_place_entrance)
-
-                elif location_types[i] == 3:
-                    # Generic Node
-                    if stop_place.access_spaces is None:
-                        stop_place.access_spaces = AccessSpacesRelStructure()
-
-                    description = getOptionalString(stop_descs[i])
-
-                    access_space = AccessSpace(
-                        id=getId(AccessSpace, self.codespace, stop_ids[i]),
-                        version=self.version.version,
-                        name=MultilingualString(value=stop_names[i]),
-                        description=[description] if description else [],  # TODO: description list crazyness
-                        private_codes=PrivateCodes(private_code=[PrivateCode(value=stop_ids[i], type_value="stop_id")]),
-                        parent_zone_ref=ZoneRefStructure(ref=zone_ids[i], version_ref="EXTERNAL") if zone_ids[i] is not None else None,
-                        accessibility_assessment=(
-                            AccessibilityAssessment(
-                                id=getId(AccessibilityAssessment, self.codespace, stop_ids[i]),
-                                version=self.version.version,
-                                mobility_impaired_access=self.wheelchairToNeTEx(wheelchair_boardings[i]),
-                            )
-                            if not isinstance(wheelchair_boardings[i], NAType)
-                            else None
-                        ),
-                        info_links=(
-                            InfoLinksRelStructure(info_link=[InfoLink(type_of_info_link=[TypeOfInfoLinkEnumeration.RESOURCE], value=stop_urls[i])])
-                            if stop_urls[i] is not None
-                            else None
-                        ),
-                        centroid=SimplePointVersionStructure(
-                            location=LocationStructure2(
-                                latitude=Decimal(str(stop_lats[i])), longitude=Decimal(str(stop_lons[i])), srs_name="urn:ogc:def:crs:EPSG::4326"
-                            )
-                        ),
-                        level_ref=LevelRef(ref=level_ids[0], version=self.version.version) if level_ids[i] is not None else None,
-                    )
-
-                    stop_place.access_spaces.access_space_ref_or_access_space.append(access_space)
-
-        return list(stop_places.values()), passenger_stop_assignments
 
     def get_shape_id(self, shape_id: str) -> str:
         if ':Route:' in shape_id:
@@ -1086,13 +589,6 @@ class GtfsNeTexProfile(CallsProfile):
         else:
             return getId(AvailabilityCondition, self.codespace, service_id)
 
-    def get_service_id_dt(self, service_id: str) -> str:
-        if ':DayType:' in service_id:
-            return service_id
-        if ':AvailabilityCondition:' in service_id:
-            return service_id.replace(':AvailabilityCondition:', ':DayType:')
-        else:
-            return getId(DayType, self.codespace, service_id)
 
     def getAvailabilityConditions(
         self,
@@ -1179,107 +675,6 @@ class GtfsNeTexProfile(CallsProfile):
 
         return availability_conditions
 
-    def getDayTypes(
-        self,
-        day_type_sql: dict[str, str] = {'query': """select * from calendar order by service_id;"""},
-        exceptions_sql: dict[str, str] = {'query': """select service_id, exception_type, date from calendar_dates order by date, exception_type;"""},
-    ) -> tuple[list[DayType], list[DayTypeAssignment], list[OperatingPeriod]]:
-        day_types = []
-        day_type_assignments = []
-        operating_periods = []
-        fake_day_type_ids = set([])
-
-        with self.conn.cursor() as cur:
-            cur.execute(**exceptions_sql)
-            exceptions_df = cur.df()
-
-            service_ids = exceptions_df.get('service_id')
-            for i in range(0, len(service_ids)):
-                exception_type = int(exceptions_df['exception_type'][i])
-                if exception_type in (1, 2):
-                    day_type_id = getFakeRef(self.get_service_id_dt(service_ids[i]), DayTypeRef, self.version.version)
-                    fake_day_type_ids.add(service_ids[i])
-                    day_type_assignments.append(
-                        DayTypeAssignment(
-                            id=f"{self.get_service_id_dt(service_ids[i]).replace('DayType', 'DayTypeAssignment')}_{str(exceptions_df['date'][i])}_{str(exception_type)}",
-                            version=self.version.version,
-                            order=1,
-                            day_type_ref=day_type_id,
-                            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=date_to_xmldate(gtfs_date(exceptions_df['date'][i])),
-                            is_available=True if exception_type == 1 else False,
-                        )
-                    )
-
-            cur.execute(**day_type_sql)
-            df = cur.df()
-
-            service_ids = df.get('service_id')
-            mondays = df.get('monday')
-            tuesdays = df.get('tuesday')
-            wednesdays = df.get('wednesday')
-            thursdays = df.get('thursday')
-            fridays = df.get('friday')
-            saturdays = df.get('saturday')
-            sundays = df.get('sunday')
-            start_dates = df.get('start_date')
-            end_dates = df.get('end_date')
-
-            for i in range(0, len(service_ids)):
-                days_of_week = []
-                if mondays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.MONDAY)
-                if tuesdays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.TUESDAY)
-                if wednesdays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.WEDNESDAY)
-                if thursdays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.THURSDAY)
-                if fridays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.FRIDAY)
-                if saturdays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.SATURDAY)
-                if sundays[i] == 1:
-                    days_of_week.append(DayOfWeekEnumeration.SUNDAY)
-
-                day_type = DayType(
-                    id=self.get_service_id_dt(service_ids[i]),
-                    version=self.version.version,
-                    private_codes=PrivateCodes(private_code=[PrivateCode(type_value="service_id", value=service_ids[i])]),
-                    properties=PropertiesOfDayRelStructure(property_of_day=[PropertyOfDay(days_of_week=days_of_week)]),
-                )
-                day_types.append(day_type)
-                try:
-                    fake_day_type_ids.remove(service_ids[i])
-                except KeyError:
-                    pass
-
-                operating_period = OperatingPeriod(
-                    id=self.get_service_id_dt(service_ids[i]).replace('DayType', 'OperatingPeriod'),
-                    version=self.version.version,
-                    from_operating_day_ref_or_from_date=date_to_xmldatetime(gtfs_date(start_dates[i])),
-                    to_operating_day_ref_or_to_date=date_to_xmldatetime(gtfs_date(end_dates[i])),
-                )
-                operating_periods.append(operating_period)
-
-                day_type_assignments.append(
-                    DayTypeAssignment(
-                        id=self.get_service_id_dt(service_ids[i]).replace('DayType', 'DayTypeAssignment'),
-                        version=self.version.version,
-                        order=1,
-                        day_type_ref=getFakeRef(self.get_service_id_dt(service_ids[i]), DayTypeRef, self.version.version),
-                        uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=cast(OperatingPeriodRef, getRef(operating_period)),
-                    )
-                )
-
-        for service_id in fake_day_type_ids:
-            day_type = DayType(
-                id=self.get_service_id_dt(service_id),
-                version=self.version.version,
-                private_codes=PrivateCodes(private_code=[PrivateCode(type_value="service_id", value=service_id)]),
-            )
-            day_types.append(day_type)
-
-        return day_types, day_type_assignments, operating_periods
 
     def getInterchangeRules(
         self,
@@ -1431,72 +826,13 @@ class GtfsNeTexProfile(CallsProfile):
                     )
 
     @staticmethod
-    def noonTimeToNeTEx(time: str) -> tuple[XmlTime, int]:
-        hour, minute, second = time.split(':')
-        hour_i = int(hour)
-        day_offset = int(math.floor(hour_i / 24))
-        return (XmlTime(hour=hour_i % 24, minute=int(minute), second=int(second)), day_offset)
 
-    @staticmethod
-    def directionToNeTEx(direction_id: int | None) -> DirectionType | None:
-        if direction_id is None:
-            return None
-
-        elif direction_id == 1:
-            return DirectionType(value=DirectionTypeEnumeration.INBOUND)
-
-        return DirectionType(value=DirectionTypeEnumeration.OUTBOUND)
-
-    @staticmethod
-    def wheelchairToNeTEx(wheelchair_accessible: int) -> LimitationStatusEnumeration:
-        if wheelchair_accessible == 1:
-            return LimitationStatusEnumeration.TRUE
-
-        elif wheelchair_accessible == 2:
-            return LimitationStatusEnumeration.FALSE
-
-        return LimitationStatusEnumeration.UNKNOWN
-
-    @staticmethod
-    def bicyclesToNeTEx(bikes_allowed: int) -> LuggageCarriageEnumeration:
-        if bikes_allowed == 1:
-            return LuggageCarriageEnumeration.CYCLES_ALLOWED
-
-        elif bikes_allowed == 2:
-            return LuggageCarriageEnumeration.NO_CYCLES
-
-        return LuggageCarriageEnumeration.UNKNOWN
 
     def gtfs_shape_to_linestring(self, shape_sql: dict[str, str] = {'query': """select * from shapes order by shape_id;"""}) -> None:
 
         with self.conn.cursor() as cur:
             cur.execute(**shape_sql)
 
-    def get_trip_id(self, trip_id: str) -> str:
-        if ':ServiceJourney:' in trip_id:
-            return trip_id
-        else:
-            return getId(ServiceJourney, self.codespace, trip_id)
-
-    def get_trip_id_aa(self, trip_id: str) -> str:
-        if ':ServiceJourney:' in trip_id:
-            return trip_id.replace(':ServiceJourney:', ':AccessibilityAssessment:')
-        else:
-            return getId(AccessibilityAssessment, self.codespace, trip_id)
-
-    def get_trip_id_sfs(self, trip_id: str) -> str:
-        if ':ServiceJourney:' in trip_id:
-            return trip_id.replace(':ServiceJourney:', ':ServiceFacilitySet:')
-        else:
-            return getId(ServiceFacilitySet, self.codespace, trip_id)
-
-    def get_trip_id_call(self, trip_id: str, sequence: int) -> str:
-        if ':ServiceJourney:' in trip_id:
-            return trip_id.replace(':ServiceJourney:', ':Call:') + '_' + str(sequence)
-        elif ':TemplateServiceJourney:' in trip_id:
-            return trip_id.replace(':TemplateServiceJourney:', ':Call:') + '_' + str(sequence)
-        else:
-            return getId(Call, self.codespace, trip_id) + '_' + str(sequence)
 
     def getServiceJourneys(
         self,
@@ -2432,174 +1768,9 @@ class GtfsNeTexProfile(CallsProfile):
                     )
 
                     yield service_journey
-    @staticmethod
-    def trips_iter(cur, batch_size=100_000):
-
-        # cursor = cur.execute("""
-        #     SELECT
-        #     route_id, trip_id, service_id, trip_short_name, trip_headsign, direction_id, block_id, shape_id, wheelchair_accessible, bikes_allowed,
-        #     stop_headsign, stop_id, arrival_time, departure_time, shape_dist_traveled, drop_off_type, pickup_type, stop_sequence
-        #     FROM trips AS t
-        #     JOIN stop_times AS s USING (trip_id)
-        #     WHERE t.trip_id NOT IN (SELECT trip_id FROM frequencies)
-        #     ORDER BY t.trip_id, s.stop_sequence
-        # """)
-
-        cursor = cur.execute("""
-                    SELECT
-                    route_id, trip_id, service_id, trip_short_name, trip_headsign, direction_id, block_id, shape_id, wheelchair_accessible, bikes_allowed,
-                    stop_headsign, stop_id, arrival_time, departure_time, shape_dist_traveled, drop_off_type, pickup_type, stop_sequence
-                    FROM trip_times
-                """)
-
-        current_trip = None
-        current_block = []
-
-        while True:
-            rows = cursor.fetchmany(batch_size)
-            if not rows:
-                if current_trip is not None:
-                    yield current_trip, current_block
-                break
-
-            for row in rows:
-                trip_id = row[1]
-                if trip_id != current_trip:
-                    if current_trip is not None:
-                        yield current_trip, current_block
-                    current_trip = trip_id
-                    current_block = []
-                current_block.append(row)
 
 
-    def getServiceJourneys2DayType3(
-        self, trips_sql: dict[str, str] = {'query': """select * from trips join stop_times using (trip_id) where trip_id not in (select trip_id from frequencies) order by trip_id, stop_sequence;"""}
-    ) -> Generator[ServiceJourney, None, None]:
 
-        shape_used = set([])
-
-        with (self.conn.cursor() as cur):
-            # This query does fill up the disk, but also prevents that a long running query eats all the memory in the Python Cache of DuckDB...
-            cur.execute("CREATE TABLE IF NOT EXISTS trip_times AS SELECT * FROM trips JOIN stop_times USING (trip_id) WHERE trip_id NOT IN (SELECT trip_id FROM frequencies) ORDER BY trip_id, stop_sequence;")
-
-            for trip_id, stops in GtfsNeTexProfile.trips_iter(cur):
-                route_id, trip_id, service_id, trip_short_name, trip_headsign, direction_id, block_id, shape_id, wheelchair_accessible, bikes_allowed, stop_headsign, stop_id, arrival_time, departure_time, shape_dist_traveled, drop_off_type, pickup_type, stop_sequence = stops[0]
-
-                journey_pattern_view = JourneyPatternView(
-                    destination_display_ref_or_destination_display_view=DestinationDisplayView(
-                        name=MultilingualString(value=trip_headsign), front_text=MultilingualString(value=trip_headsign)
-                    )
-                ) if trip_headsign else None
-
-                accessibility_assessment = AccessibilityAssessment(
-                        id=self.get_trip_id_aa(trip_id),
-                        version=self.version.version,
-                        mobility_impaired_access=self.wheelchairToNeTEx(wheelchair_accessible)
-                ) if wheelchair_accessible is not None and not isinstance(wheelchair_accessible, NAType) else None
-
-                block_ref = getFakeRef(getId(Block, self.codespace, block_id), BlockRef, None, "EXTERNAL") if block_id is not None else None
-
-                luggage_carriage_facility_list = []
-                facitities = None
-                if bikes_allowed is not None:
-                    if bikes_allowed == 1:
-                        luggage_carriage_facility_list.append(LuggageCarriageEnumeration.CYCLES_ALLOWED)
-                    elif bikes_allowed == 2:
-                        luggage_carriage_facility_list.append(LuggageCarriageEnumeration.NO_CYCLES)
-
-                if len(luggage_carriage_facility_list) > 0:
-                    facitities = ServiceFacilitySetsRelStructure(
-                        restricted_service_facility_set_ref_or_service_facility_set_ref_or_service_facility_set=[
-                            ServiceFacilitySet(
-                                id=self.get_trip_id_sfs(trip_id),
-                                version=self.version.version,
-                                luggage_carriage_facility_list=LuggageCarriageFacilityList(value=luggage_carriage_facility_list),
-                            )
-                        ]
-                    )
-
-                calls = CallsRelStructure()
-
-                prev_call = None
-                prev_shape_traveled = 0
-                prev_order = 1
-
-                for route_id, trip_id, service_id, trip_short_name, trip_headsign, direction_id, block_id, shape_id, wheelchair_accessible, bikes_allowed, stop_headsign, stop_id, arrival_time, departure_time, shape_dist_traveled, drop_off_type, pickup_type, stop_sequence in stops:
-                    destination_display_view = DestinationDisplayView(
-                        name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
-                    ) if stop_headsign else None
-
-                    from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_id)
-                    arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_time)
-                    departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_time)
-
-                    if prev_call and shape_dist_traveled is not None and not numpy.isnan(shape_dist_traveled):
-                        distance = shape_dist_traveled - prev_shape_traveled
-                        prev_call.onward_service_link_ref_or_onward_service_link_view = OnwardServiceLinkView(distance=distance)
-                    pickup = pickup_type if pickup_type else 0
-                    drop_off= drop_off_type if drop_off_type else 0
-                    call = Call(
-                        id=self.get_trip_id_call(trip_id, stop_sequence),
-                        version=self.version.version,
-                        fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view=getFakeRef(
-                            from_point_ref, ScheduledStopPointRef, self.version.version
-                        ),
-                        destination_display_ref_or_destination_display_view=destination_display_view,
-                        arrival=ArrivalStructure(time=arrival_time, day_offset=arrival_dayoffset, for_alighting=bool(drop_off != 1)),
-                        departure=DepartureStructure(time=departure_time, day_offset=departure_dayoffset, for_boarding=bool(pickup != 1)),
-                        request_stop=bool( pickup == 2 or pickup == 3 or drop_off == 2 or drop_off == 3   ),
-                        order=prev_order,
-                    )  # stop_sequence is non-negative integer
-
-                    calls.call.append(call)
-
-                    prev_call = call
-                    if shape_dist_traveled:
-                        prev_shape_traveled = shape_dist_traveled
-                    prev_order += 1
-
-                service_journey = ServiceJourney(
-                    id=self.get_trip_id(trip_id),
-                    version=self.version.version,
-                    flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(
-                        getId(Line, self.codespace, route_id), LineRef, self.version.version
-                    ),
-                    private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_id, type_value="trip_id")]),
-                    short_name=getOptionalString(trip_short_name),
-                    day_types=DayTypeRefsRelStructure(day_type_ref=[getFakeRef(self.get_service_id_dt(service_id), DayTypeRef, self.version.version)]),
-                    journey_pattern_view=journey_pattern_view,
-                    direction_type=self.directionToNeTEx(direction_id),
-                    block_ref=block_ref,
-                    accessibility_assessment=accessibility_assessment,
-                    facilities=facitities,
-                    # link_sequence_projection_ref_or_link_sequence_projection=lsp,
-                    calls=calls,
-                )
-
-                # print(service_journey.id)
-                yield service_journey
-
-            cur.execute("DROP TABLE trip_times;")
-
-                # route_ref = None
-                # lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
-                # shape_id = get_or_none(shape_ids, i)
-                # if shape_id is not None:
-                #     if shape_id in shape_used:
-                #         lsp = getFakeRef(getId(LinkSequenceProjection, self.codespace, shape_id), LinkSequenceProjectionRef, self.version.version)
-                #     else:
-                #         lsps = self.getLineStrings(
-                #             {
-                #                 'query': (
-                #                     """select shape_id, shape_pt_lat, shape_pt_lon, shape_pt_sequence, shape_dist_traveled from shapes where shape_id = ? order by shape_id, shape_pt_sequence, shape_dist_traveled;"""
-                #                 ),
-                #                 'parameters': (shape_id,),
-                #             }
-                #         )
-                #         if len(lsps) > 0:
-                #             lsp = lsps[0]
-                #
-                #        shape_used.add(shape_id)
 
 
     def get_trip_id_tsj(self, trip_id: str) -> str:
@@ -3128,20 +2299,9 @@ class GtfsNeTexProfile(CallsProfile):
         self.lines = self.getLines()
 
 
-def main(database_gtfs: str, database_netex: str) -> None:
-    serializer_config = SerializerConfig(ignore_default_attributes=True)
-    serializer_config.pretty_print = True
-    serializer_config.ignore_default_attributes = True
-    serializer = XmlSerializer(config=serializer_config)
-
-    gtfs = GtfsNeTexProfile(conn=duckdb.connect(database=database_gtfs, read_only=False), serializer=serializer)
-
-    with Database(Path(database_netex), BinarySerializer(classes=get_boring_classes()), readonly=False) as db_write:
-        assert gtfs.version.version is not None
-        # db_write.insert_metadata_on_queue([("GTFS", gtfs.version.version, gtfs.frame_defaults)])
-        gtfs.database(db_write)
-        pass
-
+def main(database_gtfs: Path, database_netex: Path) -> None:
+    with LmdbStorage(database_netex, ByteSerializer(domain.netex.model.interesting_members), readonly=False) as storage:
+        to_storage(database_gtfs, storage)
 
 if __name__ == '__main__':
     import argparse
@@ -3149,13 +2309,13 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description='Convert a GTFS database to a NeTEx database')
     parser.add_argument('gtfs', type=str, help='GTFS database to convert, for example: gtfs-import.duckdb')
-    parser.add_argument('database', type=str, help='DuckDB file to overwrite and store contents of the conversion.')
+    parser.add_argument('database', type=str, help='Storage file to overwrite and store contents of the conversion.')
     parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
     try:
-        main(args.gtfs, args.database)
+        main(Path(args.gtfs), Path(args.database))
     except Exception as e:
         log_all(logging.ERROR, f'{e} {traceback.format_exc()}')
         raise e

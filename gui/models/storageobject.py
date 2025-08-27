@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional, Any, cast, TYPE_CHECKING
+from typing import Optional, Any, TYPE_CHECKING
 
 from PySide6.QtCore import QObject, Signal, Slot
 
@@ -41,14 +41,21 @@ class StorageObject(QObject):
         name = getattr(self._obj, 'name', None)
         if name is not None:
             if isinstance(name, MultilingualString):
-                self._name = cast(TextType, name.content[0]).value
-                self.nameChanged.emit(self._name)
+                if isinstance(name.content[0], str):
+                    self._name = name.content[0]
+                    self.nameChanged.emit(self._name)
+
+                elif isinstance(name.content[0], TextType):
+                    self._name = name.content[0].value
+                    self.nameChanged.emit(self._name)
+
             elif isinstance(name, str):
                 self._name = name
                 self.nameChanged.emit(self._name)
 
         if self._name is None:
             self._name = self._obj.id
+            self.nameChanged.emit(self._name)
 
     @property
     def obj(self) -> Optional[Tid]:

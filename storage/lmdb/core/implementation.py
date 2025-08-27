@@ -105,6 +105,14 @@ class LmdbStorage(Storage):
                     db_names[db_name] = clazz
         return db_names
 
+    def clean(self) -> None:
+        with self.env.begin(write=True) as txn:
+            for db_name, _ in txn.cursor():
+                db = self.env.open_db(db_name, txn=txn)
+                if db:
+                    txn.drop(db=db, delete=True)
+        self._populate_class_idx()
+
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         print(klass)
 

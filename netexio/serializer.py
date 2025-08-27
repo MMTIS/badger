@@ -21,8 +21,8 @@ def _all_subclasses(cls):
 
 netex.set_ref_types = frozenset(
     {netex.VersionOfObjectRef, netex.VersionOfObjectRefStructure}
-    | _all_subclasses(netex.VersionOfObjectRef)
-    | _all_subclasses(netex.VersionOfObjectRefStructure)
+    | _all_subclasses(netex.VersionOfObjectRef) # type: ignore
+    | _all_subclasses(netex.VersionOfObjectRefStructure) # type: ignore
 )
 
 T = TypeVar("T")

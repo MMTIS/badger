@@ -11,7 +11,7 @@ class TextDumpPanelProvider(DetailPanelProvider):
 
     def __init__(self):
         super().__init__()
-        self.xml_serializer = MyXmlSerializer()
+        self.xml_serializer = MyXmlSerializer([])
 
     def can_handle(self, lmdbo: StorageObject) -> bool:
         return lmdbo.obj is not None

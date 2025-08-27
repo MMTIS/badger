@@ -100,6 +100,7 @@ class LazyObjectListModel(QAbstractListModel):
 
         start_row = self.rowCount()
         start_key = self._cache[-1].key if self._cache else None
+        # TODO: self.clazz may be uninitialized
         new_items = list(
             self._storage_controller.scan_objects(self.clazz, start_key=start_key, limit=OBJECT_FETCH_BATCH_SIZE))
 
