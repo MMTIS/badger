@@ -56,8 +56,8 @@ def get_interesting_classes(
         interesting_clazzes = [x[1] for x in entitiesinversion if x[1] in my_filter]
     else:
         clean_element_names = [x[0] for x in entitiesinversion if not x[0].endswith("Frame")]
-        interesting_element_names = [get_element_name_with_ns(x[1]) for x in entitiesinversion if not x[0].endswith("Frame")]
-        interesting_clazzes = [x[1] for x in entitiesinversion if not x[0].endswith("Frame")]
+        interesting_element_names = [get_element_name_with_ns(x[1]) for x in entitiesinversion if not x[0].endswith("Frame") and not x[0].endswith("Structure") and not x[0].endswith("Dummy")]
+        interesting_clazzes = [x[1] for x in entitiesinversion if not x[0].endswith("Frame") and not x[0].endswith("Structure") and not x[0].endswith("Dummy")]
 
     return clean_element_names, interesting_element_names, interesting_clazzes
 

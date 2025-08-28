@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Generator, Any, Hashable
 from domain.netex import model as netex
-from domain.netex.services.model_typing import Tid
+from domain.netex.services.model_typing import Tid, Tref
 from storage.interface import Serializer
 
 
@@ -102,3 +102,31 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 obj.ref,
                 getattr(obj, "version", "any"),
             )
+
+def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
+    assert deserialized.id is not None, "deserialised.id must not be none"
+
+    for obj, path in recursive_attributes(deserialized, []):
+        if hasattr(obj, "ref"):
+            assert obj.ref is not None, "Object ref must not be none"
+            if obj.version_ref is not None and obj.version is None:
+                # Don't include external references
+                continue
+
+            if obj.name_of_ref_class is None:
+                # Hack, because NeTEx does not define the default name of ref class yet
+                if obj.__class__.__name__.endswith("RefStructure"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                elif obj.__class__.__name__.endswith("Ref"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+
+            yield obj
+
+
+def only_embedding(serializer: Serializer, deserialized: Tid, interesting_classes: set[type[Tid]], ignore: set[type[Tid]]=set([])) -> Generator[bytes, None, None]:
+    assert deserialized.id is not None, "deserialised.id must not be none"
+
+    for obj, path in recursive_attributes(deserialized, []):
+        if hasattr(obj, "id") and obj.id is not None:
+            if obj.__class__ not in ignore and obj.__class__ in interesting_classes:
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)

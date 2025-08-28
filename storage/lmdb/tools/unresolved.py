@@ -3,7 +3,7 @@ from pathlib import Path
 from domain.netex.services.utils import get_boring_classes
 from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_UNRESOLVED
 
-from storage.lmdb.serialization.byteserializer import ByteSerializer
+from utils.utils import get_object_name
 
 
 def unresolved_lmdb(storage: LmdbStorage) -> None:
@@ -19,13 +19,13 @@ def unresolved_lmdb(storage: LmdbStorage) -> None:
                         obj_id = key2
                         break
 
-                print(obj_id, storage.idx_class[obj_id.split(b'-')[-1]], value,
-                      storage.idx_class[value.split(b'-')[-1]])  # TODO
+                print(get_object_name(storage.idx_class[obj_id.split(b'-')[-1]]), obj_id,
+                      get_object_name(storage.idx_class[value.split(b'-')[-1]]), value)
 
 
 if __name__ == "__main__":
     import sys
 
     interesting_members = get_boring_classes()
-    with LmdbStorage(Path(sys.argv[1]), ByteSerializer(interesting_members), readonly=True) as storage:
+    with LmdbStorage(Path(sys.argv[1]), readonly=True) as storage:
         unresolved_lmdb(storage)

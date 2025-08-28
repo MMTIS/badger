@@ -1,14 +1,15 @@
 from itertools import count
 from pathlib import Path
 from types import TracebackType
-from typing import Optional, Type, Literal, Iterable, Generator
+from typing import Optional, Type, Literal, Iterable, Generator, Self, Any
 
 import lmdb
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
+from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.interface import Storage, Serializer
+from storage.interface import Storage
 from storage.lmdb.serialization.byteserializer import ByteSerializer
 
 DB_CLASS_IDX = b'_class_idx'
@@ -25,13 +26,13 @@ class LmdbStorage(Storage):
     class_idx: dict[type, bytes]
     idx_class: dict[bytes, type]
     class_name_idx: dict[str, bytes]
+    serializer: ByteSerializer
 
-    def __init__(self, path: Path, serializer: Serializer, readonly: bool = True):
+    def __init__(self, path: Path, readonly: bool = True):
         if readonly and not path.exists():
             raise
 
         self.path = path
-        self.serializer = serializer
         self.readonly = readonly
         self.max_dbs = 128
         self.initial_size = 4 * 1024**3
@@ -39,6 +40,7 @@ class LmdbStorage(Storage):
         self.class_idx = {}
         self.idx_class = {}
         self.class_name_idx = {}
+        self.serializer = ByteSerializer(get_boring_classes())
 
     def _populate_class_idx(self) -> None:
         if self.readonly:
@@ -56,7 +58,7 @@ class LmdbStorage(Storage):
             self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
 
     def _restore_class_idx(self) -> None:
-         with self.env.begin(write=False) as txn:
+        with self.env.begin(write=False) as txn:
             db_class_idx = self.env.open_db(key=DB_CLASS_IDX, txn=txn, create=True, integerkey=False)
             for idx, name in txn.cursor(db=db_class_idx):
                 clazz = self.serializer.name_object[name.decode('utf-8')]
@@ -64,7 +66,9 @@ class LmdbStorage(Storage):
                 self.class_name_idx[get_object_name(clazz)] = idx
                 self.class_idx[clazz] = idx
 
-    def __enter__(self) -> Storage:
+        self.serializer.set_class_idx(self.class_idx)
+
+    def __enter__(self) -> Self:
         new_database = not self.path.exists()
 
         self.env = lmdb.open(
@@ -146,7 +150,8 @@ class LmdbStorage(Storage):
 
                 value = self.serializer.marshall(obj, klass)
                 txn.put(key.to_bytes(4, 'little'), value, db=db)
-                txn.put(self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), full_key, db=db_id_idx)
+                my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+                txn.put(my_id, full_key, db=db_id_idx)
 
     def _load_references(self, full_key: bytes, db_direction: bytes) -> Generator[tuple[type, bytes], None, None]:
         with self.env.begin(write=False) as txn:
@@ -175,6 +180,15 @@ class LmdbStorage(Storage):
                 key = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
                 full_key = txn.get(key, db=db_id_idx)
                 yield from self._load_references(full_key, db_direction)
+
+    def load_object_by_full_key(self, full_key: bytes) -> Any:
+        this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
+        clazz = self.idx_class[this_clazz_idx]
+        with self.env.begin(write=False) as txn:
+            db = self.env.open_db(this_clazz_idx, txn=txn, create=False)
+            value = txn.get(key, db=db)
+            obj: Tid = self.serializer.unmarshall(value, clazz)
+            return obj
 
     def load_object(self, clazz: type[Tid], key: bytes) -> Tid:
         this_class_idx = self.class_idx[clazz]

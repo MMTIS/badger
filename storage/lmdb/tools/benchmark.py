@@ -8,9 +8,6 @@ from domain.utils import get_object_name
 from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, DB_CLASS_IDX
 import time
 
-from storage.lmdb.serialization.byteserializer import ByteSerializer
-
-
 def benchmark_lmdb(storage: LmdbStorage) -> None:
     db_names = storage.db_names()
     results = []
@@ -89,5 +86,5 @@ if __name__ == "__main__":
     import sys
 
     interesting_members = get_boring_classes()
-    with LmdbStorage(Path(sys.argv[1]), ByteSerializer(interesting_members), readonly=True) as storage:
+    with LmdbStorage(Path(sys.argv[1]), readonly=True) as storage:
         benchmark_lmdb(storage)

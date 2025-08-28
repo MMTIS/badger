@@ -1,4 +1,3 @@
-import re
 import string
 from typing import Any, cast
 
@@ -14,12 +13,16 @@ class ByteSerializer(Serializer):
     SEPARATOR = ord("-")
     SPECIAL_CHAR = ord("*")
     WORD_MASK = "#"
+    class_idx: dict[type, bytes]
+
+    def set_class_idx(self, class_idx: dict[type, bytes]) -> None:
+        """ This mapping assures that the stored indices in the database, matches the lookup. """
+        self.class_idx = class_idx
 
     @staticmethod
-    def encode_string(value: str, obj_name: str | None, mask: bool = True) -> bytes:
-        """Encodes a string by replacing special characters and masking the object name."""
-        if mask and obj_name is not None:
-            value = re.sub(rf"\b{re.escape(obj_name)}\b", ByteSerializer.WORD_MASK, value.upper())
+    def encode_string(value: str, obj_name: str | None) -> bytes:
+        """Encodes a string by replacing special characters."""
+        value = value.upper()
         return bytes(
             (ord(char) if char in string.ascii_uppercase or char in string.digits or char == ByteSerializer.WORD_MASK else ByteSerializer.SPECIAL_CHAR)
             for char in value
@@ -44,7 +47,7 @@ class ByteSerializer(Serializer):
         encoded_bytes.append(ByteSerializer.SEPARATOR)
 
         if include_clazz:
-            encoded_bytes.extend(self.classes.index(clazz).to_bytes(2, 'little'))
+            encoded_bytes.extend(self.class_idx[clazz])
 
         return bytes(encoded_bytes)
 

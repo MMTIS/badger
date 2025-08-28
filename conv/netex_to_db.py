@@ -2,7 +2,7 @@ from pathlib import Path
 
 from domain.netex.services.utils import get_boring_classes
 from storage.lmdb.core.implementation import LmdbStorage
-from storage.lmdb.core.references import resolve
+from storage.lmdb.core.references import resolve, resolve_embeddings
 from storage.lmdb.serialization.byteserializer import ByteSerializer
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
@@ -16,8 +16,7 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
         log_flush()
         exit(1)
 
-    interesting_members = get_boring_classes()
-    with LmdbStorage(Path(database), ByteSerializer(interesting_members), readonly=False) as storage:
+    with LmdbStorage(Path(database), readonly=False) as storage:
         """
         if clean_database:
             print("Is cleaned!")
@@ -31,6 +30,7 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
                 insert_database(xml_storage, storage, interesting_classes, sub_file)
 
         resolve(storage)
+        resolve_embeddings(storage)
 
 if __name__ == '__main__':
     import argparse

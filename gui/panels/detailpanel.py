@@ -1,7 +1,5 @@
 from abc import ABC, abstractmethod
-
 from PySide6.QtWidgets import QWidget
-
 from gui.models.storageobject import StorageObject
 
 

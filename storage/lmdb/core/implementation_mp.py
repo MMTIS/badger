@@ -60,7 +60,7 @@ class LmdbStorageMP(LmdbStorage):
         if self.readonly:
             raise
 
-        class_idx = self.serializer.classes.index(klass)
+        this_class_idx = self.class_idx[klass]
 
         with self.env.begin(write=False) as txn:
             db_id_idx = self.env.open_db(DB_ID_IDX, txn=txn)
@@ -71,7 +71,7 @@ class LmdbStorageMP(LmdbStorage):
             for obj in objects:
                 key = int(next(self.last_entry))
 
-                full_key = ((class_idx << 32) | key).to_bytes(8, 'little')
+                full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in only_references(obj, self.serializer):
                     unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
                     resolved_idx = txn.get(unresolved_value, db=db_id_idx)
@@ -102,7 +102,7 @@ class LmdbStorageMP(LmdbStorage):
                 value = self.serializer.marshall(obj, klass)
                 self.queue.put(
                     (
-                        class_idx.to_bytes(2, 'little'),
+                        this_class_idx,
                         key.to_bytes(4, 'little'),
                         value,
                     )

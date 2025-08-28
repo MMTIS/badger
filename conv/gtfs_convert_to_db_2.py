@@ -12,7 +12,7 @@ from domain.netex.services.utils import get_boring_classes
 
 def main(database_gtfs: Path, database_netex: Path) -> None:
     interesting_members = get_boring_classes()
-    with LmdbStorage(database_netex, ByteSerializer(interesting_members), readonly=False) as storage:  # type: ignore
+    with LmdbStorage(database_netex, readonly=False) as storage:  # type: ignore
         to_storage(database_gtfs, storage)
         resolve(cast(LmdbStorage, storage))
 

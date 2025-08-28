@@ -19,9 +19,11 @@ class XmlStorage(Storage):
                 if l_zip_filename.endswith(".xml.gz") or l_zip_filename.endswith(".xml"):
                     yield zip_file.open(zip_filename), str(zip_filename)
 
-    def __init__(self, path: Path, serializer: MyXmlSerializer=MyXmlSerializer([]), readonly: bool = True):
+    def __init__(self, path: Path, readonly: bool = True):
         if readonly and not path.exists():
             raise
+
+        serializer: MyXmlSerializer = MyXmlSerializer([])
 
         self.path = path
         self.serializer = serializer

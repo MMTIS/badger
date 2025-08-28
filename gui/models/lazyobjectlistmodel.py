@@ -1,7 +1,6 @@
 from typing import Any, Generic
 
-from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Slot, QThreadPool, QRunnable, QPersistentModelIndex, \
-    QObject
+from PySide6.QtCore import QAbstractListModel, QModelIndex, Qt, Slot, QThreadPool, QRunnable, QPersistentModelIndex, QObject
 
 from domain.netex.services.model_typing import Tid
 from gui.controllers.storagecontroller import StorageController
@@ -101,8 +100,7 @@ class LazyObjectListModel(QAbstractListModel):
         start_row = self.rowCount()
         start_key = self._cache[-1].key if self._cache else None
         # TODO: self.clazz may be uninitialized
-        new_items = list(
-            self._storage_controller.scan_objects(self.clazz, start_key=start_key, limit=OBJECT_FETCH_BATCH_SIZE))
+        new_items = list(self._storage_controller.scan_objects(self.clazz, start_key=start_key, limit=OBJECT_FETCH_BATCH_SIZE))
 
         if len(new_items) == 0:
             self._can_fetch_more = False

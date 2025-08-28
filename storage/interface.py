@@ -29,7 +29,6 @@ class Serializer:
 
     def __init__(self, classes: list[type]) -> None:
         self.name_object = {get_object_name(x): x for x in classes}
-        self.classes = classes
 
     @abstractmethod
     def split_key(self, key: bytes) -> list[bytes]: ...

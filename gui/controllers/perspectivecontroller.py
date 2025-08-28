@@ -11,7 +11,7 @@ from gui.models.storageobject import StorageObject
 from gui.panels.detailpanel import DetailPanelProvider
 
 # from gui.panels.geojsonpanel import GeoJSONPanelProvider
-from gui.panels.textdumppanel import TextDumpPanelProvider
+from gui.panels.netexxmlpanel import NeTExXmlPanelProvider
 from gui.panels.treeviewpanel import TreeViewPanelProvider
 from gui.widgets.perspective import PerspectiveWidget
 
@@ -36,7 +36,7 @@ class PerspectiveController(QObject):
 
     def _setup_detail_panels(self) -> None:
         """Creates the detail panel widgets once and adds them to the tab view."""
-        panel_providers = [TreeViewPanelProvider(), TextDumpPanelProvider()]  # TODO: , GeoJSONPanelProvider()]
+        panel_providers = [TreeViewPanelProvider(), NeTExXmlPanelProvider()]  # TODO: , GeoJSONPanelProvider()]
         for provider in panel_providers:
             widget, title = provider.create_panel()
             self.detail_panels.append((provider, widget))
