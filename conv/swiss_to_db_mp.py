@@ -3,54 +3,73 @@ import zipfile
 from pathlib import Path
 
 from storage.lmdb.core.implementation import LmdbStorage
+from storage.lmdb.core.implementation_mp import LmdbStorageMP
 from storage.lmdb.core.references import resolve, resolve_embeddings
-from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import get_interesting_classes, insert_database
+from storage.lxml.core.implementation import XmlStorage
 from utils.aux_logging import log_all, prepare_logger
 from domain.netex.services.profiles import SWISS_CLASSES
+import multiprocessing as mp
+
+n_proc = 10
 
 
-def first_pattern_index(name: str) -> tuple[int, str] | None:
+def first_pattern_index(name: str, patterns: list[str]) -> tuple[int, str] | None:
     """
     Return (pattern_index, matched_token) if any token appears in `name`,
     otherwise None. Matching is substring-based and case-sensitive.
     """
-
-    patterns = [
-        "_RESOURCE_",
-        "_SITE_",
-        "_SERVICE_",
-        "_SERVICECALENDAR_",
-        "_TIMETABLE_",
-        "_COMMON_",
-    ]
 
     for i, token in enumerate(patterns):
         if token in name:
             return i, token
     return None
 
+def parse_and_enqueue(database: str, queue: mp.Queue, filename: str, sub_filename: str):
+    """Runs in a subprocess: parse XML and enqueue objects."""
+
+    import zipfile
+    from storage.lmdb.core.implementation_queue import LmdbStorageQueue
+    from storage.lxml.core.insert import get_interesting_classes, insert_database
+
+    print(f"[{mp.current_process().name}] Parsing {sub_filename}")
+
+    with zipfile.ZipFile(filename) as zip_file:
+        with zip_file.open(sub_filename) as sub_file:
+            interesting_classes = get_interesting_classes(SWISS_CLASSES)
+            with LmdbStorageQueue(Path(database), queue) as storage:
+                print(sub_filename)
+                insert_database(storage, interesting_classes, sub_file)
+
+
 def main(filename: str, database: str, clean_database: bool = True) -> None:
     if not filename.endswith('.zip'):
         return
 
-    with LmdbStorage(Path(database), readonly=False) as storage:
+    interesting_classes = get_interesting_classes(SWISS_CLASSES)
+    xml_storage = XmlStorage(Path(filename))
+    # Stap 1: alleen bestandsnamen ophalen
+    all_names = xml_storage.list_netex_files()
+    initial_size = 8 * 1024**3
+
+    with LmdbStorage(Path(database), readonly=False, initial_size=initial_size) as storage:
         """
         if clean_database:
             print("Is cleaned!")
             storage.clean()
         """
 
-        interesting_classes = get_interesting_classes(SWISS_CLASSES)
-        xml_storage = XmlStorage(Path(filename))
-
-        # Stap 1: alleen bestandsnamen ophalen
-        all_names = xml_storage.list_netex_files()
+        patterns = [
+            "_RESOURCE_",
+            "_SITE_",
+            "_SERVICE_",
+            "_SERVICECALENDAR_"
+        ]
 
         # Stap 2: filter + sort op patronen
         bucket: list[tuple[int, str]] = []
         for real_filename in all_names:
-            match = first_pattern_index(real_filename)
+            match = first_pattern_index(real_filename, patterns)
             if match:
                 prio, token = match
                 # eventueel check of sub_file == real_filename in jouw context
@@ -63,6 +82,25 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
             print(sub_filename)
             sub_file = zip_file.open(sub_filename)
             insert_database(storage, interesting_classes, sub_file)
+
+    with LmdbStorageMP(Path(database), readonly=False, initial_size=initial_size) as storage:
+        with storage.ctx.Pool(processes=n_proc) as pool:
+            tasks = []
+            for sub_filename in all_names:
+                if "_TIMETABLE_" in sub_filename:
+                    tasks.append(
+                        pool.apply_async(parse_and_enqueue, (database, storage.queue, filename,sub_filename))
+                    )
+            # Wacht tot alle producers klaar zijn
+            for task in tasks:
+                task.get()
+
+    with LmdbStorage(Path(database), readonly=False, initial_size=initial_size) as storage:
+        for sub_filename in all_names:
+            if '_COMMON_' in sub_filename:
+                print(sub_filename)
+                sub_file = zip_file.open(sub_filename)
+                insert_database(storage, interesting_classes, sub_file)
 
         resolve(storage)
         resolve_embeddings(storage)

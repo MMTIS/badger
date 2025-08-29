@@ -129,8 +129,8 @@ def resolve(storage: LmdbStorage) -> None:
                 # Because cursor.delete() does very funky things.
                 now_resolved.append((idx, value))
 
-            else:
-                print("unresolved", value, idx)
+            # else:
+            #    print("unresolved", value, idx)
 
             has_item = unresolved_cursor.next()
 

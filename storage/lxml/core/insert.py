@@ -18,6 +18,8 @@ from storage.lxml.core.time import class_contains_xml_time, recursive_replace
 
 from lxml import etree
 
+from storage.lxml.serialization.xmlserializer import MyXmlSerializer
+
 
 def get_element_name_with_ns(clazz: type[Tid]) -> str:
     name = get_object_name(clazz)
@@ -71,12 +73,12 @@ def get_local_name(element: type[Tid]) -> str:
 
 
 def insert_database(
-    xml_storage: XmlStorage,
     storage: Storage,
     classes: tuple[list[str], list[str], list[Any]],
     f: IO[Any] | None = None,
     type_of_frame_filter: list[str] | None = None) -> None:
 
+    myserializer: MyXmlSerializer = MyXmlSerializer([])
     xml_context = XmlContext()
     parser_config = ParserConfig(fail_on_unknown_properties=False)
     parser = XmlParser(context=xml_context, config=parser_config, handler=LxmlEventHandler)
@@ -274,7 +276,7 @@ def insert_database(
 
                 id = element.attrib["id"]
                 order = element.attrib.get("order", None)
-                object = xml_storage.serializer.unmarshall(element, clazz)
+                object = myserializer.unmarshall(element, clazz)
 
                 if False and current_zoneinfo is not None:  # TODO: Fix this after we can do this in xsData
                     if localname in all_classes_with_xml_time:
@@ -288,7 +290,7 @@ def insert_database(
 
                 # TODO: Als we deze nu eens vervangen voor een lijst van objecten, tot het object type wijzigt.
                 if clazz != obj_clazz or len(obj_list) > 10000:
-                    if  obj_clazz is not None and len(obj_list) > 0:
+                    if obj_clazz is not None and len(obj_list) > 0:
                         storage.insert_objects_on_queue(obj_clazz, obj_list, False)
                         obj_list = []
                     obj_clazz = clazz

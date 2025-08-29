@@ -1,9 +1,7 @@
 from pathlib import Path
 
-from domain.netex.services.utils import get_boring_classes
 from storage.lmdb.core.implementation import LmdbStorage
 from storage.lmdb.core.references import resolve, resolve_embeddings
-from storage.lmdb.serialization.byteserializer import ByteSerializer
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
 from utils.aux_logging import *
@@ -27,7 +25,7 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
         for filename in filenames:
             xml_storage = XmlStorage(Path(filename))
             for sub_file, real_filename in xml_storage.open_netex_file():
-                insert_database(xml_storage, storage, interesting_classes, sub_file)
+                insert_database(storage, interesting_classes, sub_file)
 
         resolve(storage)
         resolve_embeddings(storage)

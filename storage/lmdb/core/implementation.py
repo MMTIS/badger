@@ -28,14 +28,14 @@ class LmdbStorage(Storage):
     class_name_idx: dict[str, bytes]
     serializer: ByteSerializer
 
-    def __init__(self, path: Path, readonly: bool = True):
+    def __init__(self, path: Path, readonly: bool = True, initial_size: int = 4 * 1024**3):
         if readonly and not path.exists():
             raise
 
         self.path = path
         self.readonly = readonly
         self.max_dbs = 128
-        self.initial_size = 4 * 1024**3
+        self.initial_size = initial_size
         self.last_entry = count() # TODO: change to context of DB
         self.class_idx = {}
         self.idx_class = {}
@@ -52,7 +52,7 @@ class LmdbStorage(Storage):
                 clazz_name = get_object_name(clazz)
                 txn.put(idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'), db=db_class_idx)
 
-            self.env.open_db(DB_UNRESOLVED, txn=txn, create=True, integerkey=True, dupsort=True, integerdup=True)
+            self.env.open_db(DB_UNRESOLVED, txn=txn, create=True, integerkey=True, dupsort=True)
             self.env.open_db(DB_ID_IDX, txn=txn, create=True)
             self.env.open_db(DB_REFERENCE_OUTWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
             self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)

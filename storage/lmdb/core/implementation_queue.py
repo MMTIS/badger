@@ -1,6 +1,5 @@
 from pathlib import Path
-from types import TracebackType
-from typing import Optional, Type, Literal, Iterable
+from typing import Iterable
 import multiprocessing as mp
 
 import lmdb
@@ -12,55 +11,15 @@ from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_REFERENC
     DB_UNRESOLVED
 
 
-class LmdbStorageMP(LmdbStorage):
+class LmdbStorageQueue(LmdbStorage):
     queue: mp.Queue  # type: ignore
-    writer: mp.Process
 
-    def __init__(self, path: Path, readonly: bool = True, initial_size: int = 4 * 1024**3):
-        super().__init__(path, readonly, initial_size)
-        self.ctx = mp.get_context("spawn")
-        self.manager = self.ctx.Manager()
-        self.queue = self.manager.Queue(maxsize=1000)
-
-    def __enter__(self) -> Storage:
-        new_database = not self.path.exists()
-
-        self.env = lmdb.open(
-            self.path.as_posix(),
-            max_dbs=self.max_dbs,
-            map_size=self.initial_size,
-            writemap=False,
-            metasync=False,
-            sync=False,
-            subdir=True,
-        )
-
-        if new_database:
-            self._populate_class_idx()
-
-        if not self.readonly:
-            self.writer = mp.Process(target=self.consumer, args=(self.queue, self.path.as_posix(), self.max_dbs, self.initial_size))
-            self.writer.start()
-
-        return self
-
-    def __exit__(
-        self,
-        exception_type: Optional[Type[BaseException]],
-        exception_value: Optional[BaseException],
-        exception_traceback: Optional[TracebackType],
-    ) -> Literal[False]:
-        if self.writer.is_alive():
-            self.queue.put(None)
-            self.writer.join()
-        self.env.close()
-        return False  # Allow errors to propagate!
+    def __init__(self, path: Path, queue: mp.Queue):
+        super().__init__(path, readonly=True)
+        self.queue = queue
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         print(klass)
-
-        if self.readonly:
-            raise
 
         this_class_idx = self.class_idx[klass]
 
@@ -116,32 +75,3 @@ class LmdbStorageMP(LmdbStorage):
                         full_key,
                     )
                 )
-
-    @staticmethod
-    def consumer(queue: mp.Queue, path: str, max_dbs: int, initial_size: int) -> None:  # type: ignore
-        env = lmdb.open(
-            path,
-            max_dbs=max_dbs,
-            map_size=initial_size,
-            writemap=False,
-            metasync=False,
-            sync=False,
-            subdir=True,
-        )
-
-        while True:
-            with env.begin(write=True) as txn:
-                while True:
-                    try:
-                        item = queue.get(timeout=0.05)  # probeer een nieuw item
-                    except Exception:
-                        # timeout → commit de transactie (door contextmanager) en start opnieuw
-                        break
-
-                    if item is None:
-                        # commit wat er nog in txn zit, daarna stoppen
-                        return
-
-                    klass, key, value = item
-                    db = env.open_db(klass, txn=txn)
-                    txn.put(key, value, db=db)
