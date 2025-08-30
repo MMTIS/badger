@@ -1,14 +1,10 @@
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Any
 import multiprocessing as mp
-
-import lmdb
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
-from storage.interface import Storage, Serializer
-from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, \
-    DB_UNRESOLVED
+from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, DB_UNRESOLVED
 
 
 class LmdbStorageQueue(LmdbStorage):
@@ -26,52 +22,53 @@ class LmdbStorageQueue(LmdbStorage):
         with self.env.begin(write=False) as txn:
             db_id_idx = self.env.open_db(DB_ID_IDX, txn=txn)
 
-            # if empty:
-            #    txn.drop(db=db, delete=False)
-
             for obj in objects:
-                key = int(next(self.last_entry))
+                # Each insert will receive a unique key, therefore they must be grouped together
+                updates: list[tuple[bytes, Any, Any]] = []
 
-                full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
+                partial_key = int.from_bytes(this_class_idx, 'little') << 32
+                # partial_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in only_references(obj, self.serializer):
                     unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
                     resolved_idx = txn.get(unresolved_value, db=db_id_idx)
                     if resolved_idx:
-                        self.queue.put(
+                        updates.append(
                             (
                                 DB_REFERENCE_OUTWARD,
-                                full_key,
+                                partial_key,
                                 resolved_idx,
                             )
                         )
-                        self.queue.put(
-                            (
-                                DB_REFERENCE_INWARD,
-                                resolved_idx,
-                                full_key,
-                            )
-                        )
+                        # updates.append(
+                        #    (
+                        #        DB_REFERENCE_INWARD,
+                        #        resolved_idx,
+                        #        partial_key,
+                        #    )
+                        #)
                     else:
-                        self.queue.put(
+                        updates.append(
                             (
                                 DB_UNRESOLVED,
-                                full_key,
+                                partial_key,
                                 unresolved_value,
                             )
                         )
 
                 value = self.serializer.marshall(obj, klass)
-                self.queue.put(
+                updates.append(
                     (
                         this_class_idx,
-                        key.to_bytes(4, 'little'),
+                        None,
                         value,
                     )
                 )
-                self.queue.put(
+                updates.append(
                     (
                         DB_ID_IDX,
                         self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True),
-                        full_key,
+                        partial_key,
                     )
                 )
+
+                self.queue.put(updates)

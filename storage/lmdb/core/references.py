@@ -9,12 +9,13 @@ from storage.lmdb.serialization.byteserializer import ByteSerializer
 def resolve_embeddings(storage: LmdbStorage):
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
-    now_resolved: list[tuple[bytes, bytes]] = []
+    now_resolved: set[tuple[bytes, bytes]] = set([]) # A set prevents duplicate deletes
 
     with storage.env.begin(write=True) as txn:
-        db_reference_forward = storage.env.open_db(DB_REFERENCE_OUTWARD, txn=txn, create=False)
-        db_reference_inward = storage.env.open_db(DB_REFERENCE_INWARD, txn=txn, create=False)
         db_unresolved = storage.env.open_db(DB_UNRESOLVED, txn=txn, create=False)
+        db_reference_outward = storage.env.open_db(DB_REFERENCE_OUTWARD, txn=txn, create=False)
+        # db_reference_inward = storage.env.open_db(DB_REFERENCE_INWARD, txn=txn, create=False)
+
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor:
             parts = storage.serializer.split_key(value)
@@ -40,15 +41,20 @@ def resolve_embeddings(storage: LmdbStorage):
                     if candidate in unresolved_pairs:
                         full_key = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(idx, 'little')).to_bytes(8, 'little')
                         for resolved_index in unresolved_pairs[candidate]:
-                            txn.put(resolved_index, full_key, db=db_reference_forward)
-                            txn.put(full_key, resolved_index, db=db_reference_inward)
-                            now_resolved.append((resolved_index, candidate))
+                            # Bij deze twee schrijfacties ontstaat build/lib/mdb.c:2156: Assertion 'rc == 0' failed in mdb_page_dirty()
+                            txn.put(resolved_index, full_key, db=db_reference_outward)
+                            # txn.put(full_key, resolved_index, db=db_reference_inward)
+                            # txn.delete(resolved_index, candidate, db=db_unresolved)
+                            now_resolved.add((resolved_index, candidate))
                         del unresolved_pairs[candidate]
 
-    # Workaround for very strang LMDB results
+    # print("Schrijven")
+    # Workaround for very strange LMDB results
     with storage.env.begin(write=True) as txn:
         db_unresolved = storage.env.open_db(DB_UNRESOLVED, txn=txn, create=False)
+
         for idx, value in now_resolved:
+            print(value)
             txn.delete(idx, value, db=db_unresolved)
 
 def resolve(storage: LmdbStorage) -> None:
@@ -61,7 +67,7 @@ def resolve(storage: LmdbStorage) -> None:
         db_unresolved = storage.env.open_db(DB_UNRESOLVED, txn=txn, create=False)
         db_id_idx = storage.env.open_db(DB_ID_IDX, txn=txn, create=False)
         db_reference_forward = storage.env.open_db(DB_REFERENCE_OUTWARD, txn=txn, create=False)
-        db_reference_inward = storage.env.open_db(DB_REFERENCE_INWARD, txn=txn, create=False)
+        # db_reference_inward = storage.env.open_db(DB_REFERENCE_INWARD, txn=txn, create=False)
 
         now_resolved: list[tuple[bytes, bytes]] = []
 
@@ -124,7 +130,7 @@ def resolve(storage: LmdbStorage) -> None:
                     txn.put(referenced_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__), db=db)
 
                 txn.put(idx, resolved_idx, db=db_reference_forward)
-                txn.put(resolved_idx, idx, db=db_reference_inward)
+                # txn.put(resolved_idx, idx, db=db_reference_inward)
 
                 # Because cursor.delete() does very funky things.
                 now_resolved.append((idx, value))

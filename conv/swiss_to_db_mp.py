@@ -1,5 +1,6 @@
 import logging
 import zipfile
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
 from storage.lmdb.core.implementation import LmdbStorage
@@ -24,6 +25,7 @@ def first_pattern_index(name: str, patterns: list[str]) -> tuple[int, str] | Non
         if token in name:
             return i, token
     return None
+
 
 def parse_and_enqueue(database: str, queue: mp.Queue, filename: str, sub_filename: str):
     """Runs in a subprocess: parse XML and enqueue objects."""
@@ -52,12 +54,11 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
     all_names = xml_storage.list_netex_files()
     initial_size = 8 * 1024**3
 
+    """
     with LmdbStorage(Path(database), readonly=False, initial_size=initial_size) as storage:
-        """
         if clean_database:
             print("Is cleaned!")
             storage.clean()
-        """
 
         patterns = [
             "_RESOURCE_",
@@ -82,20 +83,36 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
             print(sub_filename)
             sub_file = zip_file.open(sub_filename)
             insert_database(storage, interesting_classes, sub_file)
+    """
 
     with LmdbStorageMP(Path(database), readonly=False, initial_size=initial_size) as storage:
-        with storage.ctx.Pool(processes=n_proc) as pool:
-            tasks = []
+        with ProcessPoolExecutor(max_workers=n_proc, mp_context=storage.ctx) as executor:
+            futures = []
+            for sub_filename in all_names:
+                if "_RESOURCE_" in sub_filename or '_SITE_' in sub_filename or '_SERVICECALENDAR_' in sub_filename:
+                    futures.append(executor.submit(parse_and_enqueue, database, storage.queue, filename, sub_filename))
+
+            for future in as_completed(futures):
+                _res = future.result()
+
+            futures = []
+            for sub_filename in all_names:
+                if "_SERVICE_" in sub_filename:
+                    futures.append(executor.submit(parse_and_enqueue, database, storage.queue, filename, sub_filename))
+
+            for future in as_completed(futures):
+                _res = future.result()
+
+            futures = []
             for sub_filename in all_names:
                 if "_TIMETABLE_" in sub_filename:
-                    tasks.append(
-                        pool.apply_async(parse_and_enqueue, (database, storage.queue, filename,sub_filename))
-                    )
-            # Wacht tot alle producers klaar zijn
-            for task in tasks:
-                task.get()
+                    futures.append(executor.submit(parse_and_enqueue, database, storage.queue, filename, sub_filename))
+
+            for future in as_completed(futures):
+                _res = future.result()
 
     with LmdbStorage(Path(database), readonly=False, initial_size=initial_size) as storage:
+        zip_file = zipfile.ZipFile(filename)
         for sub_filename in all_names:
             if '_COMMON_' in sub_filename:
                 print(sub_filename)
@@ -104,6 +121,7 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
 
         resolve(storage)
         resolve_embeddings(storage)
+
 
 if __name__ == '__main__':
     import argparse

@@ -1,4 +1,3 @@
-from itertools import count
 from pathlib import Path
 from types import TracebackType
 from typing import Optional, Type, Literal, Iterable, Generator, Self, Any
@@ -28,7 +27,7 @@ class LmdbStorage(Storage):
     class_name_idx: dict[str, bytes]
     serializer: ByteSerializer
 
-    def __init__(self, path: Path, readonly: bool = True, initial_size: int = 4 * 1024**3):
+    def __init__(self, path: Path, readonly: bool = True, initial_size: int = 8 * 1024**3):
         if readonly and not path.exists():
             raise
 
@@ -36,7 +35,7 @@ class LmdbStorage(Storage):
         self.readonly = readonly
         self.max_dbs = 128
         self.initial_size = initial_size
-        self.last_entry = count() # TODO: change to context of DB
+        self.next_entry = None
         self.class_idx = {}
         self.idx_class = {}
         self.class_name_idx = {}
@@ -55,7 +54,7 @@ class LmdbStorage(Storage):
             self.env.open_db(DB_UNRESOLVED, txn=txn, create=True, integerkey=True, dupsort=True)
             self.env.open_db(DB_ID_IDX, txn=txn, create=True)
             self.env.open_db(DB_REFERENCE_OUTWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
-            self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True)
+            # self.env.open_db(DB_REFERENCE_INWARD, create=True, txn=txn, integerkey=True, dupsort=True, integerdup=True, pagesize=16384)
 
     def _restore_class_idx(self) -> None:
         with self.env.begin(write=False) as txn:
@@ -75,9 +74,9 @@ class LmdbStorage(Storage):
             self.path.as_posix(),
             max_dbs=self.max_dbs,
             map_size=self.initial_size,
-            writemap=False,
-            metasync=False,
-            sync=False,
+            writemap=True,
+            metasync=True,
+            sync=True,
             subdir=True,
         )
 
@@ -85,6 +84,7 @@ class LmdbStorage(Storage):
             self._populate_class_idx()
 
         self._restore_class_idx()
+        self.next_entry = self.get_next_key()
 
         return self
 
@@ -130,13 +130,13 @@ class LmdbStorage(Storage):
             db_unresolved = self.env.open_db(DB_UNRESOLVED, txn=txn, create=False)
             db_id_idx = self.env.open_db(DB_ID_IDX, txn=txn, create=False)
             db_reference_forward = self.env.open_db(DB_REFERENCE_OUTWARD, txn=txn, create=False)
-            db_reference_inward = self.env.open_db(DB_REFERENCE_INWARD, txn=txn, create=False)
+            # db_reference_inward = self.env.open_db(DB_REFERENCE_INWARD, txn=txn, create=False)
 
             if empty:
                 txn.drop(db=db, delete=False)
 
             for obj in objects:
-                key = int(next(self.last_entry))
+                key = self.next_entry = self.next_entry + 1
 
                 full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in only_references(obj, self.serializer):
@@ -144,7 +144,7 @@ class LmdbStorage(Storage):
                     resolved_idx = txn.get(unresolved_value, db=db_id_idx)
                     if resolved_idx:
                         txn.put(full_key, resolved_idx, db=db_reference_forward)
-                        txn.put(resolved_idx, full_key, db=db_reference_inward)
+                        # txn.put(resolved_idx, full_key, db=db_reference_inward)
                     else:
                         txn.put(full_key, unresolved_value, db=db_unresolved)
 
@@ -195,6 +195,8 @@ class LmdbStorage(Storage):
         with self.env.begin(write=False) as txn:
             db = self.env.open_db(this_class_idx, txn=txn, create=False)
             value = txn.get(key, db=db)
+            if value is None:
+                pass
             obj = self.serializer.unmarshall(value, clazz)
             # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
             return obj
@@ -228,3 +230,11 @@ class LmdbStorage(Storage):
                 count += 1
                 if count >= limit:
                     break
+
+    def get_next_key(self) -> int:
+        with self.env.begin(write=False) as txn:
+            db = self.env.open_db(DB_ID_IDX, txn=txn, create=False)
+            cur = txn.cursor(db=db)
+            if cur.last():
+                return int.from_bytes(cur.value(), "little") + 1
+            return 0
