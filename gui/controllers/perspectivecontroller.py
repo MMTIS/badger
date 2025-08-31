@@ -81,7 +81,8 @@ class PerspectiveController(QObject):
             self._on_detail_tab_changed(current_tab_index)
 
         # Pass the database object to the view so the model can perform lazy checks.
-        self.widget.update_reference_lists(self._storage_controller.load_references_inwards(lmdbo), self._storage_controller.load_references_outwards(lmdbo))
+        # self.widget.update_reference_lists(self._storage_controller.load_references_inwards(lmdbo), self._storage_controller.load_references_outwards(lmdbo))
+        self.widget.update_reference_lists([], self._storage_controller.load_references_outwards(lmdbo))
 
     def handle_item_selected(self, index: QModelIndex) -> None:
         if not index.isValid():

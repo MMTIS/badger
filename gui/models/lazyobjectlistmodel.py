@@ -116,6 +116,9 @@ class LazyObjectListModel(QAbstractListModel):
             # Use a lambda with a default argument to capture the current row value
             item.objLoaded.connect(lambda _unused, r=row: self._on_object_loaded(r))
 
+        self._can_fetch_more = len(new_items) == OBJECT_FETCH_BATCH_SIZE
+
+
     @Slot(int)
     def _on_object_loaded(self, row: int) -> None:
         """Slot to handle the dataLoaded signal from an LMDBObject."""

@@ -4,6 +4,7 @@ from storage.lmdb.core.implementation import LmdbStorage
 from storage.lmdb.core.references import resolve, resolve_embeddings
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
+from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import *
 
 
@@ -14,7 +15,7 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
         log_flush()
         exit(1)
 
-    with LmdbStorage(Path(database), readonly=False) as storage:
+    with MdbxStorage(Path(database), readonly=False) as storage:
         """
         if clean_database:
             print("Is cleaned!")
