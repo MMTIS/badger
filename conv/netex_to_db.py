@@ -1,7 +1,6 @@
 from pathlib import Path
 
-from storage.lmdb.core.implementation import LmdbStorage
-from storage.lmdb.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.references import resolve, resolve_embeddings
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
 from storage.mdbx.core.implementation import MdbxStorage

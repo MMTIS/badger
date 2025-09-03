@@ -3,9 +3,9 @@ import zipfile
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 
-from storage.lmdb.core.implementation import LmdbStorage
-from storage.lmdb.core.implementation_mp import LmdbStorageMP
-from storage.lmdb.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.implementation import MdbxStorage
+from storage.mdbx.core.implementation_mp import MdbxStorageMP
+from storage.mdbx.core.references import resolve, resolve_embeddings
 from storage.lxml.core.insert import get_interesting_classes, insert_database
 from storage.lxml.core.implementation import XmlStorage
 from utils.aux_logging import log_all, prepare_logger
@@ -31,7 +31,7 @@ def parse_and_enqueue(database: str, queue: mp.Queue, filename: str, sub_filenam
     """Runs in a subprocess: parse XML and enqueue objects."""
 
     import zipfile
-    from storage.lmdb.core.implementation_queue import LmdbStorageQueue
+    from storage.mdbx.core.implementation_queue import MdbxStorageQueue
     from storage.lxml.core.insert import get_interesting_classes, insert_database
 
     print(f"[{mp.current_process().name}] Parsing {sub_filename}")
@@ -39,7 +39,7 @@ def parse_and_enqueue(database: str, queue: mp.Queue, filename: str, sub_filenam
     with zipfile.ZipFile(filename) as zip_file:
         with zip_file.open(sub_filename) as sub_file:
             interesting_classes = get_interesting_classes(SWISS_CLASSES)
-            with LmdbStorageQueue(Path(database), queue) as storage:
+            with MdbxStorageQueue(Path(database), queue) as storage:
                 print(sub_filename)
                 insert_database(storage, interesting_classes, sub_file)
 
@@ -52,7 +52,6 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
     xml_storage = XmlStorage(Path(filename))
     # Stap 1: alleen bestandsnamen ophalen
     all_names = xml_storage.list_netex_files()
-    initial_size = 8 * 1024**3
 
     """
     with LmdbStorage(Path(database), readonly=False, initial_size=initial_size) as storage:
@@ -85,7 +84,7 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
             insert_database(storage, interesting_classes, sub_file)
     """
 
-    with LmdbStorageMP(Path(database), readonly=False, initial_size=initial_size) as storage:
+    with MdbxStorageMP(Path(database), readonly=False) as storage:
         with ProcessPoolExecutor(max_workers=n_proc, mp_context=storage.ctx) as executor:
             futures = []
             for sub_filename in all_names:
@@ -111,14 +110,13 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
             for future in as_completed(futures):
                 _res = future.result()
 
-    with LmdbStorage(Path(database), readonly=False, initial_size=initial_size) as storage:
+    with MdbxStorage(Path(database), readonly=False) as storage:
         zip_file = zipfile.ZipFile(filename)
         for sub_filename in all_names:
             if '_COMMON_' in sub_filename:
                 print(sub_filename)
                 sub_file = zip_file.open(sub_filename)
                 insert_database(storage, interesting_classes, sub_file)
-
         resolve(storage)
         resolve_embeddings(storage)
 

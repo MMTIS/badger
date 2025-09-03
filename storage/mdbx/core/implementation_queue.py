@@ -30,7 +30,7 @@ class MdbxStorageQueue(MdbxStorage):
                 # partial_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in only_references(obj, self.serializer):
                     unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
-                    resolved_idx = db_id_idx.get(unresolved_value)
+                    resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         updates.append(
                             (

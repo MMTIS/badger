@@ -41,7 +41,7 @@ class MdbxStorageMP(MdbxStorage):
             self.queue.put(None)
             self.writer.join()
 
-        return super().__exit__()
+        return super().__exit__(exception_type, exception_value, exception_traceback)
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         print(klass)
@@ -106,6 +106,8 @@ class MdbxStorageMP(MdbxStorage):
 
     @staticmethod
     def consumer(queue: mp.Queue, path: str, max_dbs: int, initial_size: int, next_entry: int) -> None:  # type: ignore
+        # TODO: Replace NextEntry with mdbx sequence generator?
+
         env = Env(
             path,
             maxdbs=max_dbs,
@@ -128,6 +130,7 @@ class MdbxStorageMP(MdbxStorage):
 
                     if items is None:
                         # commit wat er nog in txn zit, daarna stoppen
+                        txn.commit()
                         return
 
                     for item in items:
@@ -153,3 +156,4 @@ class MdbxStorageMP(MdbxStorage):
 
                     # When the entire item is inserted, increment
                     next_entry += 1
+                txn.commit()

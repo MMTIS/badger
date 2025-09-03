@@ -96,20 +96,21 @@ class MdbxStorage(Storage):
         exception_value: Optional[BaseException],
         exception_traceback: Optional[TracebackType],
     ) -> Literal[False]:
-        # self.env.close()
+        self.env.close()
         return False  # Allow errors to propagate!
 
-    def db_names(self) -> dict[bytes, type]:
+    def db_names(self, txn=None) -> dict[bytes, type]:
         db_names: dict[bytes, type] = {}
-        with self.env.ro_transaction() as txn:
-            with txn.cursor() as cur:
-                for db_name, _ in cur.iter():
-                    if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_INWARD, DB_REFERENCE_OUTWARD):
-                        continue
+        if txn is None:
+            txn = self.env.ro_transaction()
+        with txn.cursor() as cur:
+            for db_name, _ in cur.iter():
+                if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_INWARD, DB_REFERENCE_OUTWARD):
+                    continue
 
-                    clazz = self.idx_class.get(db_name, None)
-                    if clazz is not None:
-                        db_names[db_name] = clazz
+                clazz = self.idx_class.get(db_name, None)
+                if clazz is not None:
+                    db_names[db_name] = clazz
         return db_names
 
     def clean(self) -> None:
@@ -128,7 +129,7 @@ class MdbxStorage(Storage):
                 cur = txn.cursor(db_id_idx)
                 k, v = cur.last()
                 if k:
-                    return int.from_bytes(v, "little") + 1
+                    return (int.from_bytes(v, "little") & 0xFFFFFFFF) + 1 # Skips the class
         return 0
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
@@ -217,7 +218,7 @@ class MdbxStorage(Storage):
                 # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
                 return obj
 
-    def scan_objects(self, clazz: type[Tid], start_key: bytes | None, limit: int) -> Generator[bytes, None, None]:
+    def scan_objects(self, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
         with self.env.ro_transaction() as txn:
             with txn.open_map(name=self.class_idx[clazz]) as db:
                 with txn.cursor(db) as cursor:
@@ -226,7 +227,22 @@ class MdbxStorage(Storage):
                     # Iterate over keys only for maximum efficiency
                     for key, _value in cursor.iter(start_key=start_key):  # TODO: MDBX_SET
                         yield key
-                        count += 1
-                        if count >= limit:
-                            break
+                        if limit:
+                            count += 1
+                            if count >= limit:
+                                break
+
+    def iter_objects(self, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None):
+        with self.env.ro_transaction() as txn:
+            with txn.open_map(name=self.class_idx[clazz]) as db:
+                with txn.cursor(db) as cursor:
+                    count = 0
+
+                    for key, value in cursor.iter(start_key=start_key):
+                        yield key, self.serializer.unmarshall(value, clazz)
+                        if limit:
+                            count += 1
+                            if count >= limit:
+                                break
+
 

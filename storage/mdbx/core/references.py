@@ -24,7 +24,7 @@ def resolve_embeddings(storage: MdbxStorage):
             unresolved_pairs.setdefault(value, set()).add(idx)
             missing_classes.add(storage.idx_class[parts[-1]])
 
-        used_classes_in_database = set(storage.db_names().values())
+        used_classes_in_database = set(storage.db_names(txn).values())
         index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
         clazzes: set[type] = set().union(*index.values())
 
@@ -43,10 +43,10 @@ def resolve_embeddings(storage: MdbxStorage):
                             full_key = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(idx, 'little')).to_bytes(8, 'little')
                             for resolved_index in unresolved_pairs[candidate]:
                                 # Bij deze twee schrijfacties ontstaat build/lib/mdb.c:2156: Assertion 'rc == 0' failed in mdb_page_dirty()
-                                db_reference_outward.put(resolved_index, full_key)
+                                db_reference_outward.put(txn, resolved_index, full_key)
                                 # db_reference_inward.put(full_key, resolved_index)
                                 db_unresolved.delete(txn, resolved_index, candidate)
-                                now_resolved.add((resolved_index, candidate))
+                                # now_resolved.add((resolved_index, candidate))
                             del unresolved_pairs[candidate]
 
     # print("Schrijven")
