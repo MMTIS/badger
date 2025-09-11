@@ -53,7 +53,10 @@ class MdbxStorage(Storage):
 
             txn.create_map(name=DB_UNRESOLVED, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT)
             txn.create_map(name=DB_ID_IDX)
-            txn.create_map(name=DB_REFERENCE_OUTWARD, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP)
+            txn.create_map(
+                name=DB_REFERENCE_OUTWARD,
+                flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP,
+            )
             # txn.create_map(key=DB_REFERENCE_INWARD, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP)
             txn.commit()
 
@@ -96,7 +99,7 @@ class MdbxStorage(Storage):
         exception_value: Optional[BaseException],
         exception_traceback: Optional[TracebackType],
     ) -> Literal[False]:
-        self.env.close()
+        # self.env.close()
         return False  # Allow errors to propagate!
 
     def db_names(self, txn=None) -> dict[bytes, type]:
@@ -129,7 +132,7 @@ class MdbxStorage(Storage):
                 cur = txn.cursor(db_id_idx)
                 k, v = cur.last()
                 if k:
-                    return (int.from_bytes(v, "little") & 0xFFFFFFFF) + 1 # Skips the class
+                    return (int.from_bytes(v, "little") & 0xFFFFFFFF) + 1  # Skips the class
         return 0
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
@@ -170,9 +173,9 @@ class MdbxStorage(Storage):
 
             txn.commit()
 
-    def _load_references(self, full_key: bytes, db_direction: bytes) -> Generator[tuple[type, bytes], None, None]:
+    def _load_references(self, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
         with self.env.ro_transaction() as txn:
-            db = txn.open_map(db_direction)
+            db = txn.open_map(DB_REFERENCE_OUTWARD)
             cursor = txn.cursor(db)
             for it in cursor.iter_dupsort_rows(start_key=full_key):
                 for _, reference_key in it:
@@ -180,23 +183,40 @@ class MdbxStorage(Storage):
                     yield self.idx_class[class_idx], reference_local_key
                 break
 
+    def _load_references_inwards(self, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
+        with self.env.ro_transaction() as txn:
+            db = txn.open_map(DB_REFERENCE_OUTWARD)
+            cursor = txn.cursor(db)
+            for it in cursor.iter_dupsort_rows():
+                for referencing_key, reference_key in it:
+                    if reference_key == full_key:
+                        class_idx, referencing_local_key = ByteSerializer.full_key_to_idx(referencing_key)
+                        yield self.idx_class[class_idx], referencing_local_key
+
     def load_references_by_clazz_key(self, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
-        db_direction = DB_REFERENCE_INWARD if inwards else DB_REFERENCE_OUTWARD
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-        yield from self._load_references(full_key, db_direction)
+        if inwards:
+            yield from self._load_references_inwards(full_key)
+        else:
+            yield from self._load_references(full_key)
 
     def load_references_by_object(self, obj: Tid, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
-        db_direction = DB_REFERENCE_INWARD if inwards else DB_REFERENCE_OUTWARD
         if hasattr(obj, 'idx'):
             full_key = obj.idx
-            yield from self._load_references(full_key, db_direction)
+            if inwards:
+                yield from self._load_references_inwards(full_key)
+            else:
+                yield from self._load_references(full_key)
         else:
             with self.env.ro_transaction() as txn:
                 with txn.open_map(name=DB_ID_IDX) as db_id_idx:
                     key = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
                     full_key = db_id_idx.get(txn, key)
-                    yield from self._load_references(full_key, db_direction)
+                    if inwards:
+                        yield from self._load_references_inwards(full_key)
+                    else:
+                        yield from self._load_references(full_key)
 
     def load_object_by_full_key(self, full_key: bytes) -> Any:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
@@ -244,5 +264,3 @@ class MdbxStorage(Storage):
                             count += 1
                             if count >= limit:
                                 break
-
-
