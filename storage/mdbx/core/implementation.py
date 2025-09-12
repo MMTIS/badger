@@ -11,11 +11,11 @@ from domain.utils import get_object_name
 from storage.interface import Storage
 from storage.lmdb.serialization.byteserializer import ByteSerializer
 
-DB_CLASS_IDX = b'_class_idx'
-DB_UNRESOLVED = b'_unresolved'
-DB_ID_IDX = b'_id_idx'
-DB_REFERENCE_OUTWARD = b'_reference_outward'
-DB_REFERENCE_INWARD = b'_reference_inward'
+DB_CLASS_IDX = bytes(b'_class_idx')
+DB_UNRESOLVED = bytes(b'_unresolved')
+DB_ID_IDX = bytes(b'_id_idx')
+DB_REFERENCE_OUTWARD = bytes(b'_reference_outward')
+DB_REFERENCE_INWARD = bytes(b'_reference_inward')
 
 
 class MdbxStorage(Storage):

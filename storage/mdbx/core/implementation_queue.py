@@ -4,13 +4,13 @@ import multiprocessing as mp
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, DB_UNRESOLVED
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED
 
 
 class MdbxStorageQueue(MdbxStorage):
-    queue: mp.Queue  # type: ignore
+    queue: mp.Queue[list[tuple[bytes, Any, Any]]]
 
-    def __init__(self, path: Path, queue: mp.Queue):
+    def __init__(self, path: Path, queue: mp.Queue[list[tuple[bytes, Any, Any]]]):
         super().__init__(path, readonly=True)
         self.queue = queue
 
@@ -45,7 +45,7 @@ class MdbxStorageQueue(MdbxStorage):
                         #        resolved_idx,
                         #        partial_key,
                         #    )
-                        #)
+                        # )
                     else:
                         updates.append(
                             (
