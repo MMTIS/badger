@@ -4,7 +4,7 @@ from PySide6.QtWidgets import QTabWidget, QMainWindow, QWidget
 class MainView(QMainWindow):
     def __init__(self, parent: QWidget | None):
         super().__init__()
-        self.setWindowTitle("LMDB Explorer")
+        self.setWindowTitle("NeTEx Explorer")
         self.setGeometry(100, 100, 1200, 800)
         self.tab_widget = QTabWidget(parent)
         self.tab_widget.setTabsClosable(True)
