@@ -85,108 +85,109 @@ def createLayers(storage: MdbxStorage, ds: Dataset):
     # First pass, see what types are around
     grouped_geo = defaultdict(set)
 
-    for k, stopPlace in storage.iter_objects(StopPlace):
-        collected_equipments: dict[str, Any] = {}
+    with storage.env.ro_transaction():
+        for k, stopPlace in storage.iter_objects(txn, StopPlace):
+            collected_equipments: dict[str, Any] = {}
 
-        # Collect all the locations equipment could be placed
-        collected_equipment_places: dict[str, EquipmentPlace] = {}
+            # Collect all the locations equipment could be placed
+            collected_equipment_places: dict[str, EquipmentPlace] = {}
 
-        if stopPlace.equipment_places:
-            for equipment_place in [
-                equipment_place
-                for equipment_place in stopPlace.equipment_places.equipment_place_ref_or_equipment_place
-                if isinstance(equipment_place, EquipmentPlace)
-            ]:
-                collected_equipment_places[equipment_place.id] = equipment_place
+            if stopPlace.equipment_places:
+                for equipment_place in [
+                    equipment_place
+                    for equipment_place in stopPlace.equipment_places.equipment_place_ref_or_equipment_place
+                    if isinstance(equipment_place, EquipmentPlace)
+                ]:
+                    collected_equipment_places[equipment_place.id] = equipment_place
 
-                if equipment_place.place_equipments:
-                    for place_equipment in equipment_place.place_equipments.choice:
-                        if hasattr(place_equipment, "ref"):
-                            actual_equipment = collected_equipments[place_equipment.ref]
-                        else:
-                            collected_equipments[place_equipment.id] = place_equipment
-                            actual_equipment = place_equipment
-                        actual_equipment.extensions = equipment_place
+                    if equipment_place.place_equipments:
+                        for place_equipment in equipment_place.place_equipments.choice:
+                            if hasattr(place_equipment, "ref"):
+                                actual_equipment = collected_equipments[place_equipment.ref]
+                            else:
+                                collected_equipments[place_equipment.id] = place_equipment
+                                actual_equipment = place_equipment
+                            actual_equipment.extensions = equipment_place
 
-        if stopPlace.place_equipments:
-            for place_equipment in stopPlace.place_equipments.choice:
-                if hasattr(place_equipment, "ref"):
-                    actual_equipment = collected_equipments[place_equipment.ref]
-                else:
-                    collected_equipments[place_equipment.id] = place_equipment
-                    actual_equipment = place_equipment
-                actual_equipment.extensions = stopPlace
+            if stopPlace.place_equipments:
+                for place_equipment in stopPlace.place_equipments.choice:
+                    if hasattr(place_equipment, "ref"):
+                        actual_equipment = collected_equipments[place_equipment.ref]
+                    else:
+                        collected_equipments[place_equipment.id] = place_equipment
+                        actual_equipment = place_equipment
+                    actual_equipment.extensions = stopPlace
 
-        if stopPlace.access_spaces:
-            for access_space in [
-                access_space for access_space in stopPlace.access_spaces.access_space_ref_or_access_space if isinstance(access_space, AccessSpace)
-            ]:
-                if access_space.equipment_places:
-                    for equipment_place in [
-                        equipment_place
-                        for equipment_place in access_space.equipment_places.equipment_place_ref_or_equipment_place
-                        if isinstance(equipment_place, EquipmentPlace)
-                    ]:
-                        collected_equipment_places[equipment_place.id] = equipment_place
+            if stopPlace.access_spaces:
+                for access_space in [
+                    access_space for access_space in stopPlace.access_spaces.access_space_ref_or_access_space if isinstance(access_space, AccessSpace)
+                ]:
+                    if access_space.equipment_places:
+                        for equipment_place in [
+                            equipment_place
+                            for equipment_place in access_space.equipment_places.equipment_place_ref_or_equipment_place
+                            if isinstance(equipment_place, EquipmentPlace)
+                        ]:
+                            collected_equipment_places[equipment_place.id] = equipment_place
 
-                        if equipment_place.place_equipments:
-                            for place_equipment in equipment_place.place_equipments.choice:
-                                if hasattr(place_equipment, "ref"):
-                                    actual_equipment = collected_equipments[place_equipment.ref]
-                                else:
-                                    collected_equipments[place_equipment.id] = place_equipment
-                                    actual_equipment = place_equipment
-                                actual_equipment.extensions = equipment_place
+                            if equipment_place.place_equipments:
+                                for place_equipment in equipment_place.place_equipments.choice:
+                                    if hasattr(place_equipment, "ref"):
+                                        actual_equipment = collected_equipments[place_equipment.ref]
+                                    else:
+                                        collected_equipments[place_equipment.id] = place_equipment
+                                        actual_equipment = place_equipment
+                                    actual_equipment.extensions = equipment_place
 
-                if access_space.place_equipments:
-                    for place_equipment in access_space.place_equipments.choice:
-                        if hasattr(place_equipment, "ref"):
-                            actual_equipment = collected_equipments[place_equipment.ref]
-                        else:
-                            collected_equipments[place_equipment.id] = place_equipment
-                            actual_equipment = place_equipment
-                        actual_equipment.extensions = access_space
+                    if access_space.place_equipments:
+                        for place_equipment in access_space.place_equipments.choice:
+                            if hasattr(place_equipment, "ref"):
+                                actual_equipment = collected_equipments[place_equipment.ref]
+                            else:
+                                collected_equipments[place_equipment.id] = place_equipment
+                                actual_equipment = place_equipment
+                            actual_equipment.extensions = access_space
 
-                geom_class = access_space.polygon_or_multi_surface.__class__ if access_space.polygon_or_multi_surface else access_space.centroid.__class__
-                grouped_geo[access_space.__class__].add(geom_class)
+                    geom_class = access_space.polygon_or_multi_surface.__class__ if access_space.polygon_or_multi_surface else access_space.centroid.__class__
+                    grouped_geo[access_space.__class__].add(geom_class)
 
-        if stopPlace.quays:
-            for quay in [quay for quay in stopPlace.quays.taxi_stand_ref_or_quay_ref_or_quay if isinstance(quay, Quay)]:
-                if quay.equipment_places:
-                    for equipment_place in [
-                        equipment_place
-                        for equipment_place in quay.equipment_places.equipment_place_ref_or_equipment_place
-                        if isinstance(equipment_place, EquipmentPlace)
-                    ]:
-                        collected_equipment_places[equipment_place.id] = equipment_place
+            if stopPlace.quays:
+                for quay in [quay for quay in stopPlace.quays.taxi_stand_ref_or_quay_ref_or_quay if isinstance(quay, Quay)]:
+                    if quay.equipment_places:
+                        for equipment_place in [
+                            equipment_place
+                            for equipment_place in quay.equipment_places.equipment_place_ref_or_equipment_place
+                            if isinstance(equipment_place, EquipmentPlace)
+                        ]:
+                            collected_equipment_places[equipment_place.id] = equipment_place
 
-                        if equipment_place.place_equipments:
-                            for place_equipment in equipment_place.place_equipments.choice:
-                                if hasattr(place_equipment, "ref"):
-                                    actual_equipment = collected_equipments[place_equipment.ref]
-                                else:
-                                    collected_equipments[place_equipment.id] = place_equipment
-                                    actual_equipment = place_equipment
-                                actual_equipment.extensions = equipment_place
+                            if equipment_place.place_equipments:
+                                for place_equipment in equipment_place.place_equipments.choice:
+                                    if hasattr(place_equipment, "ref"):
+                                        actual_equipment = collected_equipments[place_equipment.ref]
+                                    else:
+                                        collected_equipments[place_equipment.id] = place_equipment
+                                        actual_equipment = place_equipment
+                                    actual_equipment.extensions = equipment_place
 
-                if quay.place_equipments:
-                    for place_equipment in quay.place_equipments.choice:
-                        if hasattr(place_equipment, "ref"):
-                            actual_equipment = collected_equipments[place_equipment.ref]
-                        else:
-                            collected_equipments[place_equipment.id] = place_equipment
-                            actual_equipment = place_equipment
-                        actual_equipment.extensions = quay
+                    if quay.place_equipments:
+                        for place_equipment in quay.place_equipments.choice:
+                            if hasattr(place_equipment, "ref"):
+                                actual_equipment = collected_equipments[place_equipment.ref]
+                            else:
+                                collected_equipments[place_equipment.id] = place_equipment
+                                actual_equipment = place_equipment
+                            actual_equipment.extensions = quay
 
-                geom_class = quay.polygon_or_multi_surface.__class__ if quay.polygon_or_multi_surface else quay.centroid.__class__
-                grouped_geo[quay.__class__].add(geom_class)
+                    geom_class = quay.polygon_or_multi_surface.__class__ if quay.polygon_or_multi_surface else quay.centroid.__class__
+                    grouped_geo[quay.__class__].add(geom_class)
 
-        geom_class = stopPlace.polygon_or_multi_surface.__class__ if stopPlace.polygon_or_multi_surface else stopPlace.centroid.__class__
-        grouped_geo[stopPlace.__class__].add(geom_class)
+            geom_class = stopPlace.polygon_or_multi_surface.__class__ if stopPlace.polygon_or_multi_surface else stopPlace.centroid.__class__
+            grouped_geo[stopPlace.__class__].add(geom_class)
 
-        for e in collected_equipments.values():
-            geom_class = e.extensions.polygon_or_multi_surface.__class__ if e.extensions.polygon_or_multi_surface else e.extensions.centroid.__class__
-            grouped_geo[e.__class__].add(geom_class)
+            for e in collected_equipments.values():
+                geom_class = e.extensions.polygon_or_multi_surface.__class__ if e.extensions.polygon_or_multi_surface else e.extensions.centroid.__class__
+                grouped_geo[e.__class__].add(geom_class)
 
     # TODO: fetch this from the objects
     srs = osr.SpatialReference()
@@ -573,5 +574,6 @@ if __name__ == "__main__":
     with MdbxStorage(Path("/tmp/epiap.mdbx"), readonly=True) as storage:
         layers = createLayers(storage, ds)
 
-        for k, stopPlace in storage.iter_objects(StopPlace):
-            stopPlaceToLayers(stopPlace, layers)
+        with storage.env.ro_transaction() as txn:
+            for k, stopPlace in storage.iter_objects(txn, StopPlace):
+                stopPlaceToLayers(stopPlace, layers)

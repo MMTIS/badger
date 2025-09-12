@@ -3,22 +3,21 @@ from types import TracebackType
 from typing import Optional, Type, Literal, Iterable, Generator, Self, Any
 
 from mdbx import Env, MDBXDBFlags
+from mdbx.mdbx import TXN
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.interface import Storage
 from storage.lmdb.serialization.byteserializer import ByteSerializer
 
 DB_CLASS_IDX = b'_class_idx'
 DB_UNRESOLVED = b'_unresolved'
 DB_ID_IDX = b'_id_idx'
 DB_REFERENCE_OUTWARD = b'_reference_outward'
-DB_REFERENCE_INWARD = b'_reference_inward'
 
 
-class MdbxStorage(Storage):
+class MdbxStorage:
     readonly: bool
     max_dbs: int
     initial_size: int
@@ -57,7 +56,6 @@ class MdbxStorage(Storage):
                 name=DB_REFERENCE_OUTWARD,
                 flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP,
             )
-            # txn.create_map(key=DB_REFERENCE_INWARD, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP)
             txn.commit()
 
     def _restore_class_idx(self) -> None:
@@ -108,7 +106,7 @@ class MdbxStorage(Storage):
             txn = self.env.ro_transaction()
         with txn.cursor() as cur:
             for db_name, _ in cur.iter():
-                if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_INWARD, DB_REFERENCE_OUTWARD):
+                if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
                     continue
 
                 clazz = self.idx_class.get(db_name, None)
@@ -148,7 +146,6 @@ class MdbxStorage(Storage):
             db_unresolved = txn.open_map(name=DB_UNRESOLVED)
             db_id_idx = txn.open_map(name=DB_ID_IDX)
             db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
-            # db_reference_inward = txn.open_map(name=DB_REFERENCE_INWARD)
 
             if empty:
                 db.drop(delete=False)
@@ -173,94 +170,87 @@ class MdbxStorage(Storage):
 
             txn.commit()
 
-    def _load_references(self, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
-        with self.env.ro_transaction() as txn:
-            db = txn.open_map(DB_REFERENCE_OUTWARD)
-            cursor = txn.cursor(db)
-            for it in cursor.iter_dupsort_rows(start_key=full_key):
-                for _, reference_key in it:
-                    class_idx, reference_local_key = ByteSerializer.full_key_to_idx(reference_key)
-                    yield self.idx_class[class_idx], reference_local_key
-                break
+    def _load_references(self, txn: TXN, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
+        db = txn.open_map(DB_REFERENCE_OUTWARD)
+        cursor = txn.cursor(db)
+        for it in cursor.iter_dupsort_rows(start_key=full_key):
+            for _, reference_key in it:
+                class_idx, reference_local_key = ByteSerializer.full_key_to_idx(reference_key)
+                yield self.idx_class[class_idx], reference_local_key
+            break
 
-    def _load_references_inwards(self, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
-        with self.env.ro_transaction() as txn:
-            db = txn.open_map(DB_REFERENCE_OUTWARD)
-            cursor = txn.cursor(db)
-            for it in cursor.iter_dupsort_rows():
-                for referencing_key, reference_key in it:
-                    if reference_key == full_key:
-                        class_idx, referencing_local_key = ByteSerializer.full_key_to_idx(referencing_key)
-                        yield self.idx_class[class_idx], referencing_local_key
+    def _load_references_inwards(self, txn: TXN, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
+        db = txn.open_map(DB_REFERENCE_OUTWARD)
+        cursor = txn.cursor(db)
+        for it in cursor.iter_dupsort_rows():
+            for referencing_key, reference_key in it:
+                if reference_key == full_key:
+                    class_idx, referencing_local_key = ByteSerializer.full_key_to_idx(referencing_key)
+                    yield self.idx_class[class_idx], referencing_local_key
 
-    def load_references_by_clazz_key(self, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
+    def load_references_by_clazz_key(self, txn: TXN, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
         if inwards:
-            yield from self._load_references_inwards(full_key)
+            yield from self._load_references_inwards(txn, full_key)
         else:
-            yield from self._load_references(full_key)
+            yield from self._load_references(txn, full_key)
 
-    def load_references_by_object(self, obj: Tid, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
+    def load_references_by_object(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
         if hasattr(obj, 'idx'):
             full_key = obj.idx
             if inwards:
-                yield from self._load_references_inwards(full_key)
+                yield from self._load_references_inwards(txn, full_key)
             else:
-                yield from self._load_references(full_key)
+                yield from self._load_references(txn, full_key)
         else:
-            with self.env.ro_transaction() as txn:
-                with txn.open_map(name=DB_ID_IDX) as db_id_idx:
-                    key = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
-                    full_key = db_id_idx.get(txn, key)
-                    if inwards:
-                        yield from self._load_references_inwards(full_key)
-                    else:
-                        yield from self._load_references(full_key)
+            with txn.open_map(name=DB_ID_IDX) as db_id_idx:
+                key = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+                full_key = db_id_idx.get(txn, key)
+                if inwards:
+                    yield from self._load_references_inwards(txn, full_key)
+                else:
+                    yield from self._load_references(txn, full_key)
 
-    def load_object_by_full_key(self, full_key: bytes) -> Any:
+    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Any:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
-        with self.env.ro_transaction() as txn:
-            with txn.open_map(name=this_clazz_idx) as db:
-                value = db.get(txn, key)
-                obj: Tid = self.serializer.unmarshall(value, clazz)
-                return obj
+        with txn.open_map(name=this_clazz_idx) as db:
+            value = db.get(txn, key)
+            obj: Tid = self.serializer.unmarshall(value, clazz)
+            return obj
 
-    def load_object(self, clazz: type[Tid], key: bytes) -> Tid:
+    def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> Tid:
         this_class_idx = self.class_idx[clazz]
-        with self.env.ro_transaction() as txn:
-            with txn.open_map(name=this_class_idx) as db:
-                value = db.get(txn, key)
-                if value is None:
-                    pass
-                obj = self.serializer.unmarshall(value, clazz)
-                # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-                return obj
+        with txn.open_map(name=this_class_idx) as db:
+            value = db.get(txn, key)
+            if value is None:
+                pass
+            obj = self.serializer.unmarshall(value, clazz)
+            # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
+            return obj
 
-    def scan_objects(self, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
-        with self.env.ro_transaction() as txn:
-            with txn.open_map(name=self.class_idx[clazz]) as db:
-                with txn.cursor(db) as cursor:
-                    count = 0
+    def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
+        with txn.open_map(name=self.class_idx[clazz]) as db:
+            with txn.cursor(db) as cursor:
+                count = 0
 
-                    # Iterate over keys only for maximum efficiency
-                    for key, _value in cursor.iter(start_key=start_key):  # TODO: MDBX_SET
-                        yield key
-                        if limit:
-                            count += 1
-                            if count >= limit:
-                                break
+                # Iterate over keys only for maximum efficiency
+                for key, _value in cursor.iter(start_key=start_key):  # TODO: MDBX_SET
+                    yield key
+                    if limit:
+                        count += 1
+                        if count >= limit:
+                            break
 
-    def iter_objects(self, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None):
-        with self.env.ro_transaction() as txn:
-            with txn.open_map(name=self.class_idx[clazz]) as db:
-                with txn.cursor(db) as cursor:
-                    count = 0
+    def iter_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None):
+        with txn.open_map(name=self.class_idx[clazz]) as db:
+            with txn.cursor(db) as cursor:
+                count = 0
 
-                    for key, value in cursor.iter(start_key=start_key):
-                        yield key, self.serializer.unmarshall(value, clazz)
-                        if limit:
-                            count += 1
-                            if count >= limit:
-                                break
+                for key, value in cursor.iter(start_key=start_key):
+                    yield key, self.serializer.unmarshall(value, clazz)
+                    if limit:
+                        count += 1
+                        if count >= limit:
+                            break

@@ -4,14 +4,14 @@ from domain.netex.indexes.inverse_class import collect_classes_index
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding
 from domain.utils import get_object_name
-from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, DB_ID_IDX
+from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_ID_IDX
 from storage.mdbx.serialization.byteserializer import ByteSerializer
 
 
 def resolve_embeddings(storage: MdbxStorage):
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
-    now_resolved: set[tuple[bytes, bytes]] = set([]) # A set prevents duplicate deletes
+    now_resolved: set[tuple[bytes, bytes]] = set([])  # A set prevents duplicate deletes
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED)
@@ -57,6 +57,7 @@ def resolve_embeddings(storage: MdbxStorage):
     #    for idx, value in now_resolved:
     #        print(value)
     #        txn.delete(idx, value, db=db_unresolved)
+
 
 def resolve(storage: MdbxStorage) -> None:
     if storage.readonly:
@@ -109,17 +110,19 @@ def resolve(storage: MdbxStorage) -> None:
                     referenced_class_idx, referenced_key = storage.serializer.full_key_to_idx(version_change or class_change)
                     referencing_class_idx, referencing_key = storage.serializer.full_key_to_idx(idx)
                     referencing_class = storage.idx_class[referencing_class_idx]
-                    referencing_obj: Tid = storage.load_object(referencing_class, referencing_key)
+                    referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
 
                     for reference in only_reference_objects(referencing_obj):
-                        cmp_value = storage.serializer.encode_key(reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[reference.name_of_ref_class], True)
+                        cmp_value = storage.serializer.encode_key(
+                            reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[reference.name_of_ref_class], True
+                        )
                         if value == cmp_value:
                             if class_change:
                                 referenced_class = storage.idx_class[referenced_class_idx]
                                 reference.name_of_ref_class = get_object_name(referenced_class)
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: Tid = storage.load_object(referenced_clazz, referenced_key)
+                                referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key, txn)
                                 reference.version = referenced_obj.version
 
                     # TODO: buffer this write to ~10000 objects of the same type?
@@ -127,7 +130,6 @@ def resolve(storage: MdbxStorage) -> None:
                     db.put(txn, referenced_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
                 db_reference_forward.put(txn, idx, resolved_idx)
-                # db_reference_inward.put(txn, resolved_idx, idx)
 
                 # Because cursor.delete() does very funky things.
                 # now_resolved.append((store_idx, store_value))
