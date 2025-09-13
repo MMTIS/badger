@@ -8,9 +8,9 @@ from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENC
 
 
 class MdbxStorageQueue(MdbxStorage):
-    queue: mp.Queue  # type: ignore
+    queue: mp.Queue[list[tuple[bytes, Any, Any]]]
 
-    def __init__(self, path: Path, queue: mp.Queue):
+    def __init__(self, path: Path, queue: mp.Queue[list[tuple[bytes, Any, Any]]]):
         super().__init__(path, readonly=True)
         self.queue = queue
 

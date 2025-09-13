@@ -9,12 +9,13 @@ from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.mdbx.serialization.byteserializer import ByteSerializer
+from storage.interface import Storage
+from storage.lmdb.serialization.byteserializer import ByteSerializer
 
-DB_CLASS_IDX = b'_class_idx'
-DB_UNRESOLVED = b'_unresolved'
-DB_ID_IDX = b'_id_idx'
-DB_REFERENCE_OUTWARD = b'_reference_outward'
+DB_CLASS_IDX = bytes(b'_class_idx')
+DB_UNRESOLVED = bytes(b'_unresolved')
+DB_ID_IDX = bytes(b'_id_idx')
+DB_REFERENCE_OUTWARD = bytes(b'_reference_outward')
 
 
 class MdbxStorage:
@@ -48,8 +49,6 @@ class MdbxStorage:
             with txn.create_map(name=DB_CLASS_IDX) as db_class_idx:
                 for idx, clazz in enumerate(self.serializer.name_object.values()):
                     clazz_name = get_object_name(clazz)
-                    if clazz_name == 'AvailabilityCondition':
-                        pass
                     db_class_idx.put(txn, idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'))
 
             txn.create_map(name=DB_UNRESOLVED, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT)
