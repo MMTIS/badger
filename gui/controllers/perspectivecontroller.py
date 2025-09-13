@@ -1,6 +1,6 @@
 from typing import Optional, Any
 
-from PySide6.QtCore import QObject, Signal, QModelIndex, Qt, Slot
+from PySide6.QtCore import QObject, Signal, QModelIndex, Qt, Slot, QThread
 from PySide6.QtWidgets import QWidget, QComboBox
 
 from domain.netex.services.model_typing import Tid
@@ -14,6 +14,7 @@ from gui.panels.detailpanel import DetailPanelProvider
 from gui.panels.netexxmlpanel import NeTExXmlPanelProvider
 from gui.panels.treeviewpanel import TreeViewPanelProvider
 from gui.widgets.perspective import PerspectiveWidget
+from gui.workers.referenceworker import ReferenceWorker
 
 
 class PerspectiveController(QObject):
@@ -33,6 +34,9 @@ class PerspectiveController(QObject):
         self.detail_panels: list[tuple[DetailPanelProvider, QWidget]] = []
         self._setup_detail_panels()
         self._connect_signals()
+
+        self._thread = None
+        self._worker = None
 
     def _setup_detail_panels(self) -> None:
         """Creates the detail panel widgets once and adds them to the tab view."""
@@ -71,6 +75,7 @@ class PerspectiveController(QObject):
         # Use db_name for consistency, as obj.__class__.__name__ might not be the DB key
         if self.widget.db_combo_box.currentData() != lmdbo.obj.__class__:
             self.set_current_index_by_data(self.widget.db_combo_box, lmdbo.obj.__class__)
+            self._find_and_select_item_in_main_list(lmdbo)
 
         # Mark all detail panels as "dirty" - needing an update.
         self.dirty_panels = {widget for _, widget in self.detail_panels}
@@ -81,7 +86,8 @@ class PerspectiveController(QObject):
             self._on_detail_tab_changed(current_tab_index)
 
         # Pass the database object to the view so the model can perform lazy checks.
-        self.widget.update_reference_lists(self._storage_controller.load_references_inwards(lmdbo), self._storage_controller.load_references_outwards(lmdbo))
+        # self.widget.update_reference_lists(self._storage_controller.load_references_inwards(lmdbo), self._storage_controller.load_references_outwards(lmdbo))
+        self.load_references_async(lmdbo)
 
     def handle_item_selected(self, index: QModelIndex) -> None:
         if not index.isValid():
@@ -104,8 +110,6 @@ class PerspectiveController(QObject):
         # matches the type currently displayed in the main list, select it.
         # if is_from_reference_list:
         # After navigate_to_object, the combo box is authoritative.
-        #     if self.widget.db_combo_box.currentData() == lmdbo.obj.__class__:
-        #        self._find_and_select_item_in_main_list(lmdbo)
 
     def handle_item_ctrl_clicked(self, index: QModelIndex) -> None:
         lmdbo = index.data(Qt.ItemDataRole.UserRole)
@@ -143,7 +147,7 @@ class PerspectiveController(QObject):
         self.source_model.set_database(lmdbo_to_show.clazz)
         if lmdbo_to_show:
             self.navigate_to_object(lmdbo_to_show)
-            self._find_and_select_item_in_main_list(lmdbo_to_show)
+            # self._find_and_select_item_in_main_list(lmdbo_to_show)
 
     def set_initial_state_by_class(self, clazz: Tid) -> None:
         self.widget.db_combo_box.blockSignals(True)
@@ -183,3 +187,46 @@ class PerspectiveController(QObject):
                     break
             else:
                 break  # No more items to fetch
+
+    def load_references_async(self, lmdbo):
+        # Zorg dat er maar 1 worker tegelijk loopt
+        if self._thread and self._thread.isRunning():
+            self._worker.abort()
+            self._thread.quit()
+            self._thread.wait()
+
+        self._thread = None
+        self._worker = None
+
+        self.widget.incoming_ref_model.beginResetModel()
+        self.widget.incoming_ref_model.clear()
+        self.widget.incoming_ref_model.endResetModel()
+
+        self.widget.outgoing_ref_model.beginResetModel()
+        self.widget.outgoing_ref_model.clear()
+        self.widget.outgoing_ref_model.endResetModel()
+
+        self._thread = QThread()
+        self._worker = ReferenceWorker(self._storage_controller, lmdbo)
+        self._worker.moveToThread(self._thread)
+
+        self._thread.started.connect(self._worker.run)
+        self._worker.referencesFound.connect(self._on_references_found)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.finished.connect(self._worker.deleteLater)
+        self._thread.finished.connect(self._on_thread_finished)
+        self._thread.start()
+
+    def _on_thread_finished(self):
+        if self._thread:
+            self._thread.quit()
+            self._thread.wait()
+            self._thread = None
+        self._worker = None
+
+    @Slot(list, bool)
+    def _on_references_found(self, refs, is_inward):
+        if is_inward:
+            self.widget.incoming_ref_model.append_batch(refs)
+        else:
+            self.widget.outgoing_ref_model.append_batch(refs)

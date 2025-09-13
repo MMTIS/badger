@@ -82,9 +82,9 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
-            if obj.version_ref is not None and obj.version is None:
-                # Don't include external references
-                continue
+            # if obj.version_ref is not None and obj.version is None:
+            # Don't include external references
+            #    continue
 
             if obj.name_of_ref_class is None:
                 # Hack, because NeTEx does not define the default name of ref class yet
@@ -100,7 +100,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
             yield (
                 serializer.name_object[obj.name_of_ref_class],  # The object that the reference is towards
                 obj.ref,
-                getattr(obj, "version", "any"),
+                getattr(obj, "version", getattr(obj, "versionRef", "any")),
             )
 
 def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
@@ -109,9 +109,9 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
-            if obj.version_ref is not None and obj.version is None:
+            # if obj.version_ref is not None and obj.version is None:
                 # Don't include external references
-                continue
+                # continue
 
             if obj.name_of_ref_class is None:
                 # Hack, because NeTEx does not define the default name of ref class yet

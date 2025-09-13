@@ -5,7 +5,7 @@ from tqdm import tqdm
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, DB_CLASS_IDX
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_CLASS_IDX
 import time
 
 def benchmark_mdbx(storage: MdbxStorage) -> None:
@@ -40,7 +40,7 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
             total_entries += entries
             total_elapsed += elapsed
 
-        for db_name in (DB_CLASS_IDX, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD): #, DB_REFERENCE_INWARD):
+        for db_name in (DB_CLASS_IDX, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
             db = txn.open_map(db_name)
 
             entries = db.get_stat(txn).ms_entries

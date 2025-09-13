@@ -66,3 +66,15 @@ class ReferenceListModel(QAbstractListModel):
         #    return Qt.ItemFlag.NoItemFlags
         # else:
         return Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
+
+    def clear(self):
+        self._references.clear()
+
+    def append_batch(self, refs: list[StorageObject]) -> None:
+        if not refs:
+            return
+        start = len(self._references)
+        end = start + len(refs) - 1
+        self.beginInsertRows(QModelIndex(), start, end)
+        self._references.extend(refs)
+        self.endInsertRows()

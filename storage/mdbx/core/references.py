@@ -16,7 +16,6 @@ def resolve_embeddings(storage: MdbxStorage):
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED)
         db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD)
-        # db_reference_inward = txn.open_map(DB_REFERENCE_INWARD)
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor.iter():
@@ -44,7 +43,6 @@ def resolve_embeddings(storage: MdbxStorage):
                             for resolved_index in unresolved_pairs[candidate]:
                                 # Bij deze twee schrijfacties ontstaat build/lib/mdb.c:2156: Assertion 'rc == 0' failed in mdb_page_dirty()
                                 db_reference_outward.put(txn, resolved_index, full_key)
-                                # db_reference_inward.put(full_key, resolved_index)
                                 db_unresolved.delete(txn, resolved_index, candidate)
                                 # now_resolved.add((resolved_index, candidate))
                             del unresolved_pairs[candidate]
@@ -69,7 +67,6 @@ def resolve(storage: MdbxStorage) -> None:
         db_unresolved = txn.open_map(DB_UNRESOLVED)
         db_id_idx = txn.open_map(DB_ID_IDX)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD)
-        # db_reference_inward = txn.open_map(DB_REFERENCE_INWARD)
 
         now_resolved: list[tuple[bytes, bytes]] = []
 

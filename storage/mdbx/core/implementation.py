@@ -9,7 +9,7 @@ from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.lmdb.serialization.byteserializer import ByteSerializer
+from storage.mdbx.serialization.byteserializer import ByteSerializer
 
 DB_CLASS_IDX = b'_class_idx'
 DB_UNRESOLVED = b'_unresolved'
@@ -48,6 +48,8 @@ class MdbxStorage:
             with txn.create_map(name=DB_CLASS_IDX) as db_class_idx:
                 for idx, clazz in enumerate(self.serializer.name_object.values()):
                     clazz_name = get_object_name(clazz)
+                    if clazz_name == 'AvailabilityCondition':
+                        pass
                     db_class_idx.put(txn, idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'))
 
             txn.create_map(name=DB_UNRESOLVED, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT)
@@ -64,9 +66,10 @@ class MdbxStorage:
                 with txn.cursor(db_class_idx) as cur:
                     for idx, name in cur.iter():
                         clazz = self.serializer.name_object[name.decode('utf-8')]
-                        self.idx_class[idx] = clazz
-                        self.class_name_idx[get_object_name(clazz)] = idx
-                        self.class_idx[clazz] = idx
+                        short_idx = idx.ljust(2, b'\x00')
+                        self.idx_class[short_idx] = clazz
+                        self.class_name_idx[get_object_name(clazz)] = short_idx
+                        self.class_idx[clazz] = short_idx
 
         self.serializer.set_class_idx(self.class_idx)
 
@@ -97,7 +100,7 @@ class MdbxStorage:
         exception_value: Optional[BaseException],
         exception_traceback: Optional[TracebackType],
     ) -> Literal[False]:
-        # self.env.close()
+        self.env.close()
         return False  # Allow errors to propagate!
 
     def db_names(self, txn=None) -> dict[bytes, type]:
@@ -109,7 +112,7 @@ class MdbxStorage:
                 if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
                     continue
 
-                clazz = self.idx_class.get(db_name, None)
+                clazz = self.idx_class.get(db_name.ljust(2, b'\x00'), None)
                 if clazz is not None:
                     db_names[db_name] = clazz
         return db_names
@@ -134,8 +137,6 @@ class MdbxStorage:
         return 0
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
-        print(klass)
-
         if self.readonly:
             raise
 

@@ -31,7 +31,7 @@ class ByteSerializer(Serializer):
     @staticmethod
     def full_key_to_idx(full_key: bytes) -> tuple[bytes, bytes]:
         full_int = int.from_bytes(full_key, 'little')
-        class_idx = (full_int >> 32).to_bytes(2, 'little')
+        class_idx = (full_int >> 32).to_bytes(8, 'little')
         key = (full_int & 0xFFFFFFFF).to_bytes(4, 'little')
         return class_idx, key
 

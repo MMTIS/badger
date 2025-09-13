@@ -3,13 +3,12 @@ from types import TracebackType
 from typing import Optional, Type, Literal, Iterable
 import multiprocessing as mp
 
-import lmdb
 from mdbx.mdbx import DBI, Env
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from storage.interface import Storage
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_REFERENCE_INWARD, DB_UNRESOLVED
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED
 
 
 class MdbxStorageMP(MdbxStorage):
@@ -72,13 +71,6 @@ class MdbxStorageMP(MdbxStorage):
                                 resolved_idx,
                             )
                         )
-                        # self.queue.put(
-                        #    (
-                        #        DB_REFERENCE_INWARD,
-                        #        resolved_idx,
-                        #        full_key,
-                        #    )
-                        #)
                     else:
                         self.queue.put(
                             (
@@ -136,7 +128,7 @@ class MdbxStorageMP(MdbxStorage):
                     for item in items:
                         db_name, key, value = item
 
-                        if db_name == DB_ID_IDX: # or db_name == DB_REFERENCE_INWARD:
+                        if db_name == DB_ID_IDX:
                             # DB_ID_IDX, encoded_key, partial
                             # INWARD, resolved_idx, partial
                             value = (value | next_entry).to_bytes(8, 'little')
