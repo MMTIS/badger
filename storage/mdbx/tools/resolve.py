@@ -10,4 +10,4 @@ if __name__ == "__main__":
     interesting_members = get_boring_classes()
     with MdbxStorage(Path(sys.argv[1]), readonly=False) as storage:
         resolve(storage)
-        # resolve_embeddings(storage)
+        resolve_embeddings(storage)
