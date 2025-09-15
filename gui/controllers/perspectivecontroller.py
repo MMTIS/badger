@@ -14,6 +14,7 @@ from gui.panels.detailpanel import DetailPanelProvider
 from gui.panels.netexxmlpanel import NeTExXmlPanelProvider
 from gui.panels.treeviewpanel import TreeViewPanelProvider
 from gui.widgets.perspective import PerspectiveWidget
+from gui.workers.itemsearcher import ItemSearcher
 from gui.workers.referenceworker import ReferenceWorker
 
 
@@ -34,6 +35,9 @@ class PerspectiveController(QObject):
         self.detail_panels: list[tuple[DetailPanelProvider, QWidget]] = []
         self._setup_detail_panels()
         self._connect_signals()
+        self.searcher = ItemSearcher(
+            self.widget.list_view_left, self.source_model, self.widget.search_input
+        )
 
         self._thread = None
         self._worker = None
@@ -75,7 +79,11 @@ class PerspectiveController(QObject):
         # Use db_name for consistency, as obj.__class__.__name__ might not be the DB key
         if self.widget.db_combo_box.currentData() != lmdbo.obj.__class__:
             self.set_current_index_by_data(self.widget.db_combo_box, lmdbo.obj.__class__)
-            self._find_and_select_item_in_main_list(lmdbo)
+            self.searcher.start(lmdbo)
+
+            # TODO: This call blocks the GUI
+            # self._find_and_select_item_in_main_list(lmdbo)
+            # TOOD: now prevent the double reload
 
         # Mark all detail panels as "dirty" - needing an update.
         self.dirty_panels = {widget for _, widget in self.detail_panels}

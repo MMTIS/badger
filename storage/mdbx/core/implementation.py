@@ -9,8 +9,7 @@ from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.interface import Storage
-from storage.lmdb.serialization.byteserializer import ByteSerializer
+from storage.mdbx.serialization.byteserializer import ByteSerializer
 
 DB_CLASS_IDX = bytes(b'_class_idx')
 DB_UNRESOLVED = bytes(b'_unresolved')

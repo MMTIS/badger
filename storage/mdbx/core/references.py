@@ -11,7 +11,6 @@ from storage.mdbx.serialization.byteserializer import ByteSerializer
 def resolve_embeddings(storage: MdbxStorage):
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
-    now_resolved: set[tuple[bytes, bytes]] = set([])  # A set prevents duplicate deletes
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED)
@@ -36,7 +35,7 @@ def resolve_embeddings(storage: MdbxStorage):
             db = txn.open_map(storage.class_idx[clazz])
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
-                    obj = storage.serializer.unmarshall(value, clazz)
+                    obj: Tid = storage.serializer.unmarshall(value, clazz)
                     for candidate in only_embedding(storage.serializer, obj, missing_classes):
                         if candidate in unresolved_pairs:
                             full_key = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(idx, 'little')).to_bytes(8, 'little')
@@ -44,18 +43,8 @@ def resolve_embeddings(storage: MdbxStorage):
                                 # Bij deze twee schrijfacties ontstaat build/lib/mdb.c:2156: Assertion 'rc == 0' failed in mdb_page_dirty()
                                 db_reference_outward.put(txn, resolved_index, full_key)
                                 db_unresolved.delete(txn, resolved_index, candidate)
-                                # now_resolved.add((resolved_index, candidate))
                             del unresolved_pairs[candidate]
-
-    # print("Schrijven")
-    # Workaround for very strange LMDB results
-    # with storage.env.begin(write=True) as txn:
-    #     db_unresolved = storage.env.open_db(DB_UNRESOLVED, txn=txn, create=False)
-    #
-    #    for idx, value in now_resolved:
-    #        print(value)
-    #        txn.delete(idx, value, db=db_unresolved)
-
+        txn.commit()
 
 def resolve(storage: MdbxStorage) -> None:
     if storage.readonly:
@@ -67,8 +56,6 @@ def resolve(storage: MdbxStorage) -> None:
         db_unresolved = txn.open_map(DB_UNRESOLVED)
         db_id_idx = txn.open_map(DB_ID_IDX)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD)
-
-        now_resolved: list[tuple[bytes, bytes]] = []
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor.iter():
@@ -104,7 +91,7 @@ def resolve(storage: MdbxStorage) -> None:
             if resolved_idx:
                 if version_change or class_change:
                     # In this situation the original reference was incomplete
-                    referenced_class_idx, referenced_key = storage.serializer.full_key_to_idx(version_change or class_change)
+                    referenced_class_idx, referenced_key = storage.serializer.full_key_to_idx(resolved_idx)
                     referencing_class_idx, referencing_key = storage.serializer.full_key_to_idx(idx)
                     referencing_class = storage.idx_class[referencing_class_idx]
                     referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
@@ -127,17 +114,9 @@ def resolve(storage: MdbxStorage) -> None:
                     db.put(txn, referenced_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
                 db_reference_forward.put(txn, idx, resolved_idx)
-
-                # Because cursor.delete() does very funky things.
-                # now_resolved.append((store_idx, store_value))
-                # db_unresolved.delete(txn, idx, value)
                 unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
 
             # else:
             #    print("unresolved", value, idx)
 
-            # idx, value = next(unresolved_cursor)
-
-        # for idx, value in now_resolved:
-        #    db_unresolved.delete(txn, idx, value)
         txn.commit()
