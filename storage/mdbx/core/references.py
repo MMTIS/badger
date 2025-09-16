@@ -46,6 +46,7 @@ def resolve_embeddings(storage: MdbxStorage):
                             del unresolved_pairs[candidate]
         txn.commit()
 
+
 def resolve(storage: MdbxStorage) -> None:
     if storage.readonly:
         raise
@@ -110,8 +111,8 @@ def resolve(storage: MdbxStorage) -> None:
                                 reference.version = referenced_obj.version
 
                     # TODO: buffer this write to ~10000 objects of the same type?
-                    db = txn.open_map(storage.class_idx[referencing_obj.__class__])
-                    db.put(txn, referenced_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+                    db = txn.open_map(referencing_class_idx)
+                    db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
                 db_reference_forward.put(txn, idx, resolved_idx)
                 unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
