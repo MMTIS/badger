@@ -34,7 +34,6 @@ class MdbxStorage:
         self.readonly = readonly
         self.max_dbs = 128
         self.initial_size = initial_size
-        self.next_entry = None
         self.class_idx = {}
         self.idx_class = {}
         self.class_name_idx = {}
@@ -87,7 +86,6 @@ class MdbxStorage:
             self._populate_class_idx()
 
         self._restore_class_idx()
-        self.next_entry = self.get_next_key()
 
         return self
 
@@ -124,15 +122,6 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
-    def get_next_key(self) -> int:
-        with self.env.ro_transaction() as txn:
-            with txn.open_map(name=DB_ID_IDX) as db_id_idx:
-                cur = txn.cursor(db_id_idx)
-                k, v = cur.last()
-                if k:
-                    return (int.from_bytes(v, "little") & 0xFFFFFFFF) + 1  # Skips the class
-        return 0
-
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         if self.readonly:
             raise
@@ -149,7 +138,8 @@ class MdbxStorage:
                 db.drop(delete=False)
 
             for obj in objects:
-                key = self.next_entry = self.next_entry + 1
+                key = db_id_idx.get_sequence(txn, 1)
+                my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
 
                 full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in only_references(obj, self.serializer):
@@ -157,13 +147,12 @@ class MdbxStorage:
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         db_reference_outward.put(txn, full_key, resolved_idx)
-                        # db_reference_inward.put(txn, resolved_idx, full_key)
+                        print(my_id, ref)
                     else:
                         db_unresolved.put(txn, full_key, unresolved_value)
 
                 value = self.serializer.marshall(obj, klass)
                 db.put(txn, key.to_bytes(4, 'little'), value)
-                my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
                 db_id_idx.put(txn, my_id, full_key)
 
             txn.commit()
@@ -172,7 +161,9 @@ class MdbxStorage:
         db = txn.open_map(DB_REFERENCE_OUTWARD)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows(start_key=full_key):
-            for _, reference_key in it:
+            for referencing_key, reference_key in it:
+                if referencing_key != full_key:
+                    break
                 class_idx, reference_local_key = ByteSerializer.full_key_to_idx(reference_key)
                 yield self.idx_class[class_idx], reference_local_key
             break

@@ -60,6 +60,8 @@ def resolve(storage: MdbxStorage) -> None:
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor.iter():
+            parts: list[str] | None = None
+            prefix: str | None = None
             resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
             class_change = False
             version_change = False
@@ -71,10 +73,10 @@ def resolve(storage: MdbxStorage) -> None:
                 # Alternative 1, id + version exists, class does not match
                 parts.pop()
                 prefix = separator.join(parts)
-                for it in cursor.iter_dupsort_rows(prefix):
-                    for _, resolved_idx in it:
-                        class_change = resolved_idx
-                        break
+                for check_key, check_idx in cursor.iter(prefix):
+                    if check_key.startswith(prefix):
+                        class_change = check_idx
+                        resolved_idx = check_idx
                     break
 
                 if not resolved_idx:
@@ -83,10 +85,10 @@ def resolve(storage: MdbxStorage) -> None:
                     parts.pop()
 
                     prefix = separator.join(parts)
-                    for it in cursor.iter_dupsort_rows(prefix):
-                        for _, resolved_idx in it:
-                            version_change = resolved_idx
-                            break
+                    for check_key, check_idx in cursor.iter(prefix):
+                        if check_key.startswith(prefix):
+                            version_change = check_idx
+                            resolved_idx = check_idx
                         break
 
             if resolved_idx:
@@ -113,6 +115,10 @@ def resolve(storage: MdbxStorage) -> None:
                     # TODO: buffer this write to ~10000 objects of the same type?
                     db = txn.open_map(referencing_class_idx)
                     db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+
+                f = storage.load_object_by_full_key(txn, idx)
+                t = storage.load_object_by_full_key(txn, resolved_idx)
+                print(f"{f.id} -> {t.id}")
 
                 db_reference_forward.put(txn, idx, resolved_idx)
                 unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)

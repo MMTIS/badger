@@ -1,31 +1,21 @@
 from pathlib import Path
 
 from domain.netex.services.utils import get_boring_classes
-from storage.lmdb.core.implementation import LmdbStorage, DB_ID_IDX, DB_UNRESOLVED
+from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_ID_IDX
 
-from utils.utils import get_object_name
-
-
-def unresolved_lmdb(storage: LmdbStorage) -> None:
-    with storage.env.begin() as txn:
+def unresolved_mdbx(storage: MdbxStorage) -> None:
+    with storage.env.ro_transaction() as txn:
         db_name = DB_UNRESOLVED
-        db = storage.env.open_db(db_name, txn=txn)
-        db_id_idx = storage.env.open_db(DB_ID_IDX, txn=txn)
+        db = txn.open_map(db_name)
+        db_id_idx = txn.open_map(DB_ID_IDX)
 
-        with (txn.cursor(db) as cursor, txn.cursor(db_id_idx) as cursor_id_idx):
+        with txn.cursor(db) as cursor:
             for key, value in cursor:
-                for key2, value2 in cursor_id_idx:
-                    if value2 == key:
-                        obj_id = key2
-                        break
-
-                print(get_object_name(storage.idx_class[obj_id.split(b'-')[-1]]), obj_id,
-                      get_object_name(storage.idx_class[value.split(b'-')[-1]]), value)
-
+                print(key, value)
 
 if __name__ == "__main__":
     import sys
 
     interesting_members = get_boring_classes()
-    with LmdbStorage(Path(sys.argv[1]), readonly=True) as storage:
-        unresolved_lmdb(storage)
+    with MdbxStorage(Path(sys.argv[1]), readonly=True) as storage:
+        unresolved_mdbx(storage)

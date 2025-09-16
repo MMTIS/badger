@@ -16,7 +16,7 @@ def main():
     app = QApplication(sys.argv)
 
     # Splash image
-    splash_pix = QPixmap("/mnt/storage/home/skinkie/Sources/badger/gui/badger.png")
+    splash_pix = QPixmap(f"{Path(__file__).resolve().parent}/badger.png")
     scaled_pixmap = splash_pix.scaled(
         500,
         400,  # breedte, hoogte
