@@ -22,13 +22,14 @@ from domain.netex.model import (
     ServiceJourney,
     ServiceJourneyInterchange,
     ServiceJourneyPattern,
+    ServiceLink,
     StopPlace,
     TemplateServiceJourney,
     TopographicPlace,
     TransportAdministrativeZone,
     UicOperatingPeriod,
     ValueSet,
-    VehicleType, ServiceLink,
+    VehicleType,
 )
 
 SWISS_CLASSES = {

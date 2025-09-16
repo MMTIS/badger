@@ -1,11 +1,14 @@
 from functools import lru_cache
-from typing import Generator, Any, Hashable
+from typing import Any, Generator, Hashable
+
 from domain.netex import model as netex
 from domain.netex.services.model_typing import Tid, Tref
 from storage.interface import Serializer
 
+import inspect
 
 # from dataclasses import fields
+
 
 def _all_subclasses(cls: type[Any]) -> set[type[Any]]:
     seen = set()
@@ -25,7 +28,9 @@ netex.set_ref_types = frozenset(  # type: ignore
     | _all_subclasses(netex.VersionOfObjectRefStructure)
 )
 
-netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
+# netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
+
+netex.set_all = frozenset({name: cls for name, cls in inspect.getmembers(netex, inspect.isclass) if cls.__module__ == netex.__name__})
 
 
 @lru_cache(maxsize=None)
@@ -65,10 +70,8 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
                         mydepth[-1] = j
                         if x is not None:
                             if x.__class__ in netex.set_ref_types:  # type: ignore
-                                yield x, tuple(
-                                    mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
-                            elif hasattr(x,
-                                         "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
+                                yield x, tuple(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
+                            elif hasattr(x, "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
                                 if hasattr(x, "id"):
                                     yield x, tuple(mydepth)
                                 yield from recursive_attributes(x, mydepth)
@@ -103,6 +106,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 getattr(obj, "version", getattr(obj, "versionRef", "any")),
             )
 
+
 def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
@@ -110,8 +114,8 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
         if hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
             # if obj.version_ref is not None and obj.version is None:
-                # Don't include external references
-                # continue
+            # Don't include external references
+            # continue
 
             if obj.name_of_ref_class is None:
                 # Hack, because NeTEx does not define the default name of ref class yet
@@ -123,7 +127,9 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
             yield obj
 
 
-def only_embedding(serializer: Serializer, deserialized: Tid, interesting_classes: set[type[Tid]], ignore: set[type[Tid]]=set([])) -> Generator[bytes, None, None]:
+def only_embedding(
+    serializer: Serializer, deserialized: Tid, interesting_classes: set[type[Tid]], ignore: set[type[Tid]] = set([])
+) -> Generator[bytes, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):

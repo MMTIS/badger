@@ -64,7 +64,7 @@ class MdbxStorage:
                 with txn.cursor(db_class_idx) as cur:
                     for idx, name in cur.iter():
                         clazz = self.serializer.name_object[name.decode('utf-8')]
-                        short_idx = idx.ljust(2, b'\x00')
+                        short_idx = idx.ljust(2, b'\x00')  # ljust is used, because MDBX seems to truncate the "map" names
                         self.idx_class[short_idx] = clazz
                         self.class_name_idx[get_object_name(clazz)] = short_idx
                         self.class_idx[clazz] = short_idx
@@ -105,12 +105,12 @@ class MdbxStorage:
         db_names: dict[bytes, type] = {}
         if txn is None:
             txn = self.env.ro_transaction()
-        with txn.cursor() as cur:
+        with txn.cursor(db=None) as cur:
             for db_name, _ in cur.iter():
                 if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
                     continue
 
-                clazz = self.idx_class.get(db_name.ljust(2, b'\x00'), None)
+                clazz = self.idx_class.get(db_name.ljust(2, b'\x00'), None)  # ljust is used, because MDBX seems to truncate the "map" names
                 if clazz is not None:
                     db_names[db_name] = clazz
         return db_names

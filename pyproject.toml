@@ -2,7 +2,7 @@
 name = "badger"
 version = "0.1.0"
 description = "A fast Python based timetable converter"
-authors = ["Stefan de Konink <stefan@konink.de>"]
+authors = [ { name =    "Stefan de Konink", email = "stefan@konink.de" } ]
 dependencies = [
     "chardet",
     "cloudpickle",

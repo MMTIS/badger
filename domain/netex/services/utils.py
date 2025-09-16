@@ -1,7 +1,7 @@
 import inspect
+from typing import Any
 
 import domain.netex.model as netex
-from typing import Any
 
 
 def get_boring_classes() -> list[Any]:

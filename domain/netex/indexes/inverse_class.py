@@ -1,14 +1,14 @@
 from __future__ import annotations
-from dataclasses import fields, is_dataclass
-from typing import Any, get_args, get_origin, Type, Dict, Set, Iterable, Union, List
+
 import inspect
+from dataclasses import fields, is_dataclass
+from typing import Any, Dict, Iterable, List, Set, Type, Union, get_args, get_origin
 
 from domain.netex.model import GeneralFrameMembersRelStructure
 
+
 def collect_classes_index(
-    classes: Iterable[Type[Any]],
-    ignore_classes: set[Type[Any]] | None = None,
-    scope_classes: set[Type[Any]] | None = None
+    classes: Iterable[Type[Any]], ignore_classes: set[Type[Any]] | None = None, scope_classes: set[Type[Any]] | None = None
 ) -> Dict[Type[Any], Set[Type[Any]]]:
     """
     Bouw een inverse index: voor ieder type T (binnen scope_classes), in welke dataclasses (ook beperkt tot scope_classes) komt T (direct of indirect) voor als attribuut?
@@ -42,7 +42,6 @@ def collect_classes_index(
     return index
 
 
-
 def _is_valid_dataclass(tp: Any, ignore_classes: Set[Type[Any]]) -> bool:
     """Check of dit een bruikbare dataclass is."""
     return (
@@ -54,9 +53,7 @@ def _is_valid_dataclass(tp: Any, ignore_classes: Set[Type[Any]]) -> bool:
     )
 
 
-def _collect_contained_types(
-    clazz: Type[Any], ignore_classes: Set[Type[Any]], seen: Set[Type[Any]] | None = None
-) -> Set[Type[Any]]:
+def _collect_contained_types(clazz: Type[Any], ignore_classes: Set[Type[Any]], seen: Set[Type[Any]] | None = None) -> Set[Type[Any]]:
     """
     Verzamelt transitief alle dataclass-types die in clazz voorkomen.
     """
@@ -97,6 +94,7 @@ def _extract_types(tp: Any) -> Set[Type[Any]]:
 
     return result
 
+
 def extract_concrete_types(tp: Any) -> Set[Type[Any]]:
     """
     Haal alle concrete types uit een typehint.
@@ -122,7 +120,7 @@ def extract_concrete_types(tp: Any) -> Set[Type[Any]]:
 
 if __name__ == "__main__":
     choice_field = next(f for f in fields(GeneralFrameMembersRelStructure) if f.name == "choice")
-    all_types = { x for x in extract_concrete_types(choice_field.type) if not x.__name__.endswith('Frame') and x.__name__ != 'EntityEntity' }
+    all_types = {x for x in extract_concrete_types(choice_field.type) if not x.__name__.endswith("Frame") and x.__name__ != "EntityEntity"}
     index = collect_classes_index(all_types, scope_classes=set(all_types))
     for k, v in index.items():
         print(k.__name__, "→", {c.__name__ for c in v})

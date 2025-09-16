@@ -1,6 +1,6 @@
 from typing import TypeVar
 
-from domain.netex.model import EntityStructure, EntityInVersionStructure, VersionOfObjectRefStructure
+from domain.netex.model import EntityInVersionStructure, EntityStructure, VersionOfObjectRefStructure
 
 Tid = TypeVar("Tid", bound=EntityStructure)
 Tver = TypeVar("Tver", bound=EntityInVersionStructure)

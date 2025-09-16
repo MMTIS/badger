@@ -1,8 +1,8 @@
 from typing import cast
 
 from domain.netex import model
-from domain.netex.model import VersionOfObjectRefStructure, CodespaceRefStructure, DataSourceRefStructure
-from domain.netex.services.model_typing import Tref, Tid
+from domain.netex.model import CodespaceRefStructure, DataSourceRefStructure, VersionOfObjectRefStructure
+from domain.netex.services.model_typing import Tid, Tref
 
 
 def getFakeRef(id: str, klass: type[Tref], version: str | None, version_ref: str | None = None) -> Tref:

@@ -5,11 +5,11 @@ from gui.controllers.perspectivecontroller import PerspectiveController
 from gui.controllers.storagecontroller import StorageController
 from gui.models.storageobject import StorageObject
 from gui.views.mainwindow import MainView
-from storage.interface import Storage
+from storage.mdbx.core.implementation import MdbxStorage
 
 
 class MainController(QObject):
-    def __init__(self, app, storage: Storage):
+    def __init__(self, app, storage: MdbxStorage):
         super().__init__()
         self.app = app
         self.database = storage
