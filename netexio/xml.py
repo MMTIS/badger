@@ -4,7 +4,7 @@ from xsdata.formats.dataclass.serializers.config import SerializerConfig
 from xsdata.formats.dataclass.serializers.writers import XmlEventWriter
 import zipfile
 import io
-from netex import PublicationDelivery
+from domain.netex.model import PublicationDelivery
 
 
 def export_publication_delivery_xml(

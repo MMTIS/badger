@@ -1,26 +1,33 @@
 # This code is written to export all data into a NeTEx GeneralFrame this should be our complete database state
 from typing import Generator  # noqa: F401
 
+from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDateTime
 
-from netex import PublicationDelivery, ParticipantRef, DataObjectsRelStructure, GeneralFrame, GeneralFrameMembersRelStructure, EntityStructure  # noqa: F401
-from netexio.database import Database
-from netexio.dbaccess import load_generator
+from domain.netex.model import PublicationDelivery, ParticipantRef, DataObjectsRelStructure, GeneralFrame, GeneralFrameMembersRelStructure, EntityStructure  # noqa: F401
+from storage.mdbx.core.implementation import MdbxStorage
+from storage.mdbx.tools.graph import export_objects
 
 from utils.utils import chain
 
-
-def export_to_general_frame(db: Database) -> PublicationDelivery:
-    # TODO: This is not the correct way of loading a module by name
-    tables = sorted(list(db.tables()), key=lambda v: v.__name__)  # To ensure predictable order
-    iterables = [load_generator(db, clazz, embedding=False) for clazz in tables]  # type: list[Generator[EntityStructure, None, None]]
+def export_to_general_frame(storage: MdbxStorage, txn: TXN) -> PublicationDelivery:
+    # tables = dict(sorted(storage.db_names(txn).items(), key=lambda item: item[1].__name__))  # To ensure predictable order
+    # iterables = [(t for _, t in storage.iter_objects(txn, clazz)) for clazz in tables.values()]
+    # publication_delivery = PublicationDelivery(
+    #     version="ntx:1.1",
+    #     publication_timestamp=XmlDateTime.now(),
+    #     participant_ref=ParticipantRef(value="PyNeTExConv"),
+    #     data_objects=DataObjectsRelStructure(
+    #         choice=[GeneralFrame(id="Database", version="1", members=GeneralFrameMembersRelStructure(choice=chain(*iterables)))]  # type: ignore
+    #     ),
+    # )
 
     publication_delivery = PublicationDelivery(
         version="ntx:1.1",
         publication_timestamp=XmlDateTime.now(),
         participant_ref=ParticipantRef(value="PyNeTExConv"),
         data_objects=DataObjectsRelStructure(
-            choice=[GeneralFrame(id="Database", version="1", members=GeneralFrameMembersRelStructure(choice=chain(*iterables)))]  # type: ignore
+            choice=[GeneralFrame(id="Database", version="1", members=GeneralFrameMembersRelStructure(choice=export_objects(txn, storage)))]  # type: ignore
         ),
     )
 

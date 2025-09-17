@@ -204,10 +204,13 @@ class MdbxStorage:
     def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Any:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
-        with txn.open_map(name=this_clazz_idx) as db:
-            value = db.get(txn, key)
-            obj: Tid = self.serializer.unmarshall(value, clazz)
-            return obj
+        try:
+            with txn.open_map(name=this_clazz_idx) as db:
+                value = db.get(txn, key)
+                obj: Tid = self.serializer.unmarshall(value, clazz)
+                return obj
+        except:
+            pass
 
     def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> Tid:
         this_class_idx = self.class_idx[clazz]
@@ -232,7 +235,7 @@ class MdbxStorage:
                         if count >= limit:
                             break
 
-    def iter_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None):
+    def iter_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[tuple[bytes, Tid], None, None]:
         with txn.open_map(name=self.class_idx[clazz]) as db:
             with txn.cursor(db) as cursor:
                 count = 0

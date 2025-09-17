@@ -1,13 +1,16 @@
-from netexio.database import Database
-from netexio.pickleserializer import MyPickleSerializer
+from pathlib import Path
+
+
+from storage.mdbx.core.implementation import MdbxStorage
 from transformers.generalframe import export_to_general_frame
 from netexio.xml import export_publication_delivery_xml
 
 
-def main(database: str, output_filename: str) -> None:
-    with Database(database, MyPickleSerializer(compression=True), readonly=True) as db_read:
-        publication_delivery = export_to_general_frame(db_read)
-        export_publication_delivery_xml(publication_delivery, output_filename)
+def main(database: Path, output_filename: str) -> None:
+    with MdbxStorage(database) as storage:
+        with storage.env.ro_transaction() as txn:
+            publication_delivery = export_to_general_frame(storage, txn)
+            export_publication_delivery_xml(publication_delivery, output_filename)
 
 
 if __name__ == '__main__':
@@ -18,4 +21,4 @@ if __name__ == '__main__':
     argument_parser.add_argument('output_filename', type=str, help='The output XML file')
     args = argument_parser.parse_args()
 
-    main(args.database, args.output_filename)
+    main(Path(args.database), args.output_filename)

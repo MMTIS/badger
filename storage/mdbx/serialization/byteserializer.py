@@ -35,6 +35,10 @@ class ByteSerializer(Serializer):
         key = (full_int & 0xFFFFFFFF).to_bytes(4, 'little')
         return class_idx, key
 
+    @staticmethod
+    def idx_full_key(class_idx: bytes, key: bytes):
+        return ((int.from_bytes(class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
+
     def encode_key(self, id: str, version: str | None, clazz: type[Tid], include_clazz: bool = False) -> bytes:
         obj_name = get_object_name(clazz).upper()
         encoded_bytes = bytearray()
