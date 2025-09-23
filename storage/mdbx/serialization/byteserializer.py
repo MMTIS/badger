@@ -16,7 +16,7 @@ class ByteSerializer(Serializer):
     class_idx: dict[type, bytes]
 
     def set_class_idx(self, class_idx: dict[type, bytes]) -> None:
-        """ This mapping assures that the stored indices in the database, matches the lookup. """
+        """This mapping assures that the stored indices in the database, matches the lookup."""
         self.class_idx = class_idx
 
     @staticmethod
@@ -36,7 +36,7 @@ class ByteSerializer(Serializer):
         return class_idx, key
 
     @staticmethod
-    def idx_full_key(class_idx: bytes, key: bytes):
+    def idx_full_key(class_idx: bytes, key: bytes) -> bytes:
         return ((int.from_bytes(class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
 
     def encode_key(self, id: str, version: str | None, clazz: type[Tid], include_clazz: bool = False) -> bytes:
