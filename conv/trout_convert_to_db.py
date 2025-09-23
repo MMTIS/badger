@@ -1,32 +1,32 @@
 import logging
 from decimal import Decimal, ROUND_UP
+from pathlib import Path
 from typing import Generator
 import datetime
-from itertools import chain
 
 from xsdata.models.datatype import XmlTime, XmlDateTime, XmlDuration
 
-from netex import Operator, MultilingualString, DataSource, DestinationDisplay, PresentationStructure, Line, \
+from domain.netex.model import Operator, MultilingualString, DestinationDisplay, PresentationStructure, Line, \
     PrivateCode, PrivateCodes, OperatorRef, AllVehicleModesOfTransportEnumeration, StopArea, \
     SimplePointVersionStructure, LocationStructure2, TopographicPlaceView, ScheduledStopPoint, PrivateCodeStructure, \
     StopAreaRefsRelStructure, StopAreaRefStructure, PointRefsRelStructure, ScheduledStopPointRef, ServiceJourneyPattern, \
-    RouteView, LineRef, ValidBetween, ValidityConditionsRelStructure, ValidityCondition, ValidDuring, \
-    TimebandsRelStructure, TimebandVersionedChildStructure, AvailabilityConditionRef, \
+    LineRef, ValidityConditionsRelStructure, \
+    AvailabilityConditionRef, \
     PointsInJourneyPatternRelStructure, StopPointInJourneyPattern, ServiceJourney, ServiceJourneyPatternRef, \
-    TypeOfProductCategoryRef, TimetabledPassingTimesRelStructure, TimetabledPassingTime, DestinationDisplayRef, \
+    TypeOfProductCategoryRef, DestinationDisplayRef, \
     TypeOfProductCategory, AvailabilityCondition, TimeDemandTypeRef, TimeDemandType, JourneyRunTimesRelStructure, \
     JourneyWaitTimesRelStructure, JourneyWaitTime, JourneyRunTime, TimingLinkRef, SiteConnection, \
-    TransferDurationStructure, SiteConnectionEndStructure, DefaultConnection, DefaultConnectionEndStructure, \
-    StopAreaRef, DefaultInterchange, Connection, ConnectionEndStructure
-from netexio.database import Database
-from netexio.pickleserializer import MyPickleSerializer
+    TransferDurationStructure, SiteConnectionEndStructure, \
+    StopAreaRef, Connection, ConnectionEndStructure
+from storage.mdbx.core.implementation import MdbxStorage
+
 from utils.aux_logging import prepare_logger, log_all
 
-import trout.trout_pb2_grpc
-import trout.trout_pb2
-from trout.tryeartimetable_pb2 import TYearTimetable, CallFlags
+import domain.trout.model.trout_pb2_grpc as trout_pb2_grpc
+import domain.trout.model.trout_pb2 as trout_pb2
+from domain.trout.model.tryeartimetable_pb2 import TYearTimetable, CallFlags
 
-def load_from_file(yeartimetable: str) -> TYearTimetable:
+def load_from_file(yeartimetable: Path) -> TYearTimetable:
     timetable = TYearTimetable()
     with open(yeartimetable, "rb") as f:
         timetable.ParseFromString(f.read())
@@ -264,12 +264,12 @@ def get_validitypatterns(tt: TYearTimetable) -> Generator[AvailabilityCondition,
         local_dt_thru = dt_from  + datetime.timedelta(days=len(valid_day_bits) - 1)
         local_to_date = XmlDateTime(local_dt_thru.year, local_dt_thru.month, local_dt_thru.day, 0, 0, 0)
 
-        yield AvailabilityCondition(id=str(validitypattern_idx), version=str(tt.exportTimestamp), from_date=from_date, to_date=local_to_date, valid_day_bits=valid_day_bits)
+        yield AvailabilityCondition(id=str(validitypattern_idx), version=str(tt.exportTimestamp), from_date=from_date, to_date=local_to_date, Path=valid_day_bits)
 
-def main(yeartimetable: str, target_database_file: str) -> None:
+def main(yeartimetable: Path, target_database_file: Path) -> None:
     timetable = load_from_file(yeartimetable)
 
-    with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
+    with MdbxStorage(target_database_file, readonly=False) as db_write:
         db_write.insert_objects_on_queue(Operator, get_operators(timetable), empty=True)
         db_write.insert_objects_on_queue(Line, get_lines(timetable), empty=True)
         db_write.insert_objects_on_queue(StopArea, get_stopareas(timetable), empty=True)
@@ -294,13 +294,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "target",
         type=str,
-        help="lmdb file to overwrite and store contents of the transformation.",
+        help="mdbx path to overwrite and store contents of the transformation.",
     )
     parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
     try:
-        main(args.yeartimetable, args.target)
+        tt = Path(args.yeartimetable)
+        if tt.exists():
+            main(tt, Path(args.target))
+        else:
+            mylogger.error("File does not exist")
     except Exception as e:
         log_all(logging.ERROR, f'{e}  {traceback.format_exc()}')
         raise e
