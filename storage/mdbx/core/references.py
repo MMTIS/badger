@@ -109,16 +109,17 @@ def resolve(storage: MdbxStorage) -> None:
                                 reference.name_of_ref_class = get_object_name(referenced_class)
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key, txn)
+                                referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key)
                                 reference.version = referenced_obj.version
 
                     # TODO: buffer this write to ~10000 objects of the same type?
                     db = txn.open_map(referencing_class_idx)
                     db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
-                f = storage.load_object_by_full_key(txn, idx)
-                t = storage.load_object_by_full_key(txn, resolved_idx)
-                print(f"{f.id} -> {t.id}")
+                # f = storage.load_object_by_full_key(txn, idx)
+                # t = storage.load_object_by_full_key(txn, resolved_idx)
+
+                # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
 
                 db_reference_forward.put(txn, idx, resolved_idx)
                 unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
