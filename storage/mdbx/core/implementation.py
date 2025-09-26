@@ -98,7 +98,7 @@ class MdbxStorage:
         self.env.close()
         return False  # Allow errors to propagate!
 
-    def db_names(self, txn=None) -> dict[bytes, type]:
+    def db_names(self, txn: TXN = None) -> dict[bytes, type]:
         db_names: dict[bytes, type] = {}
         if txn is None:
             txn = self.env.ro_transaction()
@@ -135,19 +135,18 @@ class MdbxStorage:
             db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
 
             if empty:
-                db.drop(delete=False)
+                db.drop(txn, delete=False)
 
             for obj in objects:
                 key = db_id_idx.get_sequence(txn, 1)
                 my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
 
                 full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
-                for referenced_class_idx, ref, version in only_references(obj, self.serializer):
-                    unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
+                for referenced_class, ref, version in only_references(obj, self.serializer):
+                    unresolved_value = self.serializer.encode_key(ref, version, referenced_class, include_clazz=True)
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         db_reference_outward.put(txn, full_key, resolved_idx)
-                        print(my_id, ref)
                     else:
                         db_unresolved.put(txn, full_key, unresolved_value)
 
@@ -204,23 +203,21 @@ class MdbxStorage:
     def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Any:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
-        try:
-            with txn.open_map(name=this_clazz_idx) as db:
-                value = db.get(txn, key)
-                obj: Tid = self.serializer.unmarshall(value, clazz)
-                return obj
-        except:
-            pass
+        with txn.open_map(name=this_clazz_idx) as db:
+            value = db.get(txn, key)
+            obj: Tid = self.serializer.unmarshall(value, clazz)
+            return obj
 
     def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> Tid:
         this_class_idx = self.class_idx[clazz]
         with txn.open_map(name=this_class_idx) as db:
             value = db.get(txn, key)
             if value is None:
-                pass
-            obj = self.serializer.unmarshall(value, clazz)
-            # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-            return obj
+                print(clazz, key)
+            else:
+                obj = self.serializer.unmarshall(value, clazz)
+                # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
+                return obj
 
     def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
         with txn.open_map(name=self.class_idx[clazz]) as db:
