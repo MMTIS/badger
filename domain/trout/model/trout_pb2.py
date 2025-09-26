@@ -22,9 +22,9 @@ _runtime_version.ValidateProtobufRuntimeVersion(
 _sym_db = _symbol_database.Default()
 
 
-import trout.tryeartimetable_pb2 as tryeartimetable__pb2
-import trout.trdaytimetable_pb2 as trdaytimetable__pb2
-import trout.trrealtime_pb2 as trrealtime__pb2
+import domain.trout.model.tryeartimetable_pb2 as tryeartimetable__pb2
+import domain.trout.model.trdaytimetable_pb2 as trdaytimetable__pb2
+import domain.trout.model.trrealtime_pb2 as trrealtime__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 
 
