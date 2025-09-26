@@ -27,16 +27,17 @@ class ReferenceWorker(QObject):
                 self.referencesFound.emit(batch, False)
 
             # Inwards
-            batch = []
-            for obj in self._storage_controller.load_references_inwards(self._lmdbo):
-                if self._abort:
-                    break
-                batch.append(obj)
-                if len(batch) >= self._batch_size:
+            if False:
+                batch = []
+                for obj in self._storage_controller.load_references_inwards(self._lmdbo):
+                    if self._abort:
+                        break
+                    batch.append(obj)
+                    if len(batch) >= self._batch_size:
+                        self.referencesFound.emit(batch, True)
+                        batch = []
+                if batch:
                     self.referencesFound.emit(batch, True)
-                    batch = []
-            if batch:
-                self.referencesFound.emit(batch, True)
         finally:
             self.finished.emit()
 
