@@ -60,9 +60,13 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
                 yield v, tuple(mydepth)
 
             else:
-                if hasattr(v, "__dataclass_fields__") and v.__class__.__name__ in netex.set_all:  # type: ignore
-                    if hasattr(v, "id"):
-                        yield v, tuple(mydepth)
+                if v.__class__ in (str, int):
+                    continue
+                if hasattr(
+                    v, "__dataclass_fields__"
+                ):  # and v.__class__.__name__ in netex.set_all or isinstance(v, StrictContainmentAggregationStructure):  # type: ignore
+                    # if hasattr(v, "id"):
+                    #    yield v, tuple(mydepth)
                     yield from recursive_attributes(v, mydepth)
                 elif v.__class__ in (list, tuple):
                     mydepth.append(0)
@@ -71,7 +75,7 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
                         if x is not None:
                             if x.__class__ in netex.set_ref_types:  # type: ignore
                                 yield x, tuple(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
-                            elif hasattr(x, "__dataclass_fields__") and x.__class__.__name__ in netex.set_all:  # type: ignore
+                            elif hasattr(x, "__dataclass_fields__"):  # and x.__class__.__name__ in netex.set_all:  # type: ignore
                                 if hasattr(x, "id"):
                                     yield x, tuple(mydepth)
                                 yield from recursive_attributes(x, mydepth)
@@ -79,8 +83,10 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
     mydepth.pop()
 
 
-def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type, str, str], None, None]:
+def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type[Tid], str, str], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
+    already_done: set[tuple[str, str | None]] = set()
+    # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
 
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "ref"):
@@ -100,11 +106,15 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
                 continue
 
-            yield (
+            result = (
                 serializer.name_object[obj.name_of_ref_class],  # The object that the reference is towards
                 obj.ref,
                 getattr(obj, "version", getattr(obj, "versionRef", "any")),
             )
+
+            if result not in already_done:
+                already_done.add(result)
+                yield result
 
 
 def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
