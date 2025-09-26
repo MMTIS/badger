@@ -1,5 +1,3 @@
-from netex import EntityStructure
-
 from typing import TypeVar, Any, cast
 
 from xsdata.formats.dataclass.context import XmlContext
@@ -11,8 +9,9 @@ from xsdata.formats.dataclass.serializers.config import SerializerConfig
 
 from lxml import etree
 
+from domain.netex.model import EntityStructure
+from domain.utils import get_object_name
 from storage.interface import Serializer
-from utils.utils import get_object_name
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
