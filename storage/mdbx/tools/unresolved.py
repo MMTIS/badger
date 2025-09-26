@@ -11,7 +11,8 @@ def unresolved_mdbx(storage: MdbxStorage) -> None:
 
         with txn.cursor(db) as cursor:
             for key, value in cursor:
-                print(key, value)
+                obj = storage.load_object_by_full_key(txn, full_key=key)
+                print(obj.id, obj.__class__, value)
 
 if __name__ == "__main__":
     import sys
