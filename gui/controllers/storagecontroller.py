@@ -18,10 +18,10 @@ class StorageController(QObject):
         """Laadt object uit storage en stuurt terug naar de requester."""
         with self._storage.env.ro_transaction() as txn:
             obj: Any = self._storage.load_object(txn, clazz, key)
-
-            sender = self.sender()
-            if isinstance(sender, StorageObject):
-                sender.setObj(obj)
+            if obj:
+                sender = self.sender()
+                if isinstance(sender, StorageObject):
+                    sender.setObj(obj)
 
     @Slot(type, bytes, int)
     def scan_objects(self, clazz: type[Tid], start_key: bytes | None, limit: int) -> Generator[StorageObject, None, None]:
