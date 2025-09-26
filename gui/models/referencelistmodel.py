@@ -50,7 +50,7 @@ class ReferenceListModel(QAbstractListModel):
         reference = self._references[index.row()]
 
         if role == Qt.ItemDataRole.DisplayRole and reference.obj is not None:
-            return f"{reference.obj.id} ({reference.obj.version})"
+            return f"[{reference.obj.__class__.__name__}] {reference.obj.id} ({reference.obj.version})"
         # elif role == Qt.ItemDataRole.ToolTipRole:
         #     if not self._is_available(index.row()):
         #        return "This object reference does not exist in the database"
