@@ -100,6 +100,10 @@ def resolve(storage: MdbxStorage) -> None:
                     referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
 
                     for reference in only_reference_objects(referencing_obj):
+                        if reference.name_of_ref_class not in storage.serializer.name_object:
+                            # TODO: Add a warning.
+                            continue
+
                         cmp_value = storage.serializer.encode_key(
                             reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[reference.name_of_ref_class], True
                         )
