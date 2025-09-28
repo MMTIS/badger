@@ -57,6 +57,8 @@ class MdbxStorageMP(MdbxStorage):
             #    txn.drop(db=db, delete=False)
 
             for obj in objects:
+                # TODO: do the serial increment here too
+                # TODO: do overwriting here too
                 key = self.next_entry = self.next_entry + 1
 
                 full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
