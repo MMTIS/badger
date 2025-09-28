@@ -138,10 +138,21 @@ class MdbxStorage:
                 db.drop(txn, delete=False)
 
             for obj in objects:
-                key = db_id_idx.get_sequence(txn, 1)
                 my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
 
-                full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
+                # First: check if the id already exists, then we must overwrite.
+                full_key = db_id_idx.get(txn, my_id)
+                if full_key is not None:
+                    full_int = int.from_bytes(full_key, 'little')
+                    key = (full_int & 0xFFFFFFFF)
+                    try:
+                        db_reference_outward.delete(txn, full_key)
+                    except:
+                        pass
+                else:
+                    key = db_id_idx.get_sequence(txn, 1)
+                    full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
+
                 for referenced_class, ref, version in only_references(obj, self.serializer):
                     unresolved_value = self.serializer.encode_key(ref, version, referenced_class, include_clazz=True)
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
