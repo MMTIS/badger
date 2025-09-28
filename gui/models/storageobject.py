@@ -41,13 +41,14 @@ class StorageObject(QObject):
         name = getattr(self._obj, 'name', None)
         if name is not None:
             if isinstance(name, MultilingualString):
-                if isinstance(name.content[0], str):
-                    self._name = name.content[0]
-                    self.nameChanged.emit(self._name)
+                if len(name.content) > 0:
+                    if isinstance(name.content[0], str):
+                        self._name = name.content[0]
+                        self.nameChanged.emit(self._name)
 
-                elif isinstance(name.content[0], TextType):
-                    self._name = name.content[0].value
-                    self.nameChanged.emit(self._name)
+                    elif isinstance(name.content[0], TextType):
+                        self._name = name.content[0].value
+                        self.nameChanged.emit(self._name)
 
             elif isinstance(name, str):
                 self._name = name
