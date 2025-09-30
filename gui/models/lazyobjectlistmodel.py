@@ -79,7 +79,10 @@ class LazyObjectListModel(QAbstractListModel):
         if role == Qt.ItemDataRole.DisplayRole:
             # Check if the full object is loaded without triggering the load
             if lmdbo._obj is not None:
-                return f"{lmdbo.name} ({lmdbo._obj.version})"
+                if hasattr(lmdbo._obj, 'version'):
+                    return f"{lmdbo.name} ({lmdbo._obj.version})"
+                else:
+                    return lmdbo.name
             else:
                 # Before loading, display lean info from the key to keep it fast
                 return "-"
@@ -117,7 +120,6 @@ class LazyObjectListModel(QAbstractListModel):
             item.objLoaded.connect(lambda _unused, r=row: self._on_object_loaded(r))
 
         self._can_fetch_more = len(new_items) == OBJECT_FETCH_BATCH_SIZE
-
 
     @Slot(int)
     def _on_object_loaded(self, row: int) -> None:
