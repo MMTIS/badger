@@ -66,5 +66,4 @@ class StorageObject(QObject):
     @property
     def name(self) -> str:
         self.load()
-
         return str(self._name)

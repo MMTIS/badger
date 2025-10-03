@@ -3,7 +3,7 @@ from pathlib import Path
 
 from storage.mdbx.core.implementation import MdbxStorage
 from transformers.generalframe import export_to_general_frame
-from netexio.xml import export_publication_delivery_xml
+from storage.lxml.serialization.xml import export_publication_delivery_xml
 
 
 def main(database: Path, output_filename: str) -> None:

@@ -1,5 +1,5 @@
 import string
-from typing import Any, cast
+from typing import Any, cast, Optional
 
 import lz4.frame
 from cloudpickle import cloudpickle
@@ -20,7 +20,7 @@ class ByteSerializer(Serializer):
         self.class_idx = class_idx
 
     @staticmethod
-    def encode_string(value: str, obj_name: str | None) -> bytes:
+    def encode_string(value: str) -> bytes:
         """Encodes a string by replacing special characters."""
         value = value.upper()
         return bytes(
@@ -39,18 +39,17 @@ class ByteSerializer(Serializer):
     def idx_full_key(class_idx: bytes, key: bytes) -> bytes:
         return ((int.from_bytes(class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
 
-    def encode_key(self, id: str, version: str | None, clazz: type[Tid], include_clazz: bool = False) -> bytes:
-        obj_name = get_object_name(clazz).upper()
+    def encode_key(self, id: str, version: str | None, clazz: Optional[type[Tid]] = None, include_clazz: bool = False) -> bytes:
         encoded_bytes = bytearray()
 
-        encoded_bytes.extend(ByteSerializer.encode_string(id, obj_name))
+        encoded_bytes.extend(ByteSerializer.encode_string(id))
         encoded_bytes.append(ByteSerializer.SEPARATOR)
 
         if version is not None and version != "any":
-            encoded_bytes.extend(ByteSerializer.encode_string(version, obj_name))
+            encoded_bytes.extend(ByteSerializer.encode_string(version))
         encoded_bytes.append(ByteSerializer.SEPARATOR)
 
-        if include_clazz:
+        if include_clazz and clazz is not None:
             encoded_bytes.extend(self.class_idx[clazz])
 
         return bytes(encoded_bytes)

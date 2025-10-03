@@ -10,6 +10,7 @@ import hashlib
 from dateutil.rrule import rrule, DAILY
 
 import utils.netex_monkeypatching  # noqa: F401
+from storage.mdbx.core.implementation import MdbxStorage
 
 from utils.aux_logging import log_print, log_all, log_once
 from transformers.routesprofile import RoutesProfile
@@ -575,7 +576,7 @@ def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any])
     )
 
 
-def epip_service_journey_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool, cache: bool) -> None:
+def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any], pool: Pool, cache: bool) -> None:
     print(sys._getframe().f_code.co_name)
     # sjps: Dict[str, ServiceJourneyPattern] = {}
     sjp_ids: Set[str] = set()
@@ -589,7 +590,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
     # uic_operating_periods: List[UicOperatingPeriod] = []
     # day_type_assignments: List[DayTypeAssignment] = []
 
-    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: Database) -> None:
+    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: MdbxStorage) -> None:
         sj_line_ref = None
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None and (
             isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineRef)

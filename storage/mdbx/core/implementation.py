@@ -3,8 +3,9 @@ from types import TracebackType
 from typing import Optional, Type, Literal, Iterable, Generator, Self, Any
 
 from mdbx import Env, MDBXDBFlags
-from mdbx.mdbx import TXN
+from mdbx.mdbx import TXN, MDBXErrorExc
 
+from domain.netex.model import VersionOfObjectRefStructure
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
@@ -230,6 +231,26 @@ class MdbxStorage:
                 # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
                 return obj
 
+    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Tid:
+        with txn.open_map(name=DB_ID_IDX) as db_id_idx:
+            if ref.name_of_ref_class is not None:
+                # The optimal situation, we can search for the id class in the right place
+                key = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[ref.name_of_ref_class]], include_clazz=True)
+                full_key = db_id_idx.get(txn, key)
+                return self.load_object_by_full_key(txn, full_key)
+
+            if True:
+                print("Fallback...")
+                prefix = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None)
+                cursor = txn.cursor(db=DB_CLASS_IDX)
+                for check_key, resolved_idx in cursor.iter(prefix):
+                    if check_key.startswith(prefix):
+                        # teruggeven check_idx
+                        referenced_class_idx, referenced_key = self.serializer.full_key_to_idx(resolved_idx)
+                        return self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
+                    else:
+                        break
+
     def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
         with txn.open_map(name=self.class_idx[clazz]) as db:
             with txn.cursor(db) as cursor:
@@ -254,3 +275,16 @@ class MdbxStorage:
                         count += 1
                         if count >= limit:
                             break
+
+    def copy_map(self, txn: TXN, remote_storage: "MdbxStorage", remote_txn: TXN, clazz: type[Tid]):
+        with remote_txn.create_map(name=remote_storage.class_idx[clazz]) as db_destination:
+            try:
+                with txn.open_map(name=self.class_idx[clazz]) as db_source:
+                    with txn.cursor(db_source) as cursor:
+                        for key, value in cursor.iter():
+                            db_destination.put(remote_txn, key, value)
+            except MDBXErrorExc as e:
+                if e.errno == -30798:
+                    pass
+                else:
+                    raise

@@ -103,9 +103,11 @@ class PerspectiveWidget(QWidget):
             # allowing the view to update its layout first.
             QTimer.singleShot(0, self.on_left_list_view_updated)
 
+    """
     def update_reference_lists(self, inwards: Iterable[StorageObject], outwards: Iterable[StorageObject]) -> None:
         self.incoming_ref_model.populate(inwards)
         self.outgoing_ref_model.populate(outwards)
+    """
 
     @Slot()
     def on_left_list_view_updated(self) -> None:
