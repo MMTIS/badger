@@ -231,23 +231,26 @@ class MdbxStorage:
                 # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
                 return obj
 
-    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Tid:
+    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Generator[Tid, None, None]:
         with txn.open_map(name=DB_ID_IDX) as db_id_idx:
             if ref.name_of_ref_class is not None:
                 # The optimal situation, we can search for the id class in the right place
                 key = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[ref.name_of_ref_class]], include_clazz=True)
                 full_key = db_id_idx.get(txn, key)
-                return self.load_object_by_full_key(txn, full_key)
+                yield self.load_object_by_full_key(txn, full_key)
+                return
 
             if True:
                 print("Fallback...")
                 prefix = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None)
-                cursor = txn.cursor(db=DB_CLASS_IDX)
+                cursor = txn.cursor(db=DB_ID_IDX)
                 for check_key, resolved_idx in cursor.iter(prefix):
                     if check_key.startswith(prefix):
-                        # teruggeven check_idx
                         referenced_class_idx, referenced_key = self.serializer.full_key_to_idx(resolved_idx)
-                        return self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
+                        # We now want to check if the referenced_class_idx actually matches what should be "possible"
+
+
+                        yield self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
                     else:
                         break
 

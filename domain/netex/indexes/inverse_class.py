@@ -7,9 +7,7 @@ from typing import Any, Dict, Iterable, List, Set, Type, Union, get_args, get_or
 from domain.netex.model import GeneralFrameMembersRelStructure
 
 
-def collect_classes_index(
-    classes: Iterable[Type[Any]], ignore_classes: set[Type[Any]] | None = None, scope_classes: set[Type[Any]] | None = None
-) -> Dict[Type[Any], Set[Type[Any]]]:
+def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type[Any]] | None = None, scope_classes: set[Type[Any]] | None = None) -> Dict[Type[Any], Set[Type[Any]]]:
     """
     Bouw een inverse index: voor ieder type T (binnen scope_classes), in welke dataclasses (ook beperkt tot scope_classes) komt T (direct of indirect) voor als attribuut?
     :param classes: de dataclasses die onderzocht worden

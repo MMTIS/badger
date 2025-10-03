@@ -14,9 +14,7 @@ def getFakeRef(id: str, klass: type[Tref], version: str | None, version_ref: str
     )
 
 
-def getRef(
-    obj: Tid, klass: type[VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure] | None = None
-) -> VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure:
+def getRef(obj: Tid, klass: type[VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure] | None = None) -> VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure:
     assert obj is not None, "A reference must be made from an existing object."
 
     if klass is None:
