@@ -50,7 +50,7 @@ from utils.aux_logging import log_all, prepare_logger
 from configuration import defaults
 
 generator_defaults = {
-    "codespace": Codespace(xmlns=str(defaults["codespace"])),
+    "codespace": Codespace(id="codespace", xmlns=str(defaults["codespace"])),
     "version": defaults["version"],
 }  # Invent something, that materialises the refs, so VersionFrameDefaultsStructure can be used
 
@@ -79,7 +79,7 @@ def epip_line_memory(source_db: MdbxStorage, txn_read: TXN, generator_defaults: 
 
 
 def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
-    print(sys._getframe().f_code.co_name)
+    # print(sys._getframe().f_code.co_name)
     # sjps: Dict[str, ServiceJourneyPattern] = {}
     sjp_ids: Set[str] = set()
     availability_conditions_ids: Set[str] = set()
@@ -114,7 +114,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
                         print("RouteView: Other options to recover line not available")
 
             elif isinstance(service_journey_pattern.route_ref_or_route_view, RouteRef):
-                route: Route = db_read.load_object()
+                route: Route = db_read.load_object(
                     Route, service_journey_pattern.route_ref_or_route_view.ref, service_journey_pattern.route_ref_or_route_view.version
                 )
                 service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=route.line_ref)
@@ -131,7 +131,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> ServiceJourney:
+    def process(sj: ServiceJourney, db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> ServiceJourney:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
@@ -225,33 +225,46 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
         # db_read.clean_cache()
         return sj
 
-    def query(db_read: Database) -> Generator[ServiceJourney, None, None]:
-        _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
-        for sj in _load_generator:
-            yield process(sj, db_read, db_write, generator_defaults)
+    def query(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
+        for _key, sj in db_read.iter_objects(txn, ServiceJourney):
+            print(_key)
+            # yield process(sj, db_read, txn, db_write, txn_write, generator_defaults)
+
+        if False:
+            yield ServiceJourney()
+
+        # _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
+        # for sj in _load_generator:
+        #     yield process(sj, db_read, db_write, generator_defaults)
         # for sj in pool.imap_unordered(partial(process, read_database=read_database, write_database=write_database, generator_defaults=generator_defaults), _load_generator, chunksize=100):
         #     yield sj
 
     # TODO: At this point we should have a check to know if the ServiceJourneyPattern is geographically enabled, or not
 
     log_all(logging.INFO, "Indexing RoutePoint to ScheduledStopPoint ")
-    route_point_projection = {}
-    for ssp in load_generator(db_read, ScheduledStopPoint):
-        rp_to_ssp = list(RoutesProfile.route_point_projection(ssp))
-        if len(rp_to_ssp) > 0:
-            route_point_projection[getRef(ssp).ref] = rp_to_ssp[0]
+    # route_point_projection = {}
+    # for ssp in load_generator(db_read, ScheduledStopPoint):
+    #     rp_to_ssp = list(RoutesProfile.route_point_projection(ssp))
+    #     if len(rp_to_ssp) > 0:
+    #         route_point_projection[getRef(ssp).ref] = rp_to_ssp[0]
 
     # log_all(logging.INFO, "Indexing AvailabilityConditions " + str(memory_usage(-1, interval=.1, timeout=1)[0]))
     # vailability_conditions = getIndex(load_local(db_read, AvailabilityCondition))
 
     log_all(logging.INFO, "Service journeys for now ")
-    db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
+    # db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
+
+    with db_read.env.ro_transaction() as txn_read:
+        db_write.insert_objects_on_queue(ServiceJourney, query(db_read, txn_read), True)
 
 
 def main(source_database_file: Path, target_database_file: Path) -> None:
     with MdbxStorage(target_database_file,readonly=False) as target_db:
         with MdbxStorage(source_database_file, readonly=True) as source_db:
+            epip_service_journey_generator(source_db, target_db, generator_defaults)
+
             with source_db.env.ro_transaction() as txn_read:
+                pass
                 """
                 for clazz in [
                     Codespace,
@@ -279,9 +292,9 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
                             pass
                 """
 
-                target_db.insert_objects_on_queue(Line, epip_line_memory(source_db, txn_read, {}), True)
+                # target_db.insert_objects_on_queue(Line, epip_line_memory(source_db, txn_read, {}), True)
 
-            epip_service_journey_generator(source_db, target_db, generator_defaults, None, cache=False)
+
 
 
 """
