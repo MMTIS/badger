@@ -102,20 +102,29 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 elif obj.__class__.__name__.endswith("Ref"):
                     obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
-            if obj.name_of_ref_class not in serializer.name_object.keys():
-                # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
-                continue
+            ref_class = None
+            if hasattr(obj.name_of_ref_class, 'value'):
+                if obj.name_of_ref_class.value not in serializer.name_object.keys():
+                    # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
+                    continue
+                else:
+                    ref_class = serializer.name_object[obj.name_of_ref_class.value]
+            else:
+                if obj.name_of_ref_class not in serializer.name_object.keys():
+                    continue
+                else:
+                    ref_class = serializer.name_object[obj.name_of_ref_class]
 
-            result = (
-                serializer.name_object[obj.name_of_ref_class],  # The object that the reference is towards
-                obj.ref,
-                getattr(obj, "version", getattr(obj, "versionRef", "any")),
-            )
+            if ref_class:
+                result = (
+                    ref_class,  # The object that the reference is towards
+                    obj.ref,
+                    getattr(obj, "version", getattr(obj, "versionRef", "any")),
+                )
 
-            if result not in already_done:
-                already_done.add(result)
-                yield result
-
+                if result not in already_done:
+                    already_done.add(result)
+                    yield result
 
 def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
