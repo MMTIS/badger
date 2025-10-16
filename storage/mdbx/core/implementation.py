@@ -123,6 +123,50 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
+    def insert_any_object_on_queue(self, objects: Iterable[Tid]) -> None:
+        if self.readonly:
+            raise
+
+        with self.env.rw_transaction() as txn:
+            db_unresolved = txn.open_map(name=DB_UNRESOLVED)
+            db_id_idx = txn.open_map(name=DB_ID_IDX)
+            db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
+
+            for obj in objects:
+                this_class_idx = self.class_idx[obj.__class__]
+                db = txn.create_map(name=this_class_idx)
+
+                my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+
+                # First: check if the id already exists, then we must overwrite.
+                full_key = db_id_idx.get(txn, my_id)
+                if full_key is not None:
+                    full_int = int.from_bytes(full_key, 'little')
+                    key = (full_int & 0xFFFFFFFF)
+                    try:
+                        db_reference_outward.delete(txn, full_key)
+                    except:
+                        pass
+                else:
+                    key = db_id_idx.get_sequence(txn, 1)
+                    full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
+
+                for referenced_class, ref, version in only_references(obj, self.serializer):
+                    unresolved_value = self.serializer.encode_key(ref, version, referenced_class, include_clazz=True)
+                    resolved_idx = db_id_idx.get(txn, unresolved_value)
+                    if resolved_idx:
+                        db_reference_outward.put(txn, full_key, resolved_idx)
+                    else:
+                        db_unresolved.put(txn, full_key, unresolved_value)
+
+                value = self.serializer.marshall(obj, obj.__class__)
+                db.put(txn, key.to_bytes(4, 'little'), value)
+                db_id_idx.put(txn, my_id, full_key)
+
+            txn.commit()
+
+
+    # Deprecate this one
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
         if self.readonly:
             raise
@@ -212,7 +256,7 @@ class MdbxStorage:
                 else:
                     yield from self._load_references(txn, full_key)
 
-    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Any:
+    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Tid:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
         with txn.open_map(name=this_clazz_idx) as db:
@@ -231,14 +275,14 @@ class MdbxStorage:
                 # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
                 return obj
 
-    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Generator[Tid, None, None]:
+    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[Tid]:
         with txn.open_map(name=DB_ID_IDX) as db_id_idx:
             if ref.name_of_ref_class is not None:
                 # The optimal situation, we can search for the id class in the right place
-                key = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[ref.name_of_ref_class]], include_clazz=True)
+                name_of_ref_class = ref.name_of_ref_class.value if hasattr(ref.name_of_ref_class, 'value') else ref.name_of_ref_class
+                key = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True)
                 full_key = db_id_idx.get(txn, key)
-                yield self.load_object_by_full_key(txn, full_key)
-                return
+                return self.load_object_by_full_key(txn, full_key)
 
             if True:
                 print("Fallback...")
@@ -249,10 +293,10 @@ class MdbxStorage:
                         referenced_class_idx, referenced_key = self.serializer.full_key_to_idx(resolved_idx)
                         # We now want to check if the referenced_class_idx actually matches what should be "possible"
 
-
-                        yield self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
+                        return self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
                     else:
                         break
+        return
 
     def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
         with txn.open_map(name=self.class_idx[clazz]) as db:

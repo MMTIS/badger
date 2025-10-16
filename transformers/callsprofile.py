@@ -3,7 +3,8 @@ from typing import List
 
 from xsdata.models.datatype import XmlDuration, XmlTime
 
-from netex import (
+from domain.netex.indexes.byid import getIndex
+from domain.netex.model import (
     ServiceJourney,
     StopPointInJourneyPattern,
     ServiceJourneyPattern,
@@ -38,7 +39,7 @@ from netex import (
     TimetabledPassingTimesRelStructure,
     TemplateServiceJourney,
 )
-from utils.refs import setIdVersion, getRef, getIndex
+from domain.netex.services.refs import getRef
 from utils.utils import project
 from utils.aux_logging import log_print, log_once
 

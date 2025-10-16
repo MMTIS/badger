@@ -3,13 +3,14 @@ import hashlib
 from decimal import Decimal
 from typing import List, Dict, Generator
 
-from netex import Codespace, ServiceLink, RouteLink, RoutePoint, RoutePointRefStructure, TimingLink, PointRefStructure, \
+from mdbx.mdbx import TXN
+
+from domain.netex.model import Codespace, ServiceLink, RouteLink, RoutePoint, RoutePointRefStructure, TimingLink, PointRefStructure, \
     TimingPoint, ScheduledStopPoint, TimingPointVersionStructure, ScheduledStopPointRefStructure, Route, \
     PointProjection, ServiceJourneyPattern, StopPointInJourneyPattern, PosList, ServiceLinkRefStructure
-from netexio.database import Database
-from netexio.dbaccess import load_local
-
-from utils.refs import getId, getRef
+from domain.netex.services.ids import getId
+from domain.netex.services.refs import getRef
+from storage.mdbx.core.implementation import MdbxStorage
 from utils.utils import project
 
 
@@ -20,11 +21,11 @@ class RoutesProfile:
             for projection in ssp.projections.projection_ref_or_projection:
                 if isinstance(projection, PointProjection):
                     if projection.project_to_point_ref:
-                        if projection.project_to_point_ref.name_of_ref_class == 'RoutePoint':
+                        if projection.project_to_point_ref.name_of_ref_class.value == 'RoutePoint':
                             yield project(projection.project_to_point_ref, RoutePointRefStructure)
 
     @staticmethod
-    def projectRouteToServiceLinks(db: Database, sjp: ServiceJourneyPattern, route: Route, route_point_projection: Dict[str, RoutePointRefStructure], generator_defaults: dict) -> Generator[ServiceLink, None, ServiceJourneyPattern]:
+    def projectRouteToServiceLinks(db: MdbxStorage, txn: TXN, sjp: ServiceJourneyPattern, route: Route, route_point_projection: Dict[str, RoutePointRefStructure], generator_defaults: dict) -> Generator[ServiceLink, None, ServiceJourneyPattern]:
         # Two variants:
         # 1. pointsInSequence has PointONRoute/OnwardRouteLinkRef;
         # 2. linksInSequence
@@ -33,7 +34,7 @@ class RoutesProfile:
         if route.points_in_sequence:
             links_in_sequence = [por.onward_route_link_ref for por in route.points_in_sequence.point_on_route if por.onward_route_link_ref]
             # TODO: #142
-            route_links_in_sequence: List[RouteLink] = [load_local(db, RouteLink, filter_id=lis.ref, cursor=True, limit=1, cache=False)[0] for lis in links_in_sequence]
+            route_links_in_sequence: List[RouteLink] = [db.load_object_by_reference(txn, lis) for lis in links_in_sequence]
             route_i = 0
 
             if sjp.points_in_sequence:
@@ -72,7 +73,7 @@ class RoutesProfile:
                             object_id = m.hexdigest()[0:8].upper()
                             combined_route_links[0].line_string.id = "LineString_" + object_id
 
-                            sl = ServiceLink(id=getId(ServiceLink, generator_defaults['codespace'], id=object_id),
+                            sl = ServiceLink(id=getId(generator_defaults['codespace'], ServiceLink, id=object_id),
                                              version=route.version,
                                              distance=combined_route_links[0].distance,
                                              from_point_ref=project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
