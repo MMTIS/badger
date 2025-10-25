@@ -8,8 +8,10 @@ from typing import List, Set, Any, TypeVar, Generator, cast
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY
+from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
+from domain.netex.indexes.byid import getIndex
 from storage.mdbx.core.implementation import MdbxStorage
 
 from utils.aux_logging import log_print, log_all, log_once
@@ -23,7 +25,7 @@ from transformers.callsprofile import CallsProfile
 
 from configuration import defaults
 
-from netex import (
+from domain.netex.model import (
     PublicationDelivery,
     ParticipantRef,
     MultilingualString,
@@ -121,10 +123,6 @@ from netex import (
     Locale,
 )
 
-from netexio.database import Database
-
-from netexio.dbaccess import load_generator, load_local, recursive_attributes, fetch_references_classes_generator
-from utils.refs import getIndex, getRef, getId, getFakeRef
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
 from transformers.projection import project_location_4326
@@ -134,10 +132,10 @@ T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 
 
-def epip_line_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool):
+def epip_line_generator(db_read: MdbxStorage, txn_read: TXN, generator_defaults: dict[str, Any]):
     print(sys._getframe().f_code.co_name)
 
-    def process(line: Line):
+    def process(line: Line) -> Generator[Line, None, None]:
         line.branding_ref = None
         line.type_of_service_ref = None
         line.type_of_product_category_ref = None
@@ -155,82 +153,41 @@ def epip_line_generator(db_read: Database, db_write: Database, generator_default
                     line.additional_operators = TransportOrganisationRefsRelStructure(transport_organisation_ref=[line.authority_ref])
                 line.authority_ref = None
 
-        return line
+        yield line
 
-    def query(db_read: Database) -> Generator:
-        _load_generator = load_generator(db_read, Line)
-        for line in pool.imap_unordered(process, _load_generator, chunksize=100):
-            yield line
+    def query(db_read: MdbxStorage, txn_read: TXN) -> Generator[Line, None, None]:
+        for _key, line in db_read.iter_objects(txn_read, Line):
+            yield from process(line)
 
-    db_write.insert_objects_on_queue(Line, query(db_read), True)
-
-
-def epip_line_memory(db_read: Database, db_write: Database, generator_defaults):
-    print(sys._getframe().f_code.co_name)
-    lines: List[Line] = load_local(db_read, Line)
-    for line in lines:
-        line: Line
-        line.branding_ref = None
-        line.type_of_service_ref = None
-        line.type_of_product_category_ref = None
-        if line.operator_ref and line.authority_ref:
-            if defaults['authority_reference']:
-                if line.additional_operators and line.additional_operators.transport_organisation_ref:
-                    line.additional_operators.transport_organisation_ref.append(line.operator_ref)
-                else:
-                    line.additional_operators = TransportOrganisationRefsRelStructure(transport_organisation_ref=[line.operator_ref])
-                line.operator_ref = None
-            else:
-                if line.additional_operators and line.additional_operators.transport_organisation_ref:
-                    line.additional_operators.transport_organisation_ref.append(line.authority_ref)
-                else:
-                    line.additional_operators = TransportOrganisationRefsRelStructure(transport_organisation_ref=[line.authority_ref])
-                line.authority_ref = None
-
-    db_write.insert_objects_on_queue(Line, lines, True)
+    yield from query(db_read, txn_read)
 
 
-def epip_scheduled_stop_point_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool):
-    print(sys._getframe().f_code.co_name)
-
-    def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, Any]):
+def epip_scheduled_stop_point_generator(db_read: MdbxStorage, txn_read: TXN, generator_defaults: dict[str, Any]):
+    def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, Any]) -> Generator[ScheduledStopPoint, None, None]:
         ssp.stop_areas = None
         ssp.key_list = None
         ssp.extensions = None
         if ssp.location is not None:
             project_location_4326(ssp.location)
-        return ssp
-
-    def query(db_read: Database) -> Generator:
-        _load_generator = load_generator(db_read, ScheduledStopPoint)
-        for ssp in pool.imap_unordered(partial(process, generator_defaults=generator_defaults), _load_generator, chunksize=100):
-            yield ssp
-
-    db_write.insert_objects_on_queue(ScheduledStopPoint, query(db_read), True)
-
-
-def epip_scheduled_stop_point_memory(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
-    print(sys._getframe().f_code.co_name)
-
-    scheduled_stop_points = load_local(db_read, ScheduledStopPoint)
-    ssp: ScheduledStopPoint
-    for ssp in scheduled_stop_points:
-        ssp.stop_areas = None
-        if ssp.location is not None:
-            project_location_4326(ssp.location)
         else:
-            print(f"ScheduledStopPoint {ssp.id} does not have a location.")
+            logging.info(f"ScheduledStopPoint {ssp.id} does not have a location.")
 
-    db_write.insert_objects_on_queue(ScheduledStopPoint, scheduled_stop_points, True)
+        yield ssp
+
+    def query(db_read: MdbxStorage, txn_read: TXN) -> Generator[ScheduledStopPoint, None, None]:
+        for _key, ssp in db_read.iter_objects(txn_read, ScheduledStopPoint):
+            yield from process(ssp, generator_defaults)
+
+    yield from query(db_read,txn_read)
 
 
-def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defaults):
+def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     print(sys._getframe().f_code.co_name)
 
-    stop_places: dict[str, StopPlace] = getIndex(load_local(db_read, StopPlace))
+    stop_places: dict[str, StopPlace] = getIndexNew(db_read.iter_objects(txn, StopPlace))
 
     # Resolving a quay is very expensive. Either in the database it should be stored independently, or an index should be made available.
-    quays: dict[str, Quay] = getIndex(
+    quays: dict[str, Quay] = getIndexNew(
         [
             quay
             for quay in chain(*[stop_place.quays.taxi_stand_ref_or_quay_ref_or_quay for stop_place in stop_places.values() if stop_place.quays is not None])
@@ -344,7 +301,7 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
     db_write.insert_objects_on_queue(StopPlace, retained_stop_places, True)
 
 
-def epip_timetabled_passing_times_memory(db_read: Database, db_write: Database, generator_defaults, dynamics=[]):
+def epip_timetabled_passing_times_memory(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults, dynamics=[]):
     print(sys._getframe().f_code.co_name)
 
     # TODO: Maybe do this on the fly, per servicejourney?
@@ -414,8 +371,8 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
 
 
 def service_journey_ac_to_day_type(
-    db_read: Database,
-    db_write: Database,
+    db_read: MdbxStorage,
+    db_write: MdbxStorage,
     service_journey: ServiceJourney,
     availability_conditions_ids: Set[str],
     day_types_ids: Set[str],
@@ -514,7 +471,7 @@ def service_journey_ac_to_day_type(
     service_journey.day_types = DayTypeRefsRelStructure(day_type_ref=[day_type_ref])
 
 
-def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any]):
+def get_service_calendar(db_write: MdbxStorage, generator_defaults: dict[str, Any]):
     """
     if len(uic_operating_periods) == 0:
         # TODO: This should never happen, since EPIP specifies the use of UicOperatingPeriod
@@ -629,7 +586,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> ServiceJourney:
+    def process(sj: ServiceJourney, db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> ServiceJourney:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
@@ -723,7 +680,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
         # db_read.clean_cache()
         return sj
 
-    def query(db_read: Database) -> Generator[ServiceJourney, None, None]:
+    def query(db_read: MdbxStorage) -> Generator[ServiceJourney, None, None]:
         _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
         for sj in _load_generator:
             yield process(sj, db_read, db_write, generator_defaults)
@@ -746,7 +703,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
     db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
 
 
-def epip_service_calendar(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
     log_all(logging.INFO, "Calendar creation...")
 
     service_calendars: List[ServiceCalendar] = load_local(db_read, ServiceCalendar)
@@ -961,7 +918,7 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
     # db_write.insert_objects_on_queue([service_calendar], True, cursor=True)
 
 
-def epip_remove_keylist_extensions(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
+def epip_remove_keylist_extensions(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]):
     def process(deserialised: Tid, keys: list[str]) -> Any:
         for obj, path in recursive_attributes(deserialised, []):
             for key in keys:
@@ -970,22 +927,22 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 
         return deserialised
 
-    def query1(db_read: Database) -> Generator[StopPlace, None, None]:
+    def query1(db_read: MdbxStorage) -> Generator[StopPlace, None, None]:
         _load_generator = load_generator(db_read, StopPlace, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
 
-    def query2(db_read: Database) -> Generator[ScheduledStopPoint, None, None]:
+    def query2(db_read: MdbxStorage) -> Generator[ScheduledStopPoint, None, None]:
         _load_generator = load_generator(db_read, ScheduledStopPoint, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
 
-    def query3(db_read: Database) -> Generator[ServiceJourneyPattern, None, None]:
+    def query3(db_read: MdbxStorage) -> Generator[ServiceJourneyPattern, None, None]:
         _load_generator = load_generator(db_read, ServiceJourneyPattern, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
 
-    def query4(db_read: Database) -> Generator[ServiceJourney, None, None]:
+    def query4(db_read: MdbxStorage) -> Generator[ServiceJourney, None, None]:
         _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
         for obj in _load_generator:
             yield process(obj, ['key_list', 'extensions'])
@@ -997,7 +954,7 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 
 
 def export_epip_network_offer(
-    db_epip: Database,
+    db_epip: MdbxStorage,
     composite_frame_id: str = "EU_NETWORK_OFFER",
     type_of_frame_ref: TypeOfFrameRef = TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0'),
 ) -> PublicationDelivery:
@@ -1229,10 +1186,10 @@ def export_epip_network_offer(
     return publication_delivery
 
 
-def epip_service_journey_interchange(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+def epip_service_journey_interchange(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
     print(sys._getframe().f_code.co_name)
 
-    def query1(db_read: Database) -> Generator[ServiceJourneyInterchange, None, None]:
+    def query1(db_read: MdbxStorage) -> Generator[ServiceJourneyInterchange, None, None]:
         # _load_generator = load_generator(db_read, InterchangeRule)
         # for interchange_rule in _load_generator:
         #     interchange_rule: InterchangeRule
@@ -1274,5 +1231,5 @@ def epip_service_journey_interchange(db_read: Database, db_write: Database, gene
     db_write.insert_objects_on_queue(ServiceJourneyInterchange, query1(db_read))
 
 
-def epip_interchange_rule(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+def epip_interchange_rule(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
     db_write.insert_objects_on_queue(ServiceJourneyInterchange, interchange_rules_to_service_journey_interchanges(db_read))

@@ -42,7 +42,9 @@ from storage.mdbx.core.implementation import MdbxStorage
 import logging
 
 from transformers.callsprofile import CallsProfile
+from transformers.epip import epip_service_calendar, epip_line_generator
 from transformers.routesprofile import RoutesProfile
+from transformers.scheduledstoppoint import infer_locations_from_quay_or_stopplace_and_apply
 
 """
 from transformers.direction import infer_directions_from_sjps_and_apply
@@ -70,30 +72,10 @@ generator_defaults = {
 }  # Invent something, that materialises the refs, so VersionFrameDefaultsStructure can be used
 
 
-def epip_line_memory(source_db: MdbxStorage, txn_read: TXN, generator_defaults: dict[str, Any]) -> Generator[Line, None, None]:
-    for _key, line in source_db.iter_objects(txn_read, Line):
-        line.branding_ref = None
-        line.type_of_service_ref = None
-        line.type_of_product_category_ref = None
-        if line.operator_ref is not None and line.authority_ref is not None:
-            if generator_defaults.get('authority_reference', False):
-                if line.additional_operators and line.additional_operators.transport_organisation_ref:
-                    line.additional_operators.transport_organisation_ref.append(line.operator_ref)
-                else:
-                    line.additional_operators = TransportOrganisationRefsRelStructure(
-                        transport_organisation_ref=[line.operator_ref])
-                line.operator_ref = None
-            else:
-                if line.additional_operators and line.additional_operators.transport_organisation_ref:
-                    line.additional_operators.transport_organisation_ref.append(line.authority_ref)
-                else:
-                    line.additional_operators = TransportOrganisationRefsRelStructure(
-                        transport_organisation_ref=[line.authority_ref])
-                line.authority_ref = None
-        yield line
 
 
-def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
+
+def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
     # print(sys._getframe().f_code.co_name)
     # sjps: Dict[str, ServiceJourneyPattern] = {}
     sjp_ids: Set[str] = set()
@@ -171,10 +153,16 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
             #     timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
             # )
 
-        elif sj.time_demand_type_ref:
+        elif sj.journey_pattern_ref and sj.time_demand_type_ref:
             service_journey_pattern: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
             time_demand_type: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
             CallsProfile.getPassingTimesFromTimeDemandType(sj, service_journey_pattern, time_demand_type)
+
+        else:
+            log_all(
+                logging.ERROR,
+                f"No matching timing transformation found for journey: {sj}",
+            )
 
         # If we already know that this generated SJP already exists, we should not even add it.
         if sj.journey_pattern_ref.ref in sjp_ids:
@@ -249,19 +237,14 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
         # vailability_conditions = getIndex(load_local(db_read, AvailabilityCondition))
 
         log_all(logging.INFO, "Service journeys for now ")
-        # db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
 
-        db_write.insert_any_object_on_queue(query(db_read, txn_read, generator_defaults))
+        yield from query(db_read, txn_read, generator_defaults)
 
 
 def main(source_database_file: Path, target_database_file: Path) -> None:
     with MdbxStorage(target_database_file,readonly=False) as target_db:
         with MdbxStorage(source_database_file, readonly=True) as source_db:
-            epip_service_journey_generator(source_db, target_db, generator_defaults)
-
             with source_db.env.ro_transaction() as txn_read:
-                pass
-                """
                 for clazz in [
                     Codespace,
                     Direction,
@@ -286,11 +269,14 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
                             txn_write.commit()
                         except:
                             pass
-                """
 
-                # target_db.insert_objects_on_queue(Line, epip_line_memory(source_db, txn_read, {}), True)
+                target_db.insert_any_object_on_queue(epip_line_generator(source_db, txn_read, {}))
 
+                target_db.insert_any_object_on_queue(infer_locations_from_quay_or_stopplace_and_apply(source_db, txn_read, generator_defaults))
 
+                target_db.insert_any_object_on_queue(epip_service_journey_generator(source_db, txn_read, generator_defaults))
+
+                epip_service_calendar(source_db, target_db, generator_defaults)
 
 
 """
