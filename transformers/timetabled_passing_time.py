@@ -1,4 +1,4 @@
-from netex import ServiceJourney
+from domain.netex.model import ServiceJourney
 
 
 # DEPRECATION WARNING

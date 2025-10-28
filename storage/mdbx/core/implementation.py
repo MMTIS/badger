@@ -1,11 +1,12 @@
 from pathlib import Path
+from sys import exception
 from types import TracebackType
 from typing import Optional, Type, Literal, Iterable, Generator, Self, Any
 
 from mdbx import Env, MDBXDBFlags
 from mdbx.mdbx import TXN, MDBXErrorExc
 
-from domain.netex.model import VersionOfObjectRefStructure
+from domain.netex.model import VersionOfObjectRefStructure, EntityStructure
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
@@ -22,8 +23,8 @@ class MdbxStorage:
     readonly: bool
     max_dbs: int
     initial_size: int
-    class_idx: dict[type, bytes]
-    idx_class: dict[bytes, type]
+    class_idx: dict[type[EntityStructure], bytes]
+    idx_class: dict[bytes, type[EntityStructure]]
     class_name_idx: dict[str, bytes]
     serializer: ByteSerializer
 
@@ -123,47 +124,44 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
-    def insert_any_object_on_queue(self, objects: Iterable[Tid]) -> None:
+    def insert_any_object_on_queue(self, txn: TXN, objects: Iterable[Tid]) -> None:
         if self.readonly:
             raise
 
-        with self.env.rw_transaction() as txn:
-            db_unresolved = txn.open_map(name=DB_UNRESOLVED)
-            db_id_idx = txn.open_map(name=DB_ID_IDX)
-            db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
+        db_unresolved = txn.open_map(name=DB_UNRESOLVED)
+        db_id_idx = txn.open_map(name=DB_ID_IDX)
+        db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
 
-            for obj in objects:
-                this_class_idx = self.class_idx[obj.__class__]
-                db = txn.create_map(name=this_class_idx)
+        for obj in objects:
+            this_class_idx = self.class_idx[obj.__class__]
+            db = txn.create_map(name=this_class_idx)
 
-                my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+            my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
 
-                # First: check if the id already exists, then we must overwrite.
-                full_key = db_id_idx.get(txn, my_id)
-                if full_key is not None:
-                    full_int = int.from_bytes(full_key, 'little')
-                    key = (full_int & 0xFFFFFFFF)
-                    try:
-                        db_reference_outward.delete(txn, full_key)
-                    except:
-                        pass
+            # First: check if the id already exists, then we must overwrite.
+            full_key = db_id_idx.get(txn, my_id)
+            if full_key is not None:
+                full_int = int.from_bytes(full_key, 'little')
+                key = (full_int & 0xFFFFFFFF)
+                try:
+                    db_reference_outward.delete(txn, full_key)
+                except:
+                    pass
+            else:
+                key = db_id_idx.get_sequence(txn, 1)
+                full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
+
+            for referenced_class, ref, version in only_references(obj, self.serializer):
+                unresolved_value = self.serializer.encode_key(ref, version, referenced_class, include_clazz=True)
+                resolved_idx = db_id_idx.get(txn, unresolved_value)
+                if resolved_idx:
+                    db_reference_outward.put(txn, full_key, resolved_idx)
                 else:
-                    key = db_id_idx.get_sequence(txn, 1)
-                    full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
+                    db_unresolved.put(txn, full_key, unresolved_value)
 
-                for referenced_class, ref, version in only_references(obj, self.serializer):
-                    unresolved_value = self.serializer.encode_key(ref, version, referenced_class, include_clazz=True)
-                    resolved_idx = db_id_idx.get(txn, unresolved_value)
-                    if resolved_idx:
-                        db_reference_outward.put(txn, full_key, resolved_idx)
-                    else:
-                        db_unresolved.put(txn, full_key, unresolved_value)
-
-                value = self.serializer.marshall(obj, obj.__class__)
-                db.put(txn, key.to_bytes(4, 'little'), value)
-                db_id_idx.put(txn, my_id, full_key)
-
-            txn.commit()
+            value = self.serializer.marshall(obj, obj.__class__)
+            db.put(txn, key.to_bytes(4, 'little'), value)
+            db_id_idx.put(txn, my_id, full_key)
 
 
     # Deprecate this one
@@ -212,7 +210,7 @@ class MdbxStorage:
 
             txn.commit()
 
-    def _load_references(self, txn: TXN, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
+    def _load_references(self, txn: TXN, full_key: bytes) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         db = txn.open_map(DB_REFERENCE_OUTWARD)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows(start_key=full_key):
@@ -256,30 +254,31 @@ class MdbxStorage:
                 else:
                     yield from self._load_references(txn, full_key)
 
-    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Tid:
+    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> EntityStructure:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
         with txn.open_map(name=this_clazz_idx) as db:
             value = db.get(txn, key)
-            obj: Tid = self.serializer.unmarshall(value, clazz)
+            obj: EntityStructure = self.serializer.unmarshall(value, clazz)
             return obj
 
-    def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> Tid:
+    def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> EntityStructure:
         this_class_idx = self.class_idx[clazz]
         with txn.open_map(name=this_class_idx) as db:
             value = db.get(txn, key)
-            if value is None:
-                print(clazz, key)
-            else:
-                obj = self.serializer.unmarshall(value, clazz)
-                # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-                return obj
+            assert value is not None
+            # if value is None:
+            #    print(clazz, key)
 
-    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[Tid]:
+            obj = self.serializer.unmarshall(value, clazz)
+            # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
+            return obj
+
+    def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[EntityStructure]:
         with txn.open_map(name=DB_ID_IDX) as db_id_idx:
             if ref.name_of_ref_class is not None:
                 # The optimal situation, we can search for the id class in the right place
-                name_of_ref_class = ref.name_of_ref_class.value if hasattr(ref.name_of_ref_class, 'value') else ref.name_of_ref_class
+                name_of_ref_class = str(ref.name_of_ref_class.value if hasattr(ref.name_of_ref_class, 'value') else ref.name_of_ref_class)
                 key = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True)
                 full_key = db_id_idx.get(txn, key)
                 return self.load_object_by_full_key(txn, full_key)
@@ -296,7 +295,7 @@ class MdbxStorage:
                         return self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
                     else:
                         break
-        return
+        return None
 
     def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
         with txn.open_map(name=self.class_idx[clazz]) as db:
@@ -312,18 +311,22 @@ class MdbxStorage:
                             break
 
     def iter_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[tuple[bytes, Tid], None, None]:
-        with txn.open_map(name=self.class_idx[clazz]) as db:
-            with txn.cursor(db) as cursor:
-                count = 0
+        try:
+            db = txn.open_map(name=self.class_idx[clazz])
+        except: # TODO: Better catching by pymdbx proper exceptions
+            return
 
-                for key, value in cursor.iter(start_key=start_key):
-                    yield key, self.serializer.unmarshall(value, clazz)
-                    if limit:
-                        count += 1
-                        if count >= limit:
-                            break
+        with txn.cursor(db) as cursor:
+            count = 0
 
-    def copy_map(self, txn: TXN, remote_storage: "MdbxStorage", remote_txn: TXN, clazz: type[Tid]):
+            for key, value in cursor.iter(start_key=start_key):
+                yield key, self.serializer.unmarshall(value, clazz)
+                if limit:
+                    count += 1
+                    if count >= limit:
+                        break
+
+    def copy_map(self, txn: TXN, remote_storage: "MdbxStorage", remote_txn: TXN, clazz: type[EntityStructure]) -> None:
         with remote_txn.create_map(name=remote_storage.class_idx[clazz]) as db_destination:
             try:
                 with txn.open_map(name=self.class_idx[clazz]) as db_source:

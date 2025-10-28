@@ -3,7 +3,7 @@ from itertools import groupby
 from typing import Optional, TypeVar, Any, Iterable
 
 # TODO: This is required for globals to work, lets fix that later.
-from netex import *  # noqa: F403
+from domain.netex.model import *  # noqa: F403
 
 import datetime
 import re

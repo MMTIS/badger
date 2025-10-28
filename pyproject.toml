@@ -28,7 +28,7 @@ dependencies = [
 requires-python = ">=3.12"
 
 [tool.black]
-extend-exclude = "netex"
+extend-exclude = "domain/netex/model/*.py"
 preview = true
 line-length = 160
 skip-string-normalization = true
@@ -36,7 +36,11 @@ skip-string-normalization = true
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["netex"]
+exclude = ["domain/netex/model/*.py"]
 
 [tool.ruff]
-exclude = ["netex"]
+exclude = ["domain/netex/model/*.py"]
+
+[[tool.mypy.overrides]]
+module = ["domain.netex.model.*"]
+ignore_errors = true

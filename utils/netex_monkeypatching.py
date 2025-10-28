@@ -1,4 +1,4 @@
-from netex import (
+from domain.netex.model import (
     VersionOfObjectRefStructure,
     ServiceJourneyRef,
     ServiceJourneyPatternRef,

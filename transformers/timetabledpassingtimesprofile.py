@@ -1,7 +1,9 @@
 from typing import cast
 
+from domain.netex.indexes.byid import getIndexNew
+from domain.netex.services.refs import getRef
 from transformers.callsprofile import CallsProfile
-from netex import (
+from domain.netex.model import (
     ServiceJourney,
     ServiceJourneyPattern,
     StopPointInJourneyPattern,
@@ -17,7 +19,6 @@ from netex import (
     TimingPointInJourneyPattern,
     TimeDemandType,
 )
-from utils.refs import getRef, getIndex, getId
 import sys
 import hashlib
 
@@ -283,8 +284,8 @@ class TimetablePassingTimesProfile:
     def getTimetabledPassingTimes(self, force: bool = False, clean: bool = False):
         service_journey_pattern: ServiceJourneyPattern | None
         sjps = {TimetablePassingTimesProfile.sjp_hash(sjp.points_in_sequence): sjp for sjp in self.service_journey_patterns}
-        existing_sjps = getIndex(self.service_journey_patterns)
-        existing_tdts = getIndex(self.time_demand_types)
+        existing_sjps = getIndexNew(self.service_journey_patterns)
+        existing_tdts = getIndexNew(self.time_demand_types)
 
         sj: ServiceJourney
         for sj in self.service_journeys:

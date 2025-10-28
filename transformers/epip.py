@@ -11,12 +11,13 @@ from dateutil.rrule import rrule, DAILY
 from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
-from domain.netex.indexes.byid import getIndex
+from domain.netex.indexes.byid import getIndex, getIndexNew
+from domain.netex.services.refs import getRef
 from storage.mdbx.core.implementation import MdbxStorage
+from transformers.projection import project_location_4326
 
 from utils.aux_logging import log_print, log_all, log_once
 from transformers.routesprofile import RoutesProfile
-from transformers.interchanges import interchange_rules_to_service_journey_interchanges
 from utils.utils import project, chain, GeneratorTester
 
 from xsdata.models.datatype import XmlDateTime, XmlDate
@@ -125,7 +126,7 @@ from domain.netex.model import (
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
-from transformers.projection import project_location_4326
+# from transformers.projection import project_location_4326
 from transformers.timetabled_passing_time import infer_id_and_order_and_apply
 
 T = TypeVar("T")
@@ -198,7 +199,7 @@ def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     refs = set([])
     missing = []
 
-    stop_assignments: List[PassengerStopAssignment] = load_local(db_read, PassengerStopAssignment)
+    stop_assignments: List[PassengerStopAssignment] = list(db_read.iter_objects(txn, PassengerStopAssignment))
     retain_stop_assignments = []
     for stop_assignment in stop_assignments:
         if stop_assignment.taxi_stand_ref_or_quay_ref_or_quay is not None:  # and 'NL:Q:' in stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref:
@@ -241,8 +242,7 @@ def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     if len(retain_stop_assignments) > 0:
         db_write.insert_objects_on_queue(PassengerStopAssignment, retain_stop_assignments, True)
 
-    stop_places_list: List[StopPlace] = load_local(db_read, StopPlace)
-    retained_stop_places: List[StopPlace] = []
+    stop_places_list: List[StopPlace] = list(db_read.iter_objects(txn, StopPlace))
     for stop_place in stop_places_list:
         keep = False
         if stop_place.id in refs:
@@ -296,11 +296,9 @@ def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
         if stop_place.centroid:
             project_location_4326(stop_place.centroid.location)
         """
-        retained_stop_places.append(stop_place)
+        yield stop_place
 
-    db_write.insert_objects_on_queue(StopPlace, retained_stop_places, True)
-
-
+"""
 def epip_timetabled_passing_times_memory(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults, dynamics=[]):
     print(sys._getframe().f_code.co_name)
 
@@ -334,7 +332,7 @@ def epip_timetabled_passing_times_memory(db_read: MdbxStorage, db_write: MdbxSto
         #     dynamic(sj)
 
     db_write.insert_objects_on_queue(ServiceJourney, service_journeys, False)
-
+"""
 
 # TODO: Potentially refactor this
 def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: dict[str, Any]):
@@ -697,16 +695,16 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
             route_point_projection[getRef(ssp).ref] = rp_to_ssp[0]
 
     # log_all(logging.INFO, "Indexing AvailabilityConditions " + str(memory_usage(-1, interval=.1, timeout=1)[0]))
-    # vailability_conditions = getIndex(load_local(db_read, AvailabilityCondition))
+    # vailability_conditions = getIndexNew(load_local(db_read, AvailabilityCondition))
 
     log_all(logging.INFO, "Service journeys for now ")
     db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
 
 
-def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
+def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> None:
     log_all(logging.INFO, "Calendar creation...")
 
-    service_calendars: List[ServiceCalendar] = load_local(db_read, ServiceCalendar)
+    service_calendars: List[ServiceCalendar] = list(db_read.iter_objects(txn, ServiceCalendar))
     if False and len(service_calendars) > 0:
         # TODO: WORKAROUND
         log_once("problem with epip_service_calender")
@@ -714,15 +712,15 @@ def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator
         # db_write.insert_objects_on_queue(service_calendars, True, True)
 
     else:
-        day_types = getIndex(
+        day_types = getIndexNew(
             list(
                 itertools.chain.from_iterable(
                     [service_calendar.day_types.day_type_ref_or_day_type for service_calendar in service_calendars if service_calendar.day_types]
                 )
             )
-            + load_local(db_read, DayType, embedding=True)
+            + list(db_read.iter_objects(txn, DayType)) # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
         )
-        uic_operating_periods = getIndex(
+        uic_operating_periods = getIndexNew(
             list(
                 itertools.chain.from_iterable(
                     [
@@ -732,14 +730,14 @@ def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator
                     ]
                 )
             )
-            + load_local(db_read, UicOperatingPeriod, embedding=True)
+            + list(db_read.iter_objects(txn, UicOperatingPeriod)) # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
         )
         day_type_assignments = list(
             itertools.chain.from_iterable(
                 [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
             )
-        ) + load_local(db_read, DayTypeAssignment, embedding=True)
-        operating_periods = getIndex(
+        ) + list(db_read.iter_objects(txn, DayTypeAssignment)) # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
+        operating_periods = getIndexNew(
             list(
                 itertools.chain.from_iterable(
                     [
@@ -749,9 +747,9 @@ def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator
                     ]
                 )
             )
-            + load_local(db_read, OperatingPeriod, embedding=True)
+            + list(db_read.iter_objects(txn, OperatingPeriod)) # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
         )
-        operating_days = getIndex(
+        operating_days = getIndexNew(
             list(
                 itertools.chain.from_iterable(
                     [
@@ -761,7 +759,7 @@ def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator
                     ]
                 )
             )
-            + load_local(db_read, OperatingDay, embedding=True)
+            + list(db_read.iter_objects(txn, OperatingDay)) # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
         )
 
         result_day_type = []
@@ -886,9 +884,9 @@ def epip_service_calendar(db_read: MdbxStorage, db_write: MdbxStorage, generator
                 result_uic_operating_periods += my_uic_operating_periods
             result_day_type += [my_day_type]
 
-        db_write.insert_objects_on_queue(DayType, result_day_type, empty=False)
-        db_write.insert_objects_on_queue(DayTypeAssignment, result_day_type_assignments, empty=False)
-        db_write.insert_objects_on_queue(UicOperatingPeriod, result_uic_operating_periods, empty=False)
+        yield result_day_type
+        yield result_day_type_assignments
+        yield result_uic_operating_periods
 
         # service_calendar = get_service_calendar(db_write, generator_defaults)
         # db_write.insert_objects_on_queue([service_calendar], True, True)
@@ -1230,6 +1228,9 @@ def epip_service_journey_interchange(db_read: MdbxStorage, db_write: MdbxStorage
 
     db_write.insert_objects_on_queue(ServiceJourneyInterchange, query1(db_read))
 
+"""
+from transformers.interchanges import interchange_rules_to_service_journey_interchanges
 
 def epip_interchange_rule(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
     db_write.insert_objects_on_queue(ServiceJourneyInterchange, interchange_rules_to_service_journey_interchanges(db_read))
+"""

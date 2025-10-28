@@ -1,6 +1,6 @@
 from typing import Generator, Any, TypeVar, cast
 
-from netex import (
+from domain.netex.model import (
     InterchangeRule,
     ScheduledStopPointRef,
     StopPlace,
@@ -23,8 +23,6 @@ from netex import (
     TimingPointInJourneyPattern,
     TimingPointRef,
 )
-from netexio.database import Database
-from netexio.dbaccess import load_local, load_generator
 from utils.utils import project, projectRef
 from utils.aux_logging import log_once
 import logging

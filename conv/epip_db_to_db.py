@@ -225,58 +225,56 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 
     # TODO: At this point we should have a check to know if the ServiceJourneyPattern is geographically enabled, or not
 
-    with db_read.env.ro_transaction() as txn_read:
-        log_all(logging.INFO, "Indexing RoutePoint to ScheduledStopPoint ")
-        route_point_projection = {}
-        for _key, ssp in db_read.iter_objects(txn_read, ScheduledStopPoint):
-            rp_to_ssp = list(RoutesProfile.route_point_projection(ssp))
-            if len(rp_to_ssp) > 0:
-                route_point_projection[getRef(ssp).ref] = rp_to_ssp[0]
 
-        # log_all(logging.INFO, "Indexing AvailabilityConditions " + str(memory_usage(-1, interval=.1, timeout=1)[0]))
-        # vailability_conditions = getIndex(load_local(db_read, AvailabilityCondition))
+    log_all(logging.INFO, "Indexing RoutePoint to ScheduledStopPoint ")
+    route_point_projection = {}
+    for _key, ssp in db_read.iter_objects(txn, ScheduledStopPoint):
+        rp_to_ssp = list(RoutesProfile.route_point_projection(ssp))
+        if len(rp_to_ssp) > 0:
+            route_point_projection[getRef(ssp).ref] = rp_to_ssp[0]
 
-        log_all(logging.INFO, "Service journeys for now ")
+    # log_all(logging.INFO, "Indexing AvailabilityConditions " + str(memory_usage(-1, interval=.1, timeout=1)[0]))
+    # vailability_conditions = getIndex(load_local(db_read, AvailabilityCondition))
 
-        yield from query(db_read, txn_read, generator_defaults)
+    log_all(logging.INFO, "Service journeys for now ")
+
+    yield from query(db_read, txn, generator_defaults)
 
 
 def main(source_database_file: Path, target_database_file: Path) -> None:
     with MdbxStorage(target_database_file,readonly=False) as target_db:
-        with MdbxStorage(source_database_file, readonly=True) as source_db:
-            with source_db.env.ro_transaction() as txn_read:
-                for clazz in [
-                    Codespace,
-                    Direction,
-                    DataSource,
-                    Authority,
-                    Operator,
-                    ValueSet,
-                    TransportAdministrativeZone,
-                    VehicleType,
-                    ResponsibilitySet,
-                    TopographicPlace,
-                    Network,
-                    DestinationDisplay,
-                ]:
-                    with target_db.env.rw_transaction() as txn_write:
+        with target_db.env.rw_transaction() as txn_write:
+            with MdbxStorage(source_database_file, readonly=True) as source_db:
+                with source_db.env.ro_transaction() as txn_read:
+                    for clazz in [
+                        Codespace,
+                        Direction,
+                        DataSource,
+                        Authority,
+                        Operator,
+                        ValueSet,
+                        TransportAdministrativeZone,
+                        VehicleType,
+                        ResponsibilitySet,
+                        TopographicPlace,
+                        Network,
+                        DestinationDisplay,
+                    ]:
                         # We need to have something like a backwards compatible copy,
                         # that takes the MultilingualString and only uses the features of NeTEx 1.3
                         # Obviously, much more expensive to check, likely want metadata that we are dealing with NeTex 2.0 as source
 
-                        try:
-                            source_db.copy_map(txn_read, target_db, txn_write, clazz)
-                            txn_write.commit()
-                        except:
-                            pass
+                        source_db.copy_map(txn_read, target_db, txn_write, clazz)
 
-                target_db.insert_any_object_on_queue(epip_line_generator(source_db, txn_read, {}))
+                    target_db.insert_any_object_on_queue(txn_write, epip_line_generator(source_db, txn_read, {}))
 
-                target_db.insert_any_object_on_queue(infer_locations_from_quay_or_stopplace_and_apply(source_db, txn_read, generator_defaults))
+                    target_db.insert_any_object_on_queue(txn_write, infer_locations_from_quay_or_stopplace_and_apply(source_db, txn_read, generator_defaults))
 
-                target_db.insert_any_object_on_queue(epip_service_journey_generator(source_db, txn_read, generator_defaults))
+                    target_db.insert_any_object_on_queue(txn_write, epip_service_journey_generator(source_db, txn_read, generator_defaults))
 
-                epip_service_calendar(source_db, target_db, generator_defaults)
+                    # epip_service_calendar(source_db, target_db, generator_defaults)
+
+            txn_write.commit()
 
 
 """

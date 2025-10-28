@@ -1,6 +1,7 @@
 from abc import abstractmethod
 from typing import Any, Iterable, Generator
 
+from domain.netex.model import EntityStructure
 from domain.utils import get_object_name
 from domain.netex.services.model_typing import Tid
 
@@ -26,9 +27,9 @@ class Storage:
 
 
 class Serializer:
-    name_object: dict[str, type[Any]] = {}
+    name_object: dict[str, type[EntityStructure]] = {}
 
-    def __init__(self, classes: list[type]) -> None:
+    def __init__(self, classes: list[type[EntityStructure]]) -> None:
         self.name_object = {get_object_name(x): x for x in classes}
 
     @abstractmethod

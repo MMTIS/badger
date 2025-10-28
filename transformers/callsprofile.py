@@ -3,7 +3,7 @@ from typing import List
 
 from xsdata.models.datatype import XmlDuration, XmlTime
 
-from domain.netex.indexes.byid import getIndex
+from domain.netex.indexes.byid import getIndex, getIndexNew
 from domain.netex.model import (
     ServiceJourney,
     StopPointInJourneyPattern,
@@ -268,11 +268,11 @@ class CallsProfile:
         # TODO: Check for ambiguities, for example due to Timebands or points having the same name
         tdt_tl: dict[str, JourneyRunTime] = {}
         if time_demand_type.run_times:
-            tdt_tl = getIndex(time_demand_type.run_times.journey_run_time, 'timing_link_ref.ref')
+            tdt_tl = getIndexNew(time_demand_type.run_times.journey_run_time, 'timing_link_ref.ref')
 
         tdt_point: dict[str, JourneyWaitTime] = {}
         if time_demand_type.wait_times:
-            tdt_point = getIndex(
+            tdt_point = getIndexNew(
                 time_demand_type.wait_times.journey_wait_time, 'timing_point_ref_or_scheduled_stop_point_ref_or_parking_point_ref_or_relief_point_ref.ref'
             )
 

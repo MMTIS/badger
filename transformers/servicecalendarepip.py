@@ -4,14 +4,14 @@ from typing import List, Set, Dict
 import dateutil.rrule
 from xsdata.models.datatype import XmlDateTime, XmlDate
 
-from netex import AvailabilityCondition, DayType, DayOfWeekEnumeration, UicOperatingPeriod, ServiceJourney, \
+from domain.netex.model import AvailabilityCondition, DayType, DayOfWeekEnumeration, UicOperatingPeriod, ServiceJourney, \
     ServiceCalendar, Codespace, DayTypeAssignment, OperatingPeriodRef, DayTypesRelStructure, OperatingDaysRelStructure, \
     ValidityConditionsRelStructure, AvailabilityConditionRef, DayTypeRefsRelStructure, OperatingPeriodsRelStructure, \
     DayTypeAssignmentsRelStructure
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
 
-from utils.refs import getIndex, getRef, getId
+from domain.netex.services.refs import getRef
 
 
 class ServiceCalendarEPIPFrame:
@@ -124,7 +124,7 @@ class ServiceCalendarEPIPFrame:
         DayType, UicOperatingPeriod and DayTypeAssignment
     """
     def availabilityConditionsToServiceCalendar(self, service_journeys: list[ServiceJourney], availability_conditions: list[AvailabilityCondition]) -> ServiceCalendar:
-        availability_conditions = getIndex(availability_conditions)
+        availability_conditions = getIndexNew(availability_conditions)
         service_journey: ServiceJourney
         uic_operating_periods: List[UicOperatingPeriod]
         day_type_assignments: List[DayTypeAssignment]
@@ -186,7 +186,7 @@ class ServiceCalendarEPIPFrame:
         return ServiceCalendar(id=getId(ServiceCalendar, self.codespace, "ServiceCalendar"),
                                version=service_journeys[0].version,
                                from_date=XmlDate.from_date(from_date.date()), to_date=XmlDate.from_date(to_date.date()),
-                               day_types=DayTypesRelStructure(day_type_ref_or_day_type=list(day_types.values())),
+                               day_types=DayTypesRelStructure(day_type_ref_or_day_type_dummy=list(day_types.values())),
                                operating_periods=OperatingPeriodsRelStructure(uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period=uic_operating_periods),
                                day_type_assignments=DayTypeAssignmentsRelStructure(day_type_assignment=day_type_assignments))
 

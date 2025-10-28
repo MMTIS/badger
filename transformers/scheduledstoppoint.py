@@ -6,6 +6,8 @@ from domain.netex.model import PassengerStopAssignment, StopPlace, LocationStruc
 
 from storage.mdbx.core.implementation import MdbxStorage
 
+from domain.netex.services.model_typing import Tid
+
 
 def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
     mapping: Dict[str, LocationStructure2] = {}
@@ -58,4 +60,4 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: 
                         psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = \
                     mapping[psa.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref]
 
-    yield from query(db_read)
+    yield from query(db_read, txn)
