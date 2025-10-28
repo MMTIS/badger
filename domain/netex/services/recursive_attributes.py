@@ -2,10 +2,14 @@ from functools import lru_cache
 from typing import Any, Generator, Hashable
 
 from domain.netex import model as netex
+from domain.netex.model import LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface, EntityStructure
 from domain.netex.services.model_typing import Tid, Tref
+from domain.netex.services.utils import get_boring_classes
 from storage.interface import Serializer
 
 import inspect
+
+from utils.mro_attributes import list_attributes
 
 # from dataclasses import fields
 
@@ -30,7 +34,28 @@ netex.set_ref_types = frozenset(  # type: ignore
 
 # netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
 
-netex.set_all = frozenset({name: cls for name, cls in inspect.getmembers(netex, inspect.isclass) if cls.__module__ == netex.__name__})
+netex.set_all = frozenset({name: cls for name, cls in inspect.getmembers(netex, inspect.isclass) if cls.__module__ == netex.__name__})  # type: ignore[attr-defined]
+
+GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
+
+
+def get_all_geo_elements() -> Generator[Any, None, None]:
+    for clazz_parent in get_boring_classes():
+        attrs = list_attributes(clazz_parent)
+        for attr in attrs:
+            clazz = attr[3].type
+            if clazz is not None and hasattr(clazz, '_name'):
+                if (clazz._name == 'Optional' or clazz._name == 'Union') and not isinstance(clazz, str):
+                    clazz_resolved = [x for x in clazz.__args__ if x is not None][0]
+                else:
+                    clazz_resolved = clazz
+
+                if clazz_resolved in GEO_CLASSES:
+                    yield clazz_parent
+                    break
+
+
+netex.set_geo_types = frozenset(get_all_geo_elements())  # type: ignore[attr-defined]
 
 
 @lru_cache(maxsize=None)
@@ -59,6 +84,9 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
             if v.__class__ in netex.set_ref_types:  # type: ignore
                 yield v, tuple(mydepth)
 
+            elif v.__class__ in GEO_CLASSES:
+                yield v, tuple(mydepth)
+
             else:
                 if v.__class__ in (str, int):
                     continue
@@ -83,9 +111,9 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
     mydepth.pop()
 
 
-def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type[Tid], str, str], None, None]:
+def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type[EntityStructure], str, str], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
-    already_done: set[tuple[str, str | None]] = set()
+    already_done: set[tuple[type[EntityStructure], str, str | None]] = set()
     # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
 
     for obj, path in recursive_attributes(deserialized, []):
@@ -125,6 +153,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 if result not in already_done:
                     already_done.add(result)
                     yield result
+
 
 def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"

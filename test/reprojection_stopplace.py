@@ -1,9 +1,12 @@
-from netexio.database import Database
-from netexio.pickleserializer import MyPickleSerializer
-from transformers.projection import reprojection_update, get_all_geo_elements
+from pathlib import Path
 
-with Database("/tmp/unittest.lmdb", serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
-    # stop_places = load_local(db_write, StopPlace, embedding=False)
-    # reprojection(stop_places[0], "urn:ogc:def:crs:EPSG::4326")
+from domain.netex.services.recursive_attributes import get_all_geo_elements
+from storage.mdbx.core.implementation import MdbxStorage
+from transformers.projection import reprojection_update
+
+with MdbxStorage(Path("/tmp/wsf.mdbx"), readonly=False) as db:
     print(list(get_all_geo_elements()))
-    reprojection_update(db_write, "urn:ogc:def:crs:EPSG::4326")
+
+    with db.env.rw_transaction() as txn:
+        db.insert_any_object_on_queue(txn, reprojection_update(db, txn, "urn:ogc:def:crs:EPSG::4326"))
+        txn.commit()

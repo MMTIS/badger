@@ -1,41 +1,22 @@
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from itertools import chain
-from typing import Any, Generator, TypeVar
+from typing import Generator
 
+from mdbx.mdbx import TXN
 from pyproj import Transformer
 from pyproj.exceptions import CRSError
 
+from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_once
-from utils.mro_attributes import list_attributes
-from netex import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, EntityStructure, LinearRing, SimplePointVersionStructure
-from netexio.database import Database
-from netexio.dbaccess import recursive_attributes
-from utils.utils import get_interesting_classes
-
-Tid = TypeVar("Tid", bound=EntityStructure)
+from domain.netex.model import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, LinearRing
+from domain.netex.services.model_typing import Tid
+from domain.netex.services.recursive_attributes import (
+    recursive_attributes,
+    get_all_geo_elements,
+)
 
 transformers: dict[str, Transformer] = {}
-
-GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
-
-
-def get_all_geo_elements() -> Generator[Any, None, None]:
-    classes = get_interesting_classes()
-    clean_element_names, interesting_element_names, interesting_classes = classes
-    for clazz_parent in interesting_classes:
-        attrs = list_attributes(clazz_parent)
-        for attr in attrs:
-            clazz = attr[3].type
-            if clazz is not None and hasattr(clazz, '_name'):
-                if (clazz._name == 'Optional' or clazz._name == 'Union') and not isinstance(clazz, str):
-                    clazz_resolved = [x for x in clazz.__args__ if x is not None][0]
-                else:
-                    clazz_resolved = clazz
-
-                if clazz_resolved in GEO_CLASSES:
-                    yield clazz_parent
-                    break
 
 
 def reprojection(deserialized: Tid, crs_to: str) -> Tid:
@@ -73,26 +54,16 @@ def reprojection(deserialized: Tid, crs_to: str) -> Tid:
     return deserialized
 
 
-def reprojection_update(db: Database, crs_to: str) -> None:
+def reprojection_update(db: MdbxStorage, txn: TXN, crs_to: str) -> Generator[Tid, None, None]:
     # Within this function we are reading and writing towards the target database.
     # This effectively means that if we would need to resize for whatever reason,
     # we cannot hold the cursor since access has to be disabled.
     # We will first validate that we do have remaining capacity.
-    db.guard_free_space(0.10)
 
-    for clazz in db.tables(exclusively=set(get_all_geo_elements())):
-        src_db = db.open_database(clazz, readonly=True)
-        if not src_db:
-            continue
-
-        with db.env.begin(db=src_db, buffers=True, write=False) as src_txn:
-            cursor = src_txn.cursor()
-
-            for key, value in cursor:
-                # transformed_value = db.serializer.marshall(reprojection(db.serializer.unmarshall(value, clazz), crs_to), clazz)
-                # TODO: We may not want to expose our internal task queue.
-                # db.task_queue.put((LmdbActions.WRITE, src_db, key, transformed_value))
-                db.insert_one_object(reprojection(db.serializer.unmarshall(value, clazz), crs_to), False, False)
+    for clazz in set(db.db_names(txn).values()).intersection(set(get_all_geo_elements())):
+        obj: Tid
+        for _key, obj in db.iter_objects(txn, clazz):
+            yield reprojection(obj, crs_to)
 
 
 def get_transformer_by_srs_name(location: LocationStructure2 | LineString, crs_to: str) -> Transformer | None:
