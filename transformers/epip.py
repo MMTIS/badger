@@ -12,7 +12,7 @@ from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
 from domain.netex.indexes.byid import getIndex, getIndexNew
-from domain.netex.services.refs import getRef
+from domain.netex.services.refs import getRef, getFakeRef
 from storage.mdbx.core.implementation import MdbxStorage
 from transformers.projection import project_location_4326
 
@@ -370,14 +370,14 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
 
 def service_journey_ac_to_day_type(
     db_read: MdbxStorage,
-    db_write: MdbxStorage,
+    txn: TXN,
     service_journey: ServiceJourney,
     availability_conditions_ids: Set[str],
     day_types_ids: Set[str],
     uic_operating_periods_ids: Set[str],
     day_type_assignments_ids: Set[str],
-) -> None:
-    acs = []
+) -> Generator[EntityStructure, None, None]:
+    acs: list[AvailabilityCondition] = []
 
     # TODO: Investigate if AvailabilityConditions are in fact used
     ac: ValidityConditionsRelStructure
@@ -385,7 +385,7 @@ def service_journey_ac_to_day_type(
         if isinstance(ac, ValidityConditionsRelStructure):
             for a in ac.choice:
                 if isinstance(a, AvailabilityConditionRef):
-                    this_ac = db_read.get_single(AvailabilityCondition, a.ref, a.version)
+                    this_ac = db_read.load_object_by_reference(txn, a)
                     acs.append(this_ac)
                 elif isinstance(a, AvailabilityCondition):
                     acs.append(a)
@@ -424,7 +424,7 @@ def service_journey_ac_to_day_type(
                 days_of_week=days_of_week,
             )
             uic_operating_periods_ids.add(uic_operating_period.id)
-            db_write.insert_one_object(uic_operating_period)
+            yield uic_operating_period
 
         else:
             uic_operating_period = UicOperatingPeriod(
@@ -438,7 +438,7 @@ def service_journey_ac_to_day_type(
                 days_of_week=days_of_week,
             )
             uic_operating_periods_ids.add(uic_operating_period.id)
-            db_write.insert_one_object(uic_operating_period)
+            yield uic_operating_period
 
         day_type = DayType(
             id=day_type_id,
@@ -447,7 +447,7 @@ def service_journey_ac_to_day_type(
             derived_from_version_ref_attribute=service_journey.version,
         )
         day_types_ids.add(day_type.id)
-        db_write.insert_one_object(day_type)
+        yield day_type
 
         day_type_assignment = DayTypeAssignment(
             id=acs[0].id.replace('AvailabilityCondition', 'DayTypeAssignment'),
@@ -461,7 +461,7 @@ def service_journey_ac_to_day_type(
             day_type_ref=cast(DayTypeRef, getRef(day_type)),
         )
         day_type_assignments_ids.add(day_type_assignment.id)
-        db_write.insert_one_object(day_type_assignment)
+        yield day_type_assignment
         day_type_ref = getRef(day_type)
     else:
         day_type_ref = getFakeRef(day_type_id, DayTypeRef, service_journey.version)  # TODO: Prevent fake ref
@@ -701,10 +701,10 @@ def epip_service_journey_generator(db_read: MdbxStorage, db_write: MdbxStorage, 
     db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
 
 
-def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> None:
+def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[EntityStructure, None, None]:
     log_all(logging.INFO, "Calendar creation...")
 
-    service_calendars: List[ServiceCalendar] = list(db_read.iter_objects(txn, ServiceCalendar))
+    service_calendars: List[ServiceCalendar] = [sc for _key, sc in db_read.iter_objects(txn, ServiceCalendar)]
     if False and len(service_calendars) > 0:
         # TODO: WORKAROUND
         log_once("problem with epip_service_calender")
@@ -712,15 +712,15 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
         # db_write.insert_objects_on_queue(service_calendars, True, True)
 
     else:
-        day_types = getIndexNew(
+        day_types = getIndex(
             list(
                 itertools.chain.from_iterable(
-                    [service_calendar.day_types.day_type_ref_or_day_type for service_calendar in service_calendars if service_calendar.day_types]
+                    [service_calendar.day_types.day_type_ref_or_day_type_dummy for service_calendar in service_calendars if service_calendar.day_types]
                 )
             )
-            + list(db_read.iter_objects(txn, DayType)) # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
+            + [dt for _key, dt in db_read.iter_objects(txn, DayType)] # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
         )
-        uic_operating_periods = getIndexNew(
+        uic_operating_periods = getIndex(
             list(
                 itertools.chain.from_iterable(
                     [
@@ -730,14 +730,14 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                     ]
                 )
             )
-            + list(db_read.iter_objects(txn, UicOperatingPeriod)) # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
+            + [op for _key, op in db_read.iter_objects(txn, UicOperatingPeriod)] # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
         )
         day_type_assignments = list(
             itertools.chain.from_iterable(
                 [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
             )
-        ) + list(db_read.iter_objects(txn, DayTypeAssignment)) # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
-        operating_periods = getIndexNew(
+        ) + [dta for _key, dta in db_read.iter_objects(txn, DayTypeAssignment)] # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
+        operating_periods = getIndex(
             list(
                 itertools.chain.from_iterable(
                     [
@@ -747,9 +747,9 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                     ]
                 )
             )
-            + list(db_read.iter_objects(txn, OperatingPeriod)) # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
+            + [op for _key, op in db_read.iter_objects(txn, OperatingPeriod)] # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
         )
-        operating_days = getIndexNew(
+        operating_days = getIndex(
             list(
                 itertools.chain.from_iterable(
                     [
@@ -759,12 +759,12 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                     ]
                 )
             )
-            + list(db_read.iter_objects(txn, OperatingDay)) # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
+            + [od for _key, od  in db_read.iter_objects(txn, OperatingDay)] # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
         )
 
-        result_day_type = []
-        result_day_type_assignments = []
-        result_uic_operating_periods = []
+        # result_day_type = []
+        # result_day_type_assignments = []
+        # result_uic_operating_periods = []
 
         for day_type_ref, my_day_type_assignments in itertools.groupby(day_type_assignments, key=lambda day_type_assignment: day_type_assignment.day_type_ref):
             t = list(my_day_type_assignments)
@@ -874,19 +874,21 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                     res_dta.day_type_ref = day_type_ref
                     res_dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(uic_operating_period, OperatingPeriodRef)
 
-                    result_day_type_assignments.append(res_dta)
-                    result_uic_operating_periods.append(uic_operating_period)
+                    # result_day_type_assignments.append(res_dta)
+                    yield res_dta
+                    # result_uic_operating_periods.append(uic_operating_period)
+                    yield uic_operating_period
                 else:
                     log_all(logging.WARNING, f"There are no operatingdays for DayType {my_day_type.id}")
 
             else:
-                result_day_type_assignments += t
-                result_uic_operating_periods += my_uic_operating_periods
-            result_day_type += [my_day_type]
+                yield from t
+                yield from my_uic_operating_periods
+            yield my_day_type
 
-        yield result_day_type
-        yield result_day_type_assignments
-        yield result_uic_operating_periods
+        # yield result_day_type
+        # yield result_day_type_assignments
+        # yield result_uic_operating_periods
 
         # service_calendar = get_service_calendar(db_write, generator_defaults)
         # db_write.insert_objects_on_queue([service_calendar], True, True)
@@ -896,10 +898,9 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
     # service_calendar = get_service_calendar(db_write, generator_defaults)
     # db_write.insert_objects_on_queue([service_calendar], True, True)
 
-    # availability_conditions = load_local(db_read, AvailabilityCondition)
+    # availability_conditions = [ac for _key, ac  in db_read.iter_objects(txn, AvailabilityCondition)]
     # servicecalendarepip = ServiceCalendarEPIPFrame(generator_defaults['codespace'])
-    # service_calendar = servicecalendarepip.availabilityConditionsToServiceCalendar(service_journeys,
-    #                                                                                availability_conditions)
+    # service_calendar = servicecalendarepip.availabilityConditionsToServiceCalendar(service_journeys, availability_conditions)
     # write_objects(write_con, [service_calendar], True, False)
 
     # timetabledpassingtimesprofile = TimetablePassingTimesProfile(generator_defaults['codespace'], generator_defaults['version'], service_journeys, service_journey_patterns, time_demand_types)
@@ -1076,12 +1077,12 @@ def export_epip_network_offer(
                                 data_sources=DataSourcesInFrameRelStructure(data_source=data_source.generator()) if data_source.has_value() else None,
                                 types_of_value=TypesOfValueInFrameRelStructure(choice=value_set.generator()) if value_set.has_value() else None,
                                 organisations=(
-                                    OrganisationsInFrameRelStructure(organisation_or_transport_organisation=organisation_or_transport_organisation)
+                                    OrganisationsInFrameRelStructure(organisation_dummy_or_transport_organisation_dummy=organisation_or_transport_organisation)
                                     if len(organisation_or_transport_organisation) > 0
                                     else None
                                 ),
                                 vehicle_types=(
-                                    VehicleTypesInFrameRelStructure(transport_type_dummy_type_or_train_type=transport_type_dummy_type_or_train_type.generator())
+                                    VehicleTypesInFrameRelStructure(transport_type_dummy_or_train_dummy=transport_type_dummy_type_or_train_type.generator())
                                     if transport_type_dummy_type_or_train_type.has_value()
                                     else None
                                 ),
@@ -1132,12 +1133,12 @@ def export_epip_network_offer(
                                 ),
                                 connections=TransfersInFrameRelStructure(transfer=transfer.generator()) if transfer.has_value() else None,
                                 stop_assignments=(
-                                    StopAssignmentsInFrameRelStructure(stop_assignment_or_passenger_boarding_position_assignment=stop_assignment.generator())
+                                    StopAssignmentsInFrameRelStructure(stop_assignment_or_passenger_boarding_position_assignment_dummy=stop_assignment.generator())
                                     if stop_assignment.has_value()
                                     else None
                                 ),
                                 notices=NoticesInFrameRelStructure(notice=notice.generator()) if notice.has_value() else None,
-                                tariff_zones=TariffZonesInFrameRelStructure(tariff_zone=tariff_zone.generator()) if tariff_zone.has_value() else None,
+                                tariff_zones=TariffZonesInFrameRelStructure(tariff_zone_dummy=tariff_zone.generator()) if tariff_zone.has_value() else None,
                             ),
                             TimetableFrame(
                                 id="EU_PI_TIMETABLE",

@@ -42,7 +42,11 @@ from storage.mdbx.core.implementation import MdbxStorage
 import logging
 
 from transformers.callsprofile import CallsProfile
-from transformers.epip import epip_service_calendar, epip_line_generator
+from transformers.epip import (
+    epip_service_calendar,
+    epip_line_generator,
+    service_journey_ac_to_day_type,
+)
 from transformers.routesprofile import RoutesProfile
 from transformers.scheduledstoppoint import infer_locations_from_quay_or_stopplace_and_apply
 
@@ -199,7 +203,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
             sjp_ids.add(service_journey_pattern.id)
 
         # service_journey_ac_to_day_type(sj, availability_conditions, day_types, uic_operating_periods, day_type_assignments)
-        # service_journey_ac_to_day_type(db_read, db_write, sj, availability_conditions_ids, day_types_ids, uic_operating_periods_ids, day_type_assignments_ids)
+        yield from service_journey_ac_to_day_type(db_read, txn, sj, availability_conditions_ids, day_types_ids, uic_operating_periods_ids, day_type_assignments_ids)
 
         # TODO: AvailabilityCondition -> Uic
 
@@ -272,7 +276,7 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
 
                     target_db.insert_any_object_on_queue(txn_write, epip_service_journey_generator(source_db, txn_read, generator_defaults))
 
-                    # epip_service_calendar(source_db, target_db, generator_defaults)
+                    target_db.insert_any_object_on_queue(txn_write, epip_service_calendar(source_db, txn_read, generator_defaults))
 
             txn_write.commit()
 
