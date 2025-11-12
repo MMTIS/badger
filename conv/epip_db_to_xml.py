@@ -1,20 +1,18 @@
-from netex import PublicationDelivery
-from netexio.database import Database
-from netexio.pickleserializer import MyPickleSerializer
-from netexio.xml import export_publication_delivery_xml
+from pathlib import Path
 
+from domain.netex.model import PublicationDelivery
+from storage.lxml.serialization.xml import export_publication_delivery_xml
 from utils.aux_logging import prepare_logger, log_all
 from transformers.epip import export_epip_network_offer
-
+from storage.mdbx.core.implementation import MdbxStorage
 import logging
 
 
-def main(database_epip: str, output_filename: str) -> None:
-    with Database(
-        database_epip, serializer=MyPickleSerializer(compression=True)
-    ) as db_epip:
-        publication_delivery: PublicationDelivery = export_epip_network_offer(db_epip)
-        export_publication_delivery_xml(publication_delivery, output_filename)
+def main(database_epip: Path, output_filename: Path) -> None:
+    with MdbxStorage(database_epip) as db_epip:
+        with db_epip.env.ro_transaction() as txn:
+            publication_delivery: PublicationDelivery = export_epip_network_offer(db_epip, txn)
+            export_publication_delivery_xml(publication_delivery, output_filename)
 
 
 if __name__ == "__main__":
@@ -38,7 +36,7 @@ if __name__ == "__main__":
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
     try:
-        main(args.epip, args.output)
+        main(Path(args.epip), Path(args.output))
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e

@@ -326,6 +326,10 @@ class MdbxStorage:
                     if count >= limit:
                         break
 
+    def iter_only_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[Tid, None, None]:
+        for _key, obj in self.iter_objects(txn, clazz, start_key, limit):
+            yield obj
+
     def copy_map(self, txn: TXN, remote_storage: "MdbxStorage", remote_txn: TXN, clazz: type[EntityStructure]) -> None:
         with remote_txn.create_map(name=remote_storage.class_idx[clazz]) as db_destination:
             try:
