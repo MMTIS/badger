@@ -19,6 +19,7 @@ from storage.lxml.core.time import class_contains_xml_time, recursive_replace
 from lxml import etree
 
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
+from storage.mdbx.core.implementation import MdbxStorage
 
 
 def get_element_name_with_ns(clazz: type[Tid]) -> str:
@@ -73,7 +74,7 @@ def get_local_name(element: type[Tid]) -> str:
 
 
 def insert_database(
-    storage: Storage,
+    storage: MdbxStorage,
     classes: tuple[list[str], list[str], list[Any]],
     f: IO[Any] | None = None,
     type_of_frame_filter: list[str] | None = None) -> None:
