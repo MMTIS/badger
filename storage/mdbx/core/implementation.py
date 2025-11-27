@@ -345,6 +345,9 @@ class MdbxStorage:
             yield obj
 
     def copy_map(self, txn: TXN, remote_storage: "MdbxStorage", remote_txn: TXN, clazz: type[EntityStructure]) -> None:
+        remote_storage.insert_any_object_on_queue(remote_txn, self.iter_only_objects(txn, clazz))
+        """
+        We missen hier de afhandeling van db_id's etc.
         with remote_txn.create_map(name=remote_storage.class_idx[clazz]) as db_destination:
             try:
                 with txn.open_map(name=self.class_idx[clazz]) as db_source:
@@ -356,3 +359,4 @@ class MdbxStorage:
                     pass
                 else:
                     raise
+        """
