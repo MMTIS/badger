@@ -4,10 +4,24 @@ from typing import List, Set, Dict
 import dateutil.rrule
 from xsdata.models.datatype import XmlDateTime, XmlDate
 
-from domain.netex.model import AvailabilityCondition, DayType, DayOfWeekEnumeration, UicOperatingPeriod, ServiceJourney, \
-    ServiceCalendar, Codespace, DayTypeAssignment, OperatingPeriodRef, DayTypesRelStructure, OperatingDaysRelStructure, \
-    ValidityConditionsRelStructure, AvailabilityConditionRef, DayTypeRefsRelStructure, OperatingPeriodsRelStructure, \
-    DayTypeAssignmentsRelStructure
+from domain.netex.model import (
+    AvailabilityCondition,
+    DayType,
+    DayOfWeekEnumeration,
+    UicOperatingPeriod,
+    ServiceJourney,
+    ServiceCalendar,
+    Codespace,
+    DayTypeAssignment,
+    OperatingPeriodRef,
+    DayTypesRelStructure,
+    OperatingDaysRelStructure,
+    ValidityConditionsRelStructure,
+    AvailabilityConditionRef,
+    DayTypeRefsRelStructure,
+    OperatingPeriodsRelStructure,
+    DayTypeAssignmentsRelStructure,
+)
 from datetime import datetime, timedelta
 from dateutil.rrule import rrule, DAILY
 
@@ -59,6 +73,7 @@ class ServiceCalendarEPIPFrame:
     """
     This function flattens a single AvailabilityCondition into a set of either available or unavailable dates.    
     """
+
     @staticmethod
     def flattenAvailabilityCondition(availability_condition: AvailabilityCondition) -> (Set[datetime], List[DayOfWeekEnumeration], bool):
         operational_dates: datetime
@@ -66,25 +81,30 @@ class ServiceCalendarEPIPFrame:
         days_of_week = []
 
         if availability_condition.day_types is not None and len(availability_condition.day_types.day_type_ref_or_day_type) > 1:
-            warnings.warn(f"AvailabilityCondition {availability_condition.id} has multiple DayTypes, we cannot handle this (yet), as we don't know the intention. Only the first DayType is being evaluated.")
+            warnings.warn(
+                f"AvailabilityCondition {availability_condition.id} has multiple DayTypes, we cannot handle this (yet), as we don't know the intention. Only the first DayType is being evaluated."
+            )
 
         if availability_condition.day_types is None or len(availability_condition.day_types.day_type_ref_or_day_type) == 0:
             if availability_condition.valid_day_bits and availability_condition.from_date and len(availability_condition.valid_day_bits) > 0:
-                operational_dates = [availability_condition.from_date.to_datetime() + timedelta(days=i) for i in range(0, len(availability_condition.valid_day_bits)) if availability_condition.valid_day_bits[i] == '1']
+                operational_dates = [
+                    availability_condition.from_date.to_datetime() + timedelta(days=i)
+                    for i in range(0, len(availability_condition.valid_day_bits))
+                    if availability_condition.valid_day_bits[i] == '1'
+                ]
             else:
-                warnings.warn(
-                    f"AvailabilityCondition {availability_condition.id} is using an unknown date limitation.")
+                warnings.warn(f"AvailabilityCondition {availability_condition.id} is using an unknown date limitation.")
                 return None
 
         elif len(availability_condition.day_types.day_type_ref_or_day_type) >= 1:
             day_type: DayType
             day_type = availability_condition.day_types.day_type_ref_or_day_type[0]
             days_of_week = day_type.properties.property_of_day[0].days_of_week
-            byweekday = ServiceCalendarEPIPFrame.mapDaysOfWeekToByWeekday(
-                day_type.properties.property_of_day[0].days_of_week)
+            byweekday = ServiceCalendarEPIPFrame.mapDaysOfWeekToByWeekday(day_type.properties.property_of_day[0].days_of_week)
 
-            operational_dates = list(rrule(DAILY, byweekday=byweekday, dtstart=availability_condition.from_date.to_datetime(),
-                       until=availability_condition.to_date.to_datetime()))
+            operational_dates = list(
+                rrule(DAILY, byweekday=byweekday, dtstart=availability_condition.from_date.to_datetime(), until=availability_condition.to_date.to_datetime())
+            )
 
         return (set(operational_dates), days_of_week, availability_condition.is_available or True)
 
@@ -92,6 +112,7 @@ class ServiceCalendarEPIPFrame:
     This function combines a list of flattened availability conditions
     and flattens it further into a single (positive) set of dates expressed.
     """
+
     @staticmethod
     def positiveAvailabilityCondition(availability_conditions: List[AvailabilityCondition]) -> (List[datetime], List[DayOfWeekEnumeration]):
         positive_dates: Set[datetime]
@@ -123,7 +144,10 @@ class ServiceCalendarEPIPFrame:
     This function expects a flattened AvailabilityCondition, which it exports into:
         DayType, UicOperatingPeriod and DayTypeAssignment
     """
-    def availabilityConditionsToServiceCalendar(self, service_journeys: list[ServiceJourney], availability_conditions: list[AvailabilityCondition]) -> ServiceCalendar:
+
+    def availabilityConditionsToServiceCalendar(
+        self, service_journeys: list[ServiceJourney], availability_conditions: list[AvailabilityCondition]
+    ) -> ServiceCalendar:
         availability_conditions = getIndexNew(availability_conditions)
         service_journey: ServiceJourney
         uic_operating_periods: List[UicOperatingPeriod]
@@ -155,40 +179,56 @@ class ServiceCalendarEPIPFrame:
             if day_type_id not in day_types:
                 valid_days, days_of_week = ServiceCalendarEPIPFrame.positiveAvailabilityCondition(acs)
 
-                uic_operating_period = UicOperatingPeriod(id=acs[0].id.replace('AvailabilityCondition', 'UicOperatingPeriod'), version=acs[0].version,
-                                    derived_from_object_ref=acs[0].id, derived_from_version_ref_attribute=acs[0].version,
-                                   from_operating_day_ref_or_from_date=XmlDateTime.from_datetime(valid_days[0]),
-                                   to_operating_day_ref_or_to_date=XmlDateTime.from_datetime(valid_days[-1]),
-                                   valid_day_bits=ServiceCalendarEPIPFrame.valid_days_to_bits(valid_days),
-                                   days_of_week=days_of_week)
+                uic_operating_period = UicOperatingPeriod(
+                    id=acs[0].id.replace('AvailabilityCondition', 'UicOperatingPeriod'),
+                    version=acs[0].version,
+                    derived_from_object_ref=acs[0].id,
+                    derived_from_version_ref_attribute=acs[0].version,
+                    from_operating_day_ref_or_from_date=XmlDateTime.from_datetime(valid_days[0]),
+                    to_operating_day_ref_or_to_date=XmlDateTime.from_datetime(valid_days[-1]),
+                    valid_day_bits=ServiceCalendarEPIPFrame.valid_days_to_bits(valid_days),
+                    days_of_week=days_of_week,
+                )
                 uic_operating_periods.append(uic_operating_period)
 
-                day_type = DayType(id=day_type_id, version=service_journey.version,
-                    derived_from_object_ref=service_journey.id, derived_from_version_ref_attribute=service_journey.version)
+                day_type = DayType(
+                    id=day_type_id,
+                    version=service_journey.version,
+                    derived_from_object_ref=service_journey.id,
+                    derived_from_version_ref_attribute=service_journey.version,
+                )
                 day_types[day_type_id] = day_type
 
-                day_type_assignment = DayTypeAssignment(id=acs[0].id.replace('AvailabilityCondition', 'DayTypeAssignment'), version=acs[0].version,
-                                                        order=1,
-                                                        derived_from_object_ref=acs[0].id, derived_from_version_ref_attribute=acs[0].version,
-                                                        uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=getRef(uic_operating_period, OperatingPeriodRef),
-                                                        day_type_ref=getRef(day_type)
-                                                        )
+                day_type_assignment = DayTypeAssignment(
+                    id=acs[0].id.replace('AvailabilityCondition', 'DayTypeAssignment'),
+                    version=acs[0].version,
+                    order=1,
+                    derived_from_object_ref=acs[0].id,
+                    derived_from_version_ref_attribute=acs[0].version,
+                    uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=getRef(uic_operating_period, OperatingPeriodRef),
+                    day_type_ref=getRef(day_type),
+                )
                 day_type_assignments.append(day_type_assignment)
 
             day_type = day_types[day_type_id]
-            service_journey.day_types = DayTypeRefsRelStructure(day_type_ref = [getRef(day_type)])
+            service_journey.day_types = DayTypeRefsRelStructure(day_type_ref=[getRef(day_type)])
 
         from_date: datetime
         to_date: datetime
         from_date = min([uic.from_operating_day_ref_or_from_date.to_datetime() for uic in uic_operating_periods])
         to_date = max([uic.to_operating_day_ref_or_to_date.to_datetime() for uic in uic_operating_periods])
 
-        return ServiceCalendar(id=getId(ServiceCalendar, self.codespace, "ServiceCalendar"),
-                               version=service_journeys[0].version,
-                               from_date=XmlDate.from_date(from_date.date()), to_date=XmlDate.from_date(to_date.date()),
-                               day_types=DayTypesRelStructure(day_type_ref_or_day_type_dummy=list(day_types.values())),
-                               operating_periods=OperatingPeriodsRelStructure(uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period=uic_operating_periods),
-                               day_type_assignments=DayTypeAssignmentsRelStructure(day_type_assignment=day_type_assignments))
+        return ServiceCalendar(
+            id=getId(ServiceCalendar, self.codespace, "ServiceCalendar"),
+            version=service_journeys[0].version,
+            from_date=XmlDate.from_date(from_date.date()),
+            to_date=XmlDate.from_date(to_date.date()),
+            day_types=DayTypesRelStructure(day_type_ref_or_day_type_dummy=list(day_types.values())),
+            operating_periods=OperatingPeriodsRelStructure(
+                uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period=uic_operating_periods
+            ),
+            day_type_assignments=DayTypeAssignmentsRelStructure(day_type_assignment=day_type_assignments),
+        )
 
     def __init__(self, codespace: Codespace):
         self.codespace = codespace

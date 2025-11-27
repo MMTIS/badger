@@ -100,8 +100,8 @@ class MdbxStorage:
         self.env.close()
         return False  # Allow errors to propagate!
 
-    def db_names(self, txn: TXN = None) -> dict[bytes, type]:
-        db_names: dict[bytes, type] = {}
+    def db_names(self, txn: TXN = None) -> dict[bytes, Tid]:
+        db_names: dict[bytes, Tid] = {}
         if txn is None:
             txn = self.env.ro_transaction()
         with txn.cursor(db=None) as cur:
@@ -113,6 +113,17 @@ class MdbxStorage:
                 if clazz is not None:
                     db_names[db_name] = clazz
         return db_names
+
+    def db_names_iter(self, txn: TXN) -> Generator[Tid, None, None]:
+        db_names: dict[bytes, Tid] = {}
+        with txn.cursor(db=None) as cur:
+            for db_name, _ in cur.iter():
+                if db_name in (DB_CLASS_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
+                    continue
+
+                clazz = self.idx_class.get(db_name, None)
+                if clazz is not None:
+                    yield clazz
 
     def clean(self) -> None:
         with self.env.rw_transaction() as txn:
@@ -142,7 +153,7 @@ class MdbxStorage:
             full_key = db_id_idx.get(txn, my_id)
             if full_key is not None:
                 full_int = int.from_bytes(full_key, 'little')
-                key = (full_int & 0xFFFFFFFF)
+                key = full_int & 0xFFFFFFFF
                 try:
                     db_reference_outward.delete(txn, full_key)
                 except:
@@ -162,7 +173,6 @@ class MdbxStorage:
             value = self.serializer.marshall(obj, obj.__class__)
             db.put(txn, key.to_bytes(4, 'little'), value)
             db_id_idx.put(txn, my_id, full_key)
-
 
     # Deprecate this one
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
@@ -187,7 +197,7 @@ class MdbxStorage:
                 full_key = db_id_idx.get(txn, my_id)
                 if full_key is not None:
                     full_int = int.from_bytes(full_key, 'little')
-                    key = (full_int & 0xFFFFFFFF)
+                    key = full_int & 0xFFFFFFFF
                     try:
                         db_reference_outward.delete(txn, full_key)
                     except:
@@ -279,7 +289,9 @@ class MdbxStorage:
             if ref.name_of_ref_class is not None:
                 # The optimal situation, we can search for the id class in the right place
                 name_of_ref_class = str(ref.name_of_ref_class.value if hasattr(ref.name_of_ref_class, 'value') else ref.name_of_ref_class)
-                key = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True)
+                key = self.serializer.encode_key(
+                    str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True
+                )
                 full_key = db_id_idx.get(txn, key)
                 return self.load_object_by_full_key(txn, full_key)
 
@@ -310,10 +322,12 @@ class MdbxStorage:
                         if count >= limit:
                             break
 
-    def iter_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[tuple[bytes, Tid], None, None]:
+    def iter_objects(
+        self, txn: TXN, clazz: type[EntityStructure], start_key: bytes | None = None, limit: int | None = None
+    ) -> Generator[tuple[bytes, Tid], None, None]:
         try:
             db = txn.open_map(name=self.class_idx[clazz])
-        except: # TODO: Better catching by pymdbx proper exceptions
+        except:  # TODO: Better catching by pymdbx proper exceptions
             return
 
         with txn.cursor(db) as cursor:

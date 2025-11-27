@@ -54,11 +54,12 @@ def reversion_all_objects(db: Database, updated_version: str, any_too: bool = Fa
     for clazz in db.tables():
         objectname = get_object_name(clazz)
         if any_too:
-            con.execute(f"UPDATE {objectname} SET version = ?, object = reversion(object, '{objectname}', ?, ?);",
-                        (updated_version, updated_version, any_too))
+            con.execute(f"UPDATE {objectname} SET version = ?, object = reversion(object, '{objectname}', ?, ?);", (updated_version, updated_version, any_too))
         else:
-            con.execute(f"UPDATE {objectname} SET version = CASE WHEN version == 'any' THEN version ELSE ? END, object = reversion(object, '{objectname}', ?, ?);",
-                        (updated_version, updated_version, any_too))
+            con.execute(
+                f"UPDATE {objectname} SET version = CASE WHEN version == 'any' THEN version ELSE ? END, object = reversion(object, '{objectname}', ?, ?);",
+                (updated_version, updated_version, any_too),
+            )
 
     con.remove_function('reversion')
 

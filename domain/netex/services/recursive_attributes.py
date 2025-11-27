@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Any, Generator, Hashable
+from typing import Any, Generator, Hashable, Optional
 
 from domain.netex import model as netex
 from domain.netex.model import LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface, EntityStructure
@@ -175,12 +175,23 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
             yield obj
 
 
+def embedding_obj_iter(
+    serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]], ignore: Optional[set[type[Tid]]]
+) -> Generator[tuple[bytes, Tid, list[int]], None, None]:
+    assert deserialized.id is not None, "deserialised.id must not be none"
+
+    for obj, path in recursive_attributes(deserialized, []):
+        if hasattr(obj, "id") and obj.id is not None:
+            if (ignore is None or obj.__class__ not in ignore) and (interesting_classes is None or obj.__class__ in interesting_classes):
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj, path
+
+
 def only_embedding(
-    serializer: Serializer, deserialized: Tid, interesting_classes: set[type[Tid]], ignore: set[type[Tid]] = set([])
+    serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]] = None, ignore: Optional[set[type[Tid]]] = None
 ) -> Generator[bytes, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
-            if obj.__class__ not in ignore and obj.__class__ in interesting_classes:
+            if (ignore is None or obj.__class__ not in ignore) and (interesting_classes is None or obj.__class__ in interesting_classes):
                 yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)

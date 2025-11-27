@@ -537,8 +537,9 @@ class GtfsProfile:
         stop = {
             'stop_id': GtfsProfile.getOriginalGtfsId(scheduled_stop_point, 'stop_id'),
             'stop_code': GtfsProfile.getOptionalPrivateCode(scheduled_stop_point.public_code),
-            'stop_name': GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.name) or GtfsProfile.getOptionalMultilingualString(
-                scheduled_stop_point.short_name
+            'stop_name': (
+                GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.name)
+                or GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.short_name)
             ),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.description),
             'stop_lat': round(latitude, 7),

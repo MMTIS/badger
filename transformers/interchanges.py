@@ -22,6 +22,7 @@ from domain.netex.model import (
     StopPointInJourneyPattern,
     TimingPointInJourneyPattern,
     TimingPointRef,
+    NameOfClassScheduledStopPointRefStructure,
 )
 from utils.utils import project, projectRef
 from utils.aux_logging import log_once
@@ -134,7 +135,7 @@ def get_all_stops(db: Database, sj: ServiceJourney) -> Generator[ScheduledStopPo
                         ssp = pis.timing_point_ref_or_scheduled_stop_point_ref_or_parking_point_ref_or_relief_point_ref
                         if isinstance(ssp, ScheduledStopPointRef):
                             yield ssp
-                        elif isinstance(ssp, TimingPointRef) and ssp.name_of_ref_class == 'ScheduledStopPoint':
+                        elif isinstance(ssp, TimingPointRef) and ssp.name_of_ref_class == NameOfClassScheduledStopPointRefStructure.SCHEDULED_STOP_POINT:
                             yield projectRef(ssp, ScheduledStopPointRef)
 
 

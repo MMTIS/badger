@@ -252,7 +252,9 @@ class CallsProfile:
         service_journey.calls = calls
 
     @staticmethod
-    def getPassingTimesFromTimeDemandType(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, time_demand_type: TimeDemandType) -> None:
+    def getPassingTimesFromTimeDemandType(
+        service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, time_demand_type: TimeDemandType
+    ) -> None:
         # If calls are present, we don't have to do anything
         if service_journey.passing_times is not None:
             return

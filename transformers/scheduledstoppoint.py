@@ -2,7 +2,17 @@ from typing import Generator, Dict, Any
 
 from mdbx.mdbx import TXN
 
-from domain.netex.model import PassengerStopAssignment, StopPlace, LocationStructure2, Quay, ScheduledStopPoint, ScheduledStopPointRef, QuayRef, StopPlaceRef, ServiceJourney
+from domain.netex.model import (
+    PassengerStopAssignment,
+    StopPlace,
+    LocationStructure2,
+    Quay,
+    ScheduledStopPoint,
+    ScheduledStopPointRef,
+    QuayRef,
+    StopPlaceRef,
+    ServiceJourney,
+)
 
 from storage.mdbx.core.implementation import MdbxStorage
 
@@ -15,8 +25,8 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: 
 
     def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, str]) -> Generator[ScheduledStopPoint, None, None]:
         assert ssp.id is not None, f"ScheduledStopPoint without id"
-        ssp.projections = None # TODO: Somewhere else
-        ssp.stop_areas = None # TODO: Somewhere else
+        ssp.projections = None  # TODO: Somewhere else
+        ssp.stop_areas = None  # TODO: Somewhere else
         if ssp.location is None:
             location: LocationStructure2 | None = ssp_location.get(ssp.id, None)
             if location is not None:
@@ -47,17 +57,16 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: 
 
     psa: PassengerStopAssignment
     for _key, psa in db_read.iter_objects(txn, PassengerStopAssignment):
-        if isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point,
-                      ScheduledStopPointRef):
+        if isinstance(psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point, ScheduledStopPointRef):
             if isinstance(psa.taxi_stand_ref_or_quay_ref_or_quay, QuayRef):
                 if psa.taxi_stand_ref_or_quay_ref_or_quay.ref in mapping:
-                    ssp_location[
-                        psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = \
-                    mapping[psa.taxi_stand_ref_or_quay_ref_or_quay.ref]
+                    ssp_location[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = mapping[
+                        psa.taxi_stand_ref_or_quay_ref_or_quay.ref
+                    ]
             if isinstance(psa.taxi_rank_ref_or_stop_place_ref_or_stop_place, StopPlaceRef):
                 if psa.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref in mapping:
-                    ssp_location[
-                        psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = \
-                    mapping[psa.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref]
+                    ssp_location[psa.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.ref] = mapping[
+                        psa.taxi_rank_ref_or_stop_place_ref_or_stop_place.ref
+                    ]
 
     yield from query(db_read, txn)

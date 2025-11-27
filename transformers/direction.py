@@ -4,9 +4,9 @@ from mdbx.mdbx import TXN
 from domain.netex.model import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef, DirectionType
 from domain.netex.services.ids import getId
 from domain.netex.services.refs import getRef
+from domain.netex.services.model_typing import Tid
 
 from storage.mdbx.core.implementation import MdbxStorage
-
 
 
 def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
@@ -22,7 +22,7 @@ def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generat
                     id=getId(generator_defaults['codespace'], Direction, key),
                     version='any',
                     name=MultilingualString(content=[key]),
-                    direction_type=DirectionType(value=sjp.direction_type), # .value?
+                    direction_type=sjp.direction_type,
                 )
                 directions[key] = direction
                 direction_refs[key] = cast(DirectionRef, getRef(direction))

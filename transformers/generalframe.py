@@ -4,11 +4,19 @@ from typing import Generator  # noqa: F401
 from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDateTime
 
-from domain.netex.model import PublicationDelivery, ParticipantRef, DataObjectsRelStructure, GeneralFrame, GeneralFrameMembersRelStructure, EntityStructure  # noqa: F401
+from domain.netex.model import (
+    PublicationDelivery,
+    ParticipantRef,
+    DataObjectsRelStructure,
+    GeneralFrame,
+    GeneralFrameMembersRelStructure,
+    EntityStructure,
+)  # noqa: F401
 from storage.mdbx.core.implementation import MdbxStorage
 from storage.mdbx.tools.graph import export_objects
 
 from utils.utils import chain
+
 
 def export_to_general_frame(storage: MdbxStorage, txn: TXN, optimal: bool = True) -> PublicationDelivery:
     if optimal:

@@ -2,43 +2,50 @@ from mdbx import MDBXCursorOp
 
 from domain.netex.indexes.inverse_class import collect_classes_index
 from domain.netex.services.model_typing import Tid
-from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding
+from domain.netex.model import EntityStructure
+from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
 from domain.utils import get_object_name
 from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_ID_IDX
 from storage.mdbx.serialization.byteserializer import ByteSerializer
+from mdbx.mdbx import TXN
+from typing import Optional, Generator
 
-def resolve_embeddings_iterable(storage: MdbxStorage):
+
+def resolve_embeddings_iterable(
+    storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[Tid]] = None, ignore: Optional[set[Tid]] = None
+) -> Generator[tuple[bytes, type[EntityStructure], type[EntityStructure]], None, None]:
     """
-In resolve_embeddings we are creating a lookup from an existing instance to the location an embedded object remains.
-Hence, it is not 'you can find this embedded object there' but 'this object has a relationship with that object'.
-When exporting or processing data for a specific profile, we may be interested in the exact locations of these
-references. An example could be a DayType, which may be part of a ServiceCalendar.
+    In resolve_embeddings we are creating a lookup from an existing instance to the location an embedded object remains.
+    Hence, it is not 'you can find this embedded object there' but 'this object has a relationship with that object'.
+    When exporting or processing data for a specific profile, we may be interested in the exact locations of these
+    references. An example could be a DayType, which may be part of a ServiceCalendar.
 
-If for every lookup we must deserialise the entire database this is unfeasible. The problem, taking the not naive
-approaches:
+    If for every lookup we must deserialise the entire database this is unfeasible. The problem, taking the not naive
+    approaches:
 
-1. When we would store the identifiers of all possible objects embedded within this specific object,
-this potentially causes a huge table. With O(1) access via ids, with the chance we would never ever
-require such individual access ever. The further downside is that upon insert we must maintain such
-table, hence for every write such thing must be checked.
+    1. When we would store the identifiers of all possible objects embedded within this specific object,
+    this potentially causes a huge table. With O(1) access via ids, with the chance we would never ever
+    require such individual access ever. The further downside is that upon insert we must maintain such
+    table, hence for every write such thing must be checked.
 
-2. When we would consider embedded object "not a good fit" we could deembed them, regardless of the NeTEx-schema
-allowing it to be a first class object. We could rewrite the original object to take a reference (if possible).
-If the reference is possible we could cleanly store the deembedded object, and manipulate it. If not, we must
-update the new location, and the initial embedding.
+    2. When we would consider embedded object "not a good fit" we could deembed them, regardless of the NeTEx-schema
+    allowing it to be a first class object. We could rewrite the original object to take a reference (if possible).
+    If the reference is possible we could cleanly store the deembedded object, and manipulate it. If not, we must
+    update the new location, and the initial embedding.
 
-3. When we would do our computation using collect_classes_index and get the reverse index of all potential
-objects and would iterate over all potential "parent" candidates, which are already limited to
-"just iterate over all objects" would still cause the effect that for every individual query we would
-deserialise a parent-type. Hence, if we would be looking for Quays and later Entrances, we would be serialising
-StopPlaces twice. We could overcome this by registering which object types we are interested in, do the full
-scan (limited to the collect_classes_index via the classes of interest) and then either create a lookup or
-a direct materialised view. The latter assumes we are not changing the embedded object, but only query it once.
-
-
-
-
+    3. When we would do our computation using collect_classes_index and get the reverse index of all potential
+    objects and would iterate over all potential "parent" candidates, which are already limited to
+    "just iterate over all objects" would still cause the effect that for every individual query we would
+    deserialise a parent-type. Hence, if we would be looking for Quays and later Entrances, we would be serialising
+    StopPlaces twice. We could overcome this by registering which object types we are interested in, do the full
+    scan (limited to the collect_classes_index via the classes of interest) and then either create a lookup or
+    a direct materialised view. The latter assumes we are not changing the embedded object, but only query it once.
     """
+
+    for key, obj in storage.iter_objects(txn, clazz):
+        for candidate in embedding_obj_iter(storage.serializer, obj, interesting_classes, ignore):
+            yield key, obj, candidate
+
 
 def resolve_embeddings(storage: MdbxStorage):
     missing_classes = set([])
