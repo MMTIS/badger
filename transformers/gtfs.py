@@ -8,6 +8,7 @@ import copy
 
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
+from domain.netex.model import NameOfClassOperatingPeriodRefStructure
 from transformers.callsprofile import CallsProfile
 from netex import (
     Line,
@@ -270,7 +271,8 @@ def gtfs_day_type(
             if dta.is_available is not False:
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                 ):
                     my_operating_period = project(
                         uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref], OperatingPeriod
@@ -294,7 +296,8 @@ def gtfs_day_type(
             if dta.is_available in (None, True):
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                 ):
                     uic_operating_period = uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
                     for dt in NordicProfile.getOperationalDates(uic_operating_period):
@@ -316,7 +319,8 @@ def gtfs_day_type(
             if dta.is_available in (None, True):
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                 ):
 
                     uic_operating_period = uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
@@ -354,7 +358,8 @@ def gtfs_day_type(
             else:
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                 ):
                     uic_operating_period = uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date]
 
@@ -487,7 +492,9 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                         ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
 
                         # TODO: Fix this kind of pattern by abstracting the reference fetching
-                        if isinstance(ref, UicOperatingPeriodRef) or (isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'):
+                        if isinstance(ref, UicOperatingPeriodRef) or (
+                            isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
+                        ):
                             uic_operating_periods.append(load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
                         elif isinstance(ref, OperatingPeriodRef):
                             r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
@@ -537,7 +544,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
                             # TODO: Fix this kind of pattern by abstracting the reference fetching
                             if isinstance(ref, UicOperatingPeriodRef) or (
-                                isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'
+                                isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                             ):
                                 uic_operating_periods.append(
                                     load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0]
@@ -653,7 +660,8 @@ def day_type_assignment_to_ac(
     # Most specific class first
     if isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
         isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-        or day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+        or day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+        == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
     ):
         uic_operating_period_ref = day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
         uic_operating_period: UicOperatingPeriod = ops[uic_operating_period_ref.ref]
