@@ -30,22 +30,28 @@ from domain.netex.model import (
     Route,
     TimeDemandType,
     ServiceLink,
+    ServiceCalendar,
 )
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.refs import getRef
+
 # from netexio.database import Database
 # from netexio.dbaccess import setup_database, copy_table, missing_class_update, load_generator
 # from netexio.pickleserializer import MyPickleSerializer
 
 from storage.mdbx.core.implementation import MdbxStorage
+
 # from utils.utils import get_interesting_classes
 import logging
 
+from storage.mdbx.core.references import resolve_embeddings_iterable
 from transformers.callsprofile import CallsProfile
 from transformers.epip import (
     epip_service_calendar,
     epip_line_generator,
-    service_journey_ac_to_day_type, epip_service_journey_generator, epip_service_journey_interchange,
+    service_journey_ac_to_day_type,
+    epip_service_journey_generator,
+    epip_service_journey_interchange,
 )
 from transformers.projection import reprojection_update
 from transformers.routesprofile import RoutesProfile
@@ -78,10 +84,22 @@ generator_defaults = {
     "version": defaults["version"],
 }  # Invent something, that materialises the refs, so VersionFrameDefaultsStructure can be used
 
+
 def main(source_database_file: Path, target_database_file: Path) -> None:
-    with MdbxStorage(target_database_file,readonly=False) as target_db:
+    with MdbxStorage(target_database_file, readonly=False) as target_db:
         with target_db.env.rw_transaction() as txn_write:
-            with MdbxStorage(source_database_file, readonly=True) as source_db:
+            with MdbxStorage(source_database_file, readonly=False) as source_db:
+                # This will deembed anything on the ServiceCalendar
+                with source_db.env.rw_transaction() as txn_write1:
+
+                    def all_embeddings():
+                        for _, _, embedding in resolve_embeddings_iterable(source_db, txn_write1, ServiceCalendar):
+                            id, obj, path = embedding
+                            yield obj
+
+                    source_db.insert_any_object_on_queue(txn_write1, all_embeddings())
+                    txn_write1.commit()
+
                 with source_db.env.ro_transaction() as txn_read:
                     for clazz in [
                         Codespace,
