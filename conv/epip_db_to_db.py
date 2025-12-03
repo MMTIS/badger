@@ -30,10 +30,12 @@ from domain.netex.model import (
     Route,
     TimeDemandType,
     ServiceLink,
-    ServiceCalendar,
+    ServiceCalendar, Connection, DayType, DayTypeAssignment, DefaultConnection, FlexibleLine, Notice,
+    PassengerStopAssignment, ServiceJourneyInterchange, SiteConnection, StopPlace, TariffZone, UicOperatingPeriod,
+    QuayRef, StopPlaceRef,
 )
 from domain.netex.services.model_typing import Tid
-from domain.netex.services.refs import getRef
+from domain.netex.services.refs import getRef, getFakeRef
 
 # from netexio.database import Database
 # from netexio.dbaccess import setup_database, copy_table, missing_class_update, load_generator
@@ -84,6 +86,39 @@ generator_defaults = {
     "version": defaults["version"],
 }  # Invent something, that materialises the refs, so VersionFrameDefaultsStructure can be used
 
+# EPIP
+other_referenced_classes: list[Tid] = [
+    Authority,
+    Connection,
+    DayType,
+    DayTypeAssignment,
+    DataSource,
+    DefaultConnection,
+    DestinationDisplay,
+    Direction,
+    FlexibleLine,
+    Line,
+    Network,
+    Notice,
+    Operator,
+    PassengerStopAssignment,
+    ResponsibilitySet,
+    ScheduledStopPoint,
+    ServiceCalendar,
+    ServiceJourney,
+    ServiceJourneyInterchange,
+    ServiceJourneyPattern,
+    ServiceLink,
+    SiteConnection,
+    # StopPlace,
+    TariffZone,
+    TopographicPlace,
+    TransportAdministrativeZone,
+    UicOperatingPeriod,
+    ValueSet,
+    VehicleType,
+]
+
 
 def main(source_database_file: Path, target_database_file: Path) -> None:
     with MdbxStorage(target_database_file, readonly=False) as target_db:
@@ -100,20 +135,48 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
                     source_db.insert_any_object_on_queue(txn_write1, all_embeddings())
                     txn_write1.commit()
 
+
+                with source_db.env.rw_transaction() as txn_write1:
+                    def all_psas():
+                        quay_sp = {embedding[1].id: getFakeRef(obj.id, StopPlaceRef, obj.version) for key, obj, embedding in
+                                   resolve_embeddings_iterable(source_db, txn_write1, StopPlace)}
+
+                        for psa in source_db.iter_only_objects(txn_write1, PassengerStopAssignment):
+                            if psa.taxi_rank_ref_or_stop_place_ref_or_stop_place is not None:
+                                continue
+
+                            if isinstance(psa.taxi_stand_ref_or_quay_ref_or_quay, QuayRef):
+                                sp_ref = quay_sp.get(psa.taxi_stand_ref_or_quay_ref_or_quay.ref, None)
+                                if sp_ref:
+                                    psa.taxi_rank_ref_or_stop_place_ref_or_stop_place = sp_ref
+
+                            yield psa
+
+                    source_db.insert_any_object_on_queue(txn_write1, all_psas())
+                    txn_write1.commit()
+
                 with source_db.env.ro_transaction() as txn_read:
+                    # To facilitate that our target EPIP database will have all objects that are internally referenced,
+                    # we will now take our original database, fetch all the references for the classes that we will have
+                    # in the EPIP database, copied or created.
+                    # TODO: We don't have to insert classes which are later directly copied or created,
+
+                    target_db.insert_any_object_on_queue(txn_write, source_db.fetch_all_references_by_class(txn_read, other_referenced_classes, False))
+
                     for clazz in [
                         Codespace,
-                        Direction,
+                        # Direction,
                         DataSource,
-                        Authority,
-                        Operator,
-                        ValueSet,
-                        TransportAdministrativeZone,
-                        VehicleType,
+                        # Authority,
+                        # Operator,
+                        # ValueSet,
+                        # TransportAdministrativeZone,
+                        # VehicleType,
                         ResponsibilitySet,
-                        TopographicPlace,
-                        Network,
-                        DestinationDisplay,
+                        # TopographicPlace,
+                        # Network,
+                        # DestinationDisplay,
+                        PassengerStopAssignment
                     ]:
                         # We need to have something like a backwards compatible copy,
                         # that takes the MultilingualString and only uses the features of NeTEx 1.3
@@ -135,6 +198,9 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
 
                     target_db.insert_any_object_on_queue(txn_write, infer_directions_from_sjps_and_apply(target_db, txn_write, generator_defaults))
 
+                    # Reprojection update would copy the entire database, instead we would actually want to filter what we introduce,
+                    # If we take a national stop registry it will have all the points, but we would want to limit this to the objects that
+                    # we would have queried.
                     target_db.insert_any_object_on_queue(txn_write, reprojection_update(target_db, txn_write, "urn:ogc:def:crs:EPSG::4326"))
 
             txn_write.commit()

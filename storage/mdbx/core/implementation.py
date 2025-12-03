@@ -135,6 +135,85 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
+    def fetch_all_references_by_class(self, txn: TXN, clazzes: set[Tid], skip_existing: bool = False) -> Generator[Tid, None, None]:
+        # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in refence outward
+        # Referenced objects may by itself introduce new references, hence it should be checked if the set contains (already) those
+        # When the scan is complete, all referenced objects should be made available via the generator.
+
+        # TODO: filter clazzes on the classes that are actually in the database, this limits the set.
+
+        yielded_set: set[bytes] = set([])
+        partial: set[bytes] = set([])
+
+        db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD)
+        cursor = txn.cursor(db_reference_outward)
+        for it in cursor.iter_dupsort_rows():
+            for referencing_key, reference_key in it:
+                referencing_class_idx, _ = ByteSerializer.full_key_to_idx(referencing_key)
+                reference_class_idx, _ = ByteSerializer.full_key_to_idx(reference_key)
+
+                # print(self.idx_class[referencing_class_idx], "->", self.idx_class[reference_class_idx])
+
+                if self.idx_class[referencing_class_idx] in clazzes:
+                    # if self.idx_class[reference_class_idx] not in clazzes:
+                    if reference_key not in yielded_set:
+                        yielded_set.add(reference_key)
+
+                    # Why is this separate: we don't want to expose objects that we already export,
+                    # but we do want to search if there are any references used.
+                        partial.add(reference_key)
+                    # print(self.idx_class[referencing_class_idx], "->", self.idx_class[reference_class_idx])
+                else:
+                    # print(self.idx_class[referencing_class_idx])
+                    pass
+
+        # Our selected objects may contain references theirselves, obviously we need to have those too
+        partial_new: set[bytes]
+
+        while True:
+            partial_new = set([])
+            for referencing_key in partial:
+                referencing_class_idx, _ = ByteSerializer.full_key_to_idx(referencing_key)
+                # print("STEP1", self.idx_class[referencing_class_idx])
+
+                for t in cursor.iter_dupsort_rows(start_key=referencing_key):
+                    for referencing_key2, reference_key in t:
+                        if referencing_key2 != referencing_key:
+                            break
+
+                        reference_class_idx, _ = ByteSerializer.full_key_to_idx(reference_key)
+                        # print("STEP2", self.idx_class[reference_class_idx])
+
+                        if self.idx_class[reference_class_idx] not in clazzes:
+                            if reference_key not in partial_new and reference_key not in yielded_set:
+                                partial_new.add(reference_key)
+
+            if len(partial_new) == 0:
+                break
+            else:
+                yielded_set.update(partial_new)
+                partial = partial_new.copy()
+
+        # TODO: we are still missing the objects that are referenced from the reference
+
+        for full_reference in yielded_set:
+            # TODO: We can optimise this by grouping the objects per class, and then fetch the groups in one access pattern
+            obj = self.load_object_by_full_key(txn, full_reference)
+            if skip_existing:
+                if obj.__class__ not in clazzes:
+                    print(obj.__class__, clazzes)
+                    yield obj
+            else:
+                yield obj
+
+    # TODO: Rename
+    def other_classes(self, txn: TXN, clazzes: set[Tid]) -> Generator[Tid, None, None]:
+        other_classes = set(self.db_names_iter(txn))
+        other_classes -= clazzes
+
+        for clazz in other_classes:
+            yield from self.iter_only_objects(txn, clazz)
+
     def insert_any_object_on_queue(self, txn: TXN, objects: Iterable[Tid]) -> None:
         if self.readonly:
             raise

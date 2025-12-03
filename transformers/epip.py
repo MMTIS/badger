@@ -588,7 +588,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> ServiceJourney | ServiceJourneyPattern | ServiceLink:
+    def process(sj: ServiceJourney, db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourney | ServiceJourneyPattern | ServiceLink, None, None]:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
@@ -1022,7 +1022,7 @@ def export_epip_network_offer(
     # TODO: Refactor this to make the ServiceCalendar only at the last point
     # service_calendar = GeneratorTester(db_epip.iter_only_objects(txn, ServiceCalendar, 1))
 
-    other_referenced_classes = [
+    other_referenced_classes = set([
         Authority,
         Connection,
         DayType,
@@ -1052,10 +1052,9 @@ def export_epip_network_offer(
         UicOperatingPeriod,
         ValueSet,
         VehicleType,
-    ]
+    ])
 
-    # TODO:
-    # other_referenced_objects = GeneratorTester(fetch_references_classes_generator(db_epip, other_referenced_classes))
+    other_referenced_objects = GeneratorTester(db_epip.fetch_all_references_by_class(txn, other_referenced_classes, True))
 
     if default_locale is None:
         all_locales = {org.locale for org in organisation_or_transport_organisation if org.locale is not None}
@@ -1192,16 +1191,15 @@ def export_epip_network_offer(
                                     db_epip, txn, {'codespace': default_codespace, 'version': version}
                                 ),  # TODO: do differently
                             ),
-                            # TODO:
-                            # GeneralFrame(
-                            #    id="OTHER_REFERENCED",
-                            #    version=version,
-                            #    members=(
-                            #        GeneralFrameMembersRelStructure(choice=other_referenced_objects.generator())
-                            #        if other_referenced_objects.has_value()
-                            #        else None
-                            #    ),
-                            # ),
+                            GeneralFrame(
+                                id="OTHER_REFERENCED",
+                                version=version,
+                                members=(
+                                    GeneralFrameMembersRelStructure(choice=other_referenced_objects.generator())
+                                    if other_referenced_objects.has_value()
+                                    else None
+                                ),
+                            ),
                         ]
                     ),
                 )

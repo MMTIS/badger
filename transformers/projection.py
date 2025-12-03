@@ -9,7 +9,8 @@ from pyproj.exceptions import CRSError
 
 from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_once
-from domain.netex.model import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, LinearRing
+from domain.netex.model import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, LinearRing, \
+    SimplePointVersionStructure
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import (
     recursive_attributes,
@@ -26,6 +27,9 @@ def reprojection(deserialized: Tid, crs_to: str) -> Tid:
     for obj, path in recursive_attributes(deserialized, []):
         if isinstance(obj, LocationStructure2):
             project_location(obj, crs_to)
+
+        elif isinstance(obj, SimplePointVersionStructure):
+            project_location(obj.location, crs_to)
 
         elif isinstance(obj, LineString):
             if obj.srs_name == crs_to:

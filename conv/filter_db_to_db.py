@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from typing import TypeVar, Any
 
-from netex import (
+from domain.netex.model import (
     Route,
     ServiceJourneyPattern,
     Line,
@@ -13,12 +13,12 @@ from netex import (
     DayType,
     UicOperatingPeriod,
 )
-from netexio.attributes import update_attr
-from netexio.database import Database
-from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
-from netexio.pickleserializer import MyPickleSerializer
+# from netexio.attributes import update_attr
+# from netexio.database import Database
+# from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
+# from netexio.pickleserializer import MyPickleSerializer
 from transformers.references import split_path
-from utils.profiles import EPIP_CLASSES
+# from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
 
 Tid = TypeVar("Tid", bound=EntityStructure)
