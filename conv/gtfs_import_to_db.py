@@ -8,7 +8,7 @@ import os
 def main(gtfs_file: Path, database_file: Path) -> None:
     # Workaround for https://github.com/duckdb/duckdb/issues/8261
     try:
-        os.remove(database_file.resolve())
+        os.remove(database_file)
     except OSError:
         pass
 

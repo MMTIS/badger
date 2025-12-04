@@ -124,7 +124,7 @@ from domain.netex.model import (
     DayTypeRef,
     EntityStructure,
     Locale,
-    NameOfClassOperatingPeriodRefStructure,
+
 )
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame

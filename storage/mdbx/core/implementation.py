@@ -72,10 +72,10 @@ class MdbxStorage:
         self.serializer.set_class_idx(self.class_idx)
 
     def __enter__(self) -> Self:
-        new_database = not self.path.exists()
+        new_database = not self is None
 
         self.env = Env(
-            self.path.as_posix(),
+            self.path,
             maxdbs=self.max_dbs,
             # map_size=self.initial_size,
             # writemap=True,

@@ -109,7 +109,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
 def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
     con: duckdb.DuckDBPyConnection = duckdb.connect(database=database_file)
 
-    zf = zipfile.ZipFile(zip_file.resolve())
+    zf = zipfile.ZipFile(zip_file)
 
     # check if this is a GTFS file
     if len(set(zf.namelist()) & {'agency.txt', 'routes.txt', 'trips.txt', 'stop_times.txt'}) == 0:

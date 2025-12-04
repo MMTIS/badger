@@ -22,8 +22,7 @@ from domain.netex.model import (
     ServiceJourneyPattern,
     StopPointInJourneyPattern,
     PosList,
-    ServiceLinkRefStructure,
-    NameOfClassRoutePointRefStructure, NameOfClassPointRefStructure,
+    ServiceLinkRefStructure
 )
 from domain.netex.services.ids import getId
 from domain.netex.services.refs import getRef

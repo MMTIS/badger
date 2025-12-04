@@ -9,3 +9,5 @@ netex/**
 *.jar
 uv.lock
 local_configuration.py
+/domain/netex/model/
+/netex/

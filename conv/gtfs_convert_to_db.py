@@ -7,14 +7,21 @@ from typing import List, TypeVar, Any, Iterable, Generator, cast, Union
 
 import duckdb
 import numpy
+from duckdb.experimental.spark.sql.catalog import Database
 from pandas._libs.missing import NAType
 import pandas as pd
 from xsdata.formats.dataclass.serializers import XmlSerializer
 from xsdata.formats.dataclass.serializers.config import SerializerConfig
 from xsdata.models.datatype import XmlDateTime, XmlTime, XmlDate, XmlDuration
 
+import domain
 from domain.gtfs.services.duckdb_to_storage import to_storage
+from domain.gtfs.transform.datetime import date_to_xmldatetime
+from domain.gtfs.transform.string import getOptionalString
 from domain.gtfs.transform.transporttype import gtfsRouteTypeToNeTEx
+from domain.netex.indexes.byid import getIndex
+from domain.netex.services.ids import getId
+from domain.netex.services.refs import getRef, getFakeRef
 from storage.lmdb.core.implementation import LmdbStorage
 from storage.lmdb.serialization.byteserializer import ByteSerializer
 from transformers.callsprofile import CallsProfile
@@ -156,8 +163,9 @@ from netex import (
     RouteLinkRefStructure,
 )
 
-from utils.utils import get_interesting_classes, get_boring_classes
-from utils.refs import getRef, getIndex, getBitString2, getFakeRef, getOptionalString, getId, getRequiredString
+#from utils.utils import get_interesting_classes, get_boring_classes
+#from utils.refs import getRef, getIndex, getBitString2, getFakeRef, getOptionalString, getId, getRequiredString
+from utils.refs import getBitString2
 from utils.aux_logging import log_all, prepare_logger
 import logging
 
