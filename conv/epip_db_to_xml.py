@@ -22,7 +22,7 @@ if __name__ == "__main__":
     argument_parser = argparse.ArgumentParser(
         description="Export a prepared EPIP export XML"
     )
-    argument_parser.add_argument("epip", type=str, help="The EPIP lmdb database")
+    argument_parser.add_argument("epip", type=str, help="The EPIP MDBX database")
     argument_parser.add_argument(
         "output",
         type=str,
