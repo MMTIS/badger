@@ -4,17 +4,12 @@ from storage.mdbx.core.references import resolve, resolve_embeddings
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
 from storage.mdbx.core.implementation import MdbxStorage
-from utils.aux_logging import *
+from utils.aux_logging import log_all, log_flush
+import logging
 
 
-def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
-    # if filenames is not a list of str  => error
-    if not (isinstance(filenames, list) and all(isinstance(item, str) for item in filenames)):
-        log_all(logging.ERROR, f'filenames parameter must be a [] of file names.')
-        log_flush()
-        exit(1)
-
-    with MdbxStorage(Path(database), readonly=False) as storage:
+def netex_to_db(filenames: set[Path], database: Path, clean_database: bool = True) -> None:
+    with MdbxStorage(database, readonly=False) as storage:
         """
         if clean_database:
             print("Is cleaned!")
@@ -23,12 +18,31 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
 
         interesting_classes = get_interesting_classes()
         for filename in filenames:
-            xml_storage = XmlStorage(Path(filename))
+            xml_storage = XmlStorage(filename)
             for sub_file, real_filename in xml_storage.open_netex_file():
                 insert_database(storage, interesting_classes, sub_file)
 
         resolve(storage)
         resolve_embeddings(storage)
+
+
+def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
+    # if filenames is not a list of str  => error
+    if not (isinstance(filenames, list) and all(isinstance(item, str) for item in filenames)):
+        log_all(logging.ERROR, 'filenames parameter must be a [] of file names.')
+        log_flush()
+        exit(1)
+
+    paths: set[Path] = set([])
+    for filename in filenames:
+        path = Path(filename)
+        if not path.exists():
+            log_all(logging.WARNING, f'{filename} does not exist.')
+        else:
+            paths.add(path)
+
+    netex_to_db(paths, Path(database), clean_database)
+
 
 if __name__ == '__main__':
     import argparse
