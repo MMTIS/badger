@@ -5,7 +5,8 @@ from domain.gtfs.services.gtfs_to_duckdb import load_gtfs_to_duckdb
 from utils.aux_logging import log_all, prepare_logger
 import os
 
-def main(gtfs_file: Path, database_file: Path) -> None:
+
+def gtfs_import_to_db(gtfs_file: Path, database_file: Path) -> None:
     # Workaround for https://github.com/duckdb/duckdb/issues/8261
     try:
         os.remove(database_file.resolve())
@@ -13,6 +14,19 @@ def main(gtfs_file: Path, database_file: Path) -> None:
         pass
 
     load_gtfs_to_duckdb(gtfs_file, database_file)
+
+
+def main(gtfs_file: str, database_file: str) -> None:
+    gtfs_path = Path(args.gtfs)
+    if not gtfs_path.exists():
+        log_all(logging.ERROR, f"{gtfs_path} does not exist.")
+
+    else:
+        try:
+            gtfs_import_to_db(gtfs_path, Path(args.database))
+        except Exception as e:
+            log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+            raise e
 
 
 if __name__ == "__main__":
@@ -26,7 +40,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
     try:
-        main(Path(args.gtfs), Path(args.database))
+        main(args.gtfs, args.database)
     except Exception as e:
         log_all(logging.ERROR, f'{e}  {traceback.format_exc()}')
         raise e
