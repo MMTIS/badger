@@ -1,7 +1,5 @@
 from pathlib import Path
-from typing import Generator, Any, Set, Optional
-
-from mdbx.mdbx import TXN
+from typing import Generator
 
 from domain.netex.model import (
     Codespace,
@@ -17,47 +15,45 @@ from domain.netex.model import (
     Network,
     DestinationDisplay,
     VehicleType,
-    VersionFrameDefaultsStructure,
     ServiceJourneyPattern,
-    StopPointInJourneyPattern,
     Line,
-    TransportOrganisationRefsRelStructure,
     ServiceJourney,
-    FlexibleLineRef,
-    LineRef,
-    RouteView,
-    RouteRef,
-    Route,
-    TimeDemandType,
     ServiceLink,
-    ServiceCalendar, Connection, DayType, DayTypeAssignment, DefaultConnection, FlexibleLine, Notice,
-    PassengerStopAssignment, ServiceJourneyInterchange, SiteConnection, StopPlace, TariffZone, UicOperatingPeriod,
-    QuayRef, StopPlaceRef,
+    ServiceCalendar,
+    Connection,
+    DayType,
+    DayTypeAssignment,
+    DefaultConnection,
+    FlexibleLine,
+    Notice,
+    PassengerStopAssignment,
+    ServiceJourneyInterchange,
+    SiteConnection,
+    StopPlace,
+    TariffZone,
+    UicOperatingPeriod,
+    QuayRef,
+    EntityStructure,
+    StopPlaceRef,
 )
-from domain.netex.services.model_typing import Tid
-from domain.netex.services.refs import getRef, getFakeRef
-
-# from netexio.database import Database
-# from netexio.dbaccess import setup_database, copy_table, missing_class_update, load_generator
-# from netexio.pickleserializer import MyPickleSerializer
+from domain.netex.services.refs import getRef
 
 from storage.mdbx.core.implementation import MdbxStorage
 
-# from utils.utils import get_interesting_classes
 import logging
+from utils.aux_logging import log_all, prepare_logger
+from configuration import defaults
+
 
 from storage.mdbx.core.references import resolve_embeddings_iterable
-from transformers.callsprofile import CallsProfile
 from transformers.epip import (
     epip_service_calendar,
     epip_line_generator,
-    service_journey_ac_to_day_type,
     epip_service_journey_generator,
     epip_service_journey_interchange,
 )
 from transformers.ivu import avv_service_journey_operator, avv_vehicle_type_short_name, avv_quay_name
 from transformers.projection import reprojection_update
-from transformers.routesprofile import RoutesProfile
 from transformers.scheduledstoppoint import infer_locations_from_quay_or_stopplace_and_apply
 
 
@@ -78,9 +74,6 @@ from transformers.epip import (
     epip_service_calendar,
 )
 """
-# from utils.profiles import EPIP_CLASSES
-from utils.aux_logging import log_all, prepare_logger
-from configuration import defaults
 
 generator_defaults = {
     "codespace": Codespace(id="codespace", xmlns=str(defaults["codespace"])),
@@ -88,7 +81,7 @@ generator_defaults = {
 }  # Invent something, that materialises the refs, so VersionFrameDefaultsStructure can be used
 
 # EPIP
-other_referenced_classes: list[Tid] = [
+other_referenced_classes: set[type[EntityStructure]] = {
     Authority,
     Connection,
     DayType,
@@ -118,17 +111,17 @@ other_referenced_classes: list[Tid] = [
     UicOperatingPeriod,
     ValueSet,
     VehicleType,
-]
+}
 
 
-def main(source_database_file: Path, target_database_file: Path) -> None:
+def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> None:
     with MdbxStorage(target_database_file, readonly=False) as target_db:
         with target_db.env.rw_transaction() as txn_write:
             with MdbxStorage(source_database_file, readonly=False) as source_db:
                 # This will deembed anything on the ServiceCalendar
                 with source_db.env.rw_transaction() as txn_write1:
 
-                    def all_embeddings():
+                    def all_embeddings() -> Generator[EntityStructure, None, None]:
                         for _, _, embedding in resolve_embeddings_iterable(source_db, txn_write1, ServiceCalendar):
                             id, obj, path = embedding
                             yield obj
@@ -136,11 +129,12 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
                     source_db.insert_any_object_on_queue(txn_write1, all_embeddings())
                     txn_write1.commit()
 
-
                 with source_db.env.rw_transaction() as txn_write1:
-                    def all_psas():
-                        quay_sp = {embedding[1].id: getFakeRef(obj.id, StopPlaceRef, obj.version) for key, obj, embedding in
-                                   resolve_embeddings_iterable(source_db, txn_write1, StopPlace)}
+
+                    def all_psas() -> Generator[PassengerStopAssignment, None, None]:
+                        quay_sp = {
+                            embedding[1].id: getRef(obj, StopPlaceRef) for key, obj, embedding in resolve_embeddings_iterable(source_db, txn_write1, StopPlace)
+                        }
 
                         for psa in source_db.iter_only_objects(txn_write1, PassengerStopAssignment):
                             if psa.taxi_rank_ref_or_stop_place_ref_or_stop_place is not None:
@@ -177,7 +171,7 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
                         # TopographicPlace,
                         # Network,
                         # DestinationDisplay,
-                        PassengerStopAssignment
+                        PassengerStopAssignment,
                     ]:
                         # We need to have something like a backwards compatible copy,
                         # that takes the MultilingualString and only uses the features of NeTEx 1.3
@@ -305,28 +299,33 @@ def main(source_database_file: Path, target_database_file: Path) -> None:
             reprojection_update(target_db, "urn:ogc:def:crs:EPSG::4326")
 """
 
+
+def main(source: str, target: str) -> None:
+    source_path = Path(args.source)
+    if not source_path.exists():
+        log_all(logging.ERROR, f"{source_path} does not exist.")
+
+    else:
+        try:
+            epip_db_to_db(source_path, Path(args.target))
+        except Exception as e:
+            log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+            raise e
+
+
 if __name__ == "__main__":
     import argparse
     import traceback
 
     parser = argparse.ArgumentParser(description="Transform the input into mandatory objects for the export of EPIP")
-    parser.add_argument("source", type=str, help="lmdb file to use as input of the transformation.")
+    parser.add_argument("source", type=str, help="mdbx file to use as input of the transformation.")
     parser.add_argument(
         "target",
         type=str,
-        help="lmdb file to overwrite and store contents of the transformation.",
+        help="mdbx file to overwrite and store contents of the transformation.",
     )
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
-    source_path = Path(args.source)
-    if not source_path.exists():
-        log_all(logging.ERROR, "{source_path} does not exist.")
-
-    else:
-        try:
-            main(source_path, Path(args.target))
-        except Exception as e:
-            log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
-            raise e
+    main(args.source, args.target)
