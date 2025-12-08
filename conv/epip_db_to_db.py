@@ -301,16 +301,12 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
 
 
 def main(source: str, target: str) -> None:
-    source_path = Path(args.source)
+    source_path = Path(source)
     if not source_path.exists():
         log_all(logging.ERROR, f"{source_path} does not exist.")
 
     else:
-        try:
-            epip_db_to_db(source_path, Path(args.target))
-        except Exception as e:
-            log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
-            raise e
+        epip_db_to_db(source_path, Path(target))
 
 
 if __name__ == "__main__":
@@ -328,4 +324,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
-    main(args.source, args.target)
+    try:
+        main(args.source, args.target)
+    except Exception as e:
+        log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+        raise e

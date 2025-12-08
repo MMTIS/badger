@@ -1,16 +1,27 @@
+import logging
 from pathlib import Path
 
 
 from storage.mdbx.core.implementation import MdbxStorage
 from transformers.generalframe import export_to_general_frame
 from storage.lxml.serialization.xml import export_publication_delivery_xml
+from utils.aux_logging import log_all
 
 
-def main(database: Path, output_filename: str) -> None:
-    with MdbxStorage(database) as storage:
+def netex_db_to_generalframe(source: Path, target: Path) -> None:
+    with MdbxStorage(source) as storage:
         with storage.env.ro_transaction() as txn:
             publication_delivery = export_to_general_frame(storage, txn)
-            export_publication_delivery_xml(publication_delivery, output_filename)
+            export_publication_delivery_xml(publication_delivery, target)
+
+
+def main(source: str, target: str) -> None:
+    source_path = Path(source)
+    if not source_path.exists():
+        log_all(logging.ERROR, f"{source_path} does not exist.")
+
+    else:
+        netex_db_to_generalframe(source_path, Path(target))
 
 
 if __name__ == '__main__':
@@ -21,4 +32,4 @@ if __name__ == '__main__':
     argument_parser.add_argument('output_filename', type=str, help='The output XML file')
     args = argument_parser.parse_args()
 
-    main(Path(args.database), args.output_filename)
+    main(args.database, args.output_filename)

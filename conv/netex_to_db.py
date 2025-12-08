@@ -1,3 +1,4 @@
+import traceback
 from pathlib import Path
 
 from storage.mdbx.core.references import resolve, resolve_embeddings
@@ -53,4 +54,8 @@ if __name__ == '__main__':
     argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=True)
     args = argument_parser.parse_args()
 
-    main(args.netex, args.database, args.clean_database)
+    try:
+        main(args.netex, args.database, args.clean_database)
+    except Exception as e:
+        log_all(logging.ERROR, traceback.format_exc())
+        raise e

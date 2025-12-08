@@ -2,10 +2,10 @@ import logging
 import zipfile
 from pathlib import Path
 
-from storage.lmdb.core.implementation import LmdbStorage
-from storage.lmdb.core.references import resolve, resolve_embeddings
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import get_interesting_classes, insert_database
+from storage.mdbx.core.implementation import MdbxStorage
+from storage.mdbx.core.references import resolve, resolve_embeddings
 from utils.aux_logging import log_all, prepare_logger
 from domain.netex.services.profiles import SWISS_CLASSES
 
@@ -30,11 +30,9 @@ def first_pattern_index(name: str) -> tuple[int, str] | None:
             return i, token
     return None
 
-def main(filename: str, database: str, clean_database: bool = True) -> None:
-    if not filename.endswith('.zip'):
-        return
 
-    with LmdbStorage(Path(database), readonly=False) as storage:
+def swiss_to_db(source: Path, target: Path, clean_database: bool = True) -> None:
+    with MdbxStorage(Path(target), readonly=False) as storage:
         """
         if clean_database:
             print("Is cleaned!")
@@ -42,7 +40,7 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
         """
 
         interesting_classes = get_interesting_classes(SWISS_CLASSES)
-        xml_storage = XmlStorage(Path(filename))
+        xml_storage = XmlStorage(source)
 
         # Stap 1: alleen bestandsnamen ophalen
         all_names = xml_storage.list_netex_files()
@@ -58,7 +56,7 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
 
         bucket.sort(key=lambda x: (x[0], x[1]))
 
-        zip_file = zipfile.ZipFile(filename)
+        zip_file = zipfile.ZipFile(source)
         for _, sub_filename in bucket:
             print(sub_filename)
             sub_file = zip_file.open(sub_filename)
@@ -67,13 +65,27 @@ def main(filename: str, database: str, clean_database: bool = True) -> None:
         resolve(storage)
         resolve_embeddings(storage)
 
+
+def main(source: str, target: str, clean_database: bool = True) -> None:
+    if not source.endswith('.zip'):
+        log_all(logging.ERROR, f"{source} does not end with .zip")
+        return
+
+    source_path = Path(source)
+    if not source_path.exists():
+        log_all(logging.ERROR, f"{source_path} does not exist.")
+
+    else:
+        swiss_to_db(source_path, Path(target), clean_database)
+
+
 if __name__ == '__main__':
     import argparse
     import traceback
 
-    argument_parser = argparse.ArgumentParser(description='Import a Swiss NeTEx ZIP archive into lmdb')
+    argument_parser = argparse.ArgumentParser(description='Import a Swiss NeTEx ZIP archive into mdbx')
     argument_parser.add_argument('swiss_zip_file', type=str, help='The NeTEx zip file')
-    argument_parser.add_argument('database', type=str, help='The lmdb to be overwritten with the NeTEx context')
+    argument_parser.add_argument('database', type=str, help='The mdbx to be overwritten with the NeTEx context')
     argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=True)
     argument_parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = argument_parser.parse_args()
