@@ -177,7 +177,7 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
 
 def embedding_obj_iter(
     serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]], ignore: Optional[set[type[Tid]]]
-) -> Generator[tuple[bytes, Tid, list[int]], None, None]:
+) -> Generator[tuple[Optional[bytes], Tid, list[int]], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):

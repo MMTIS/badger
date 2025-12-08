@@ -25,10 +25,10 @@ from domain.netex.model import (
     OperatingPeriod,
     DayTypeAssignment,
 )
-from storage.interface import Storage
+from storage.mdbx.core.implementation import MdbxStorage
 
 
-def to_storage(database_file: Path, storage: Storage) -> None:
+def to_storage(database_file: Path, storage: MdbxStorage) -> None:
     with duckdb.connect(database=database_file, read_only=True) as con:
         version = getVersion(con)
         assert version

@@ -135,7 +135,7 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
-    def fetch_all_references_by_class(self, txn: TXN, clazzes: set[Tid], skip_existing: bool = False) -> Generator[Tid, None, None]:
+    def fetch_all_references_by_class(self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False) -> Generator[type[EntityStructure], None, None]:
         # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in refence outward
         # Referenced objects may by itself introduce new references, hence it should be checked if the set contains (already) those
         # When the scan is complete, all referenced objects should be made available via the generator.

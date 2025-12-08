@@ -2,7 +2,7 @@ import inspect
 
 import warnings
 import re
-from typing import TypeVar, Iterable, Any
+from typing import TypeVar, Iterable, Any, Optional
 from xsdata.models.datatype import XmlDuration, XmlTime
 
 from domain.netex.model import (
@@ -10,6 +10,8 @@ from domain.netex.model import (
     EntityStructure,
     VersionFrameDefaultsStructure,
 )
+
+import domain.netex.model as netex_model
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
@@ -57,7 +59,7 @@ def to_seconds(xml_duration: XmlDuration) -> int:
     return int((((xml_duration.days or 0) * 24 + (xml_duration.hours or 0)) * 3600) + ((xml_duration.minutes or 0) * 60) + (xml_duration.seconds or 0))
 
 
-def to_seconds_xmltime(xml_time: XmlTime, offset: int = None) -> int:
+def to_seconds_xmltime(xml_time: XmlTime, offset: Optional[int] = None) -> int:
     return int((((offset or 0) * 24 + (xml_time.hour)) * 3600) + ((xml_time.minute or 0) * 60) + (xml_time.second or 0))
 
 
@@ -107,7 +109,7 @@ class GeneratorTester:
 
 def get_boring_classes() -> list[Any]:
     # Get all classes from the generated NeTEx Python Dataclasses
-    clsmembers = inspect.getmembers(domain.netex.schema, inspect.isclass)
+    clsmembers = inspect.getmembers(netex_model, inspect.isclass)
 
     # The interesting class members certainly will have a "Meta class" with a namespace
     interesting_members = [x[1] for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace")] + [VersionFrameDefaultsStructure]

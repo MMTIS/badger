@@ -6,7 +6,7 @@ from storage.interface import Storage
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
 
 
-class XmlStorage(Storage):
+class XmlStorage:
     def list_netex_files(self) -> list[str]:
         """Return only the list of contained XML(.gz) filenames."""
         if str(self.path).endswith(".xml.gz"):

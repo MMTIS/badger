@@ -1,5 +1,6 @@
 import logging
 from collections import defaultdict
+from pathlib import Path
 from typing import TypeVar, Any
 
 from domain.netex.model import (
@@ -13,22 +14,38 @@ from domain.netex.model import (
     DayType,
     UicOperatingPeriod,
 )
+from storage.mdbx.core.implementation import MdbxStorage
+
 # from netexio.attributes import update_attr
 # from netexio.database import Database
 # from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
 # from netexio.pickleserializer import MyPickleSerializer
 from transformers.references import split_path
+
 # from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
 
 Tid = TypeVar("Tid", bound=EntityStructure)
 
 
-def main(source_database_file: str, target_database_file: str, object_type: str, object_filter: str) -> None:
-    with Database(source_database_file, serializer=MyPickleSerializer(compression=True), readonly=True) as db_read:
-        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, DayTypeAssignment, UicOperatingPeriod}
-        filter_set.add(db_read.get_class_by_name(object_type))
+def main(source_database_file: Path, target_database_file: Path, object_type: str, object_filter: str) -> None:
+    with MdbxStorage(source_database_file) as db_read:
+        clazz = db_read.idx_class.get(db_read.class_name_idx.get(object_type, None), None)
+        if clazz is None:
+            log_all(logging.ERROR, "{object_type} does not exist.")
+            return
 
+        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, DayTypeAssignment, UicOperatingPeriod}
+        filter_set.add(clazz)
+
+        with db_read.env.ro_transaction() as txn:
+
+            my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+
+            # First: check if the id already exists, then we must overwrite.
+            full_key = db_id_idx.get(txn, my_id)
+
+            db_read.iter_objects(txn, clazz, db_read.serializer.encode_key())
         objs: list[Any] = load_local(db_read, db_read.get_class_by_name(object_type), filter_id=object_filter)
 
         with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
@@ -73,7 +90,7 @@ if __name__ == "__main__":
     import traceback
 
     parser = argparse.ArgumentParser(description="Filter the input by an object")
-    parser.add_argument("source", type=str, help="lmdb file to use as input of the transformation.")
+    parser.add_argument("source", type=str, help="MDBX file to use as input of the transformation.")
 
     parser.add_argument('object_type', type=str, help='The NeTEx object type to filter, for example ServiceJourney')
     parser.add_argument('object_filter', type=str, help='The object filter to apply.')
@@ -81,14 +98,20 @@ if __name__ == "__main__":
     parser.add_argument(
         "target",
         type=str,
-        help="lmdb file to overwrite and store contents of the transformation.",
+        help="MDBX file to overwrite and store contents of the transformation.",
     )
 
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
-    try:
-        main(args.source, args.target, args.object_type, args.object_filter)
-    except Exception as e:
-        log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
-        raise e
+
+    source_path = Path(args.source)
+    if not source_path.exists():
+        log_all(logging.ERROR, "{source_path} does not exist.")
+
+    else:
+        try:
+            main(source_path, Path(args.target), args.object_type, args.object_filter)
+        except Exception as e:
+            log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+            raise e

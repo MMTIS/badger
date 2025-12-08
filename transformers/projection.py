@@ -10,7 +10,7 @@ from pyproj.exceptions import CRSError
 from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_once
 from domain.netex.model import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, LinearRing, \
-    SimplePointVersionStructure
+    SimplePointVersionStructure, EntityStructure
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import (
     recursive_attributes,
@@ -29,7 +29,8 @@ def reprojection(deserialized: Tid, crs_to: str) -> Tid:
             project_location(obj, crs_to)
 
         elif isinstance(obj, SimplePointVersionStructure):
-            project_location(obj.location, crs_to)
+            if obj.location:
+                project_location(obj.location, crs_to)
 
         elif isinstance(obj, LineString):
             if obj.srs_name == crs_to:
@@ -64,6 +65,7 @@ def reprojection_update(db: MdbxStorage, txn: TXN, crs_to: str) -> Generator[Tid
     # we cannot hold the cursor since access has to be disabled.
     # We will first validate that we do have remaining capacity.
 
+    clazz: EntityStructure
     for clazz in set(db.db_names(txn).values()).intersection(set(get_all_geo_elements())):
         obj: Tid
         for _key, obj in db.iter_objects(txn, clazz):

@@ -10,7 +10,6 @@ from storage.mdbx.serialization.byteserializer import ByteSerializer
 from mdbx.mdbx import TXN
 from typing import Optional, Generator
 
-
 def resolve_embeddings_iterable(
     storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[Tid]] = None, ignore: Optional[set[Tid]] = None
 ) -> Generator[tuple[bytes, type[EntityStructure], type[EntityStructure]], None, None]:

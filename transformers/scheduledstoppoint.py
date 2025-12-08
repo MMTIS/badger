@@ -36,7 +36,7 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: 
         yield ssp
 
     def query(db_read: MdbxStorage, txn: TXN) -> Generator[ScheduledStopPoint, None, None]:
-        for _key, ssp in db_read.iter_objects(txn, ScheduledStopPoint):
+        for ssp in db_read.iter_only_objects(txn, ScheduledStopPoint):
             yield from process(ssp, generator_defaults)
 
     sp: StopPlace

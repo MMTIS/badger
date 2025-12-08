@@ -25,7 +25,7 @@ class MyXmlSerializer(Serializer):
         "gml": "http://www.opengis.net/gml/3.2",
     }
 
-    def __init__(self, classes) -> None:
+    def __init__(self, classes: set[Tid]) -> None:
         Serializer.__init__(self, classes)
         context = XmlContext()
         config = ParserConfig(fail_on_unknown_properties=False)

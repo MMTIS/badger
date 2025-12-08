@@ -12,7 +12,7 @@ from dateutil.rrule import rrule, DAILY
 from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
-from domain.netex.indexes.byid import getIndex, getIndexNew
+from domain.netex.indexes.byid import getIndex
 from domain.netex.services.refs import getRef, getFakeRef
 from domain.netex.services.ids import getId
 from storage.mdbx.core.implementation import MdbxStorage
@@ -192,7 +192,7 @@ def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     stop_places: dict[str, StopPlace] = getIndex(db_read.iter_only_objects(txn, StopPlace))
 
     # Resolving a quay is very expensive. Either in the database it should be stored independently, or an index should be made available.
-    quays: dict[str, Quay] = getIndexNew(
+    quays: dict[str, Quay] = getIndex(
         [
             quay
             for quay in chain(*[stop_place.quays.taxi_stand_ref_or_quay_ref_or_quay for stop_place in stop_places.values() if stop_place.quays is not None])
@@ -1022,7 +1022,7 @@ def export_epip_network_offer(
     # TODO: Refactor this to make the ServiceCalendar only at the last point
     # service_calendar = GeneratorTester(db_epip.iter_only_objects(txn, ServiceCalendar, 1))
 
-    other_referenced_classes = set([
+    other_referenced_classes: set[type[EntityStructure]] = {
         Authority,
         Connection,
         DayType,
@@ -1052,7 +1052,7 @@ def export_epip_network_offer(
         UicOperatingPeriod,
         ValueSet,
         VehicleType,
-    ])
+    }
 
     other_referenced_objects = GeneratorTester(db_epip.fetch_all_references_by_class(txn, other_referenced_classes, True))
 
@@ -1210,7 +1210,7 @@ def export_epip_network_offer(
     return publication_delivery
 
 
-def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> None:
+def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
     print(sys._getframe().f_code.co_name)
 
     def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange, None, None]:

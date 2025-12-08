@@ -9,7 +9,7 @@ from domain.netex.services.model_typing import Tid
 from storage.mdbx.core.implementation import MdbxStorage
 
 
-def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
+def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyPattern | Direction, None, None]:
     directions: Dict[str, Direction] = {}
     direction_refs: Dict[str, DirectionRef | None] = {}
 

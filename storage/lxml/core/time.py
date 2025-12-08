@@ -12,7 +12,7 @@ class XmlTimeZoned(XmlTime):
 
     def __new__(
         cls, hour: int, minute: int, second: int, fractional_second: int = 0, offset: int | None = None, zoneinfo: ZoneInfo | None = None
-    ):
+    ) -> "XmlTimeZoned":
         instance = super().__new__(cls, hour, minute, second, fractional_second, offset)
         instance.zoneinfo = zoneinfo
         return instance
@@ -34,7 +34,7 @@ class XmlDateTimeZoned(XmlDateTime):
         fractional_second: int = 0,
         offset: int | None = None,
         zoneinfo: ZoneInfo | None = None,
-    ):
+    ) -> "XmlDateTimeZoned":
         instance = super().__new__(cls, year, month, day, hour, minute, second, fractional_second, offset)
         instance.zoneinfo = zoneinfo
         return instance

@@ -17,7 +17,6 @@ def main(database_gtfs: Path, database_netex: Path) -> None:
         resolve(cast(LmdbStorage, storage))
 
 
-
 if __name__ == '__main__':
     import argparse
     import traceback

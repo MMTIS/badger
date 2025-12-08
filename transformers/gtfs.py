@@ -3,54 +3,24 @@ import logging
 import sys
 import warnings
 from datetime import timedelta, datetime, time
-from typing import Generator, TypeVar, Iterable, Any, Iterator
+from typing import Generator, TypeVar, Iterable, Any, Iterator, cast
 import copy
 
+from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
-from domain.netex.model import NameOfClassOperatingPeriodRefStructure
+from domain.netex.indexes.byid import getIndex
+from domain.netex.model import NameOfClassOperatingPeriodRefStructure, Operator, Line, ServiceJourney, \
+    DayTypeRefsRelStructure, ValidityConditionsRelStructure, AvailabilityCondition, AvailabilityConditionRef, Branding, \
+    Authority, ResponsibilitySet, StakeholderRoleTypeEnumeration, ResponsibilitySetRef, Version, OperatingPeriod, \
+    DayTypeAssignment, OperatingDay, OperatingDayRef, DayOfWeekEnumeration, DayType, UicOperatingPeriod, DayTypeRef, \
+    TimeDemandType, Route, RouteRef, RouteView, ServiceJourneyPattern, UicOperatingPeriodRef, OperatingPeriodRef
+from domain.netex.services.refs import getRef, getFakeRef
+from storage.mdbx.core.implementation import MdbxStorage
 from transformers.callsprofile import CallsProfile
-from netex import (
-    Line,
-    Branding,
-    Operator,
-    Authority,
-    ResponsibilitySet,
-    StakeholderRoleTypeEnumeration,
-    ServiceJourney,
-    TemplateServiceJourney,
-    ServiceJourneyPattern,
-    TimeDemandType,
-    RouteView,
-    RouteRef,
-    Route,
-    ValidityConditionsRelStructure,
-    AvailabilityCondition,
-    AvailabilityConditionRef,
-    DayType,
-    DayTypeAssignment,
-    OperatingPeriod,
-    ServiceCalendar,
-    DayTypesRelStructure,
-    OperatingPeriodRef,
-    UicOperatingPeriodRef,
-    OperatingDay,
-    DayTypeRef,
-    OperatingDaysRelStructure,
-    OperatingDayRefStructure,
-    UicOperatingPeriod,
-    OperatingDayRef,
-    PropertiesOfDayRelStructure,
-    PropertyOfDay,
-    DayOfWeekEnumeration,
-    DayTypeRefsRelStructure,
-    Version,
-)
-from netexio.database import Database
-from netexio.dbaccess import load_generator, load_local, copy_table
 from transformers.nordicprofile import NordicProfile
-from utils.refs import getRef, getIndex, getIndexByGroup
 from transformers.daytype import get_day_type_from_availability_condition, datetime_weekday_to_dow
+from utils.refs import getIndexByGroup
 from utils.utils import project
 from utils.aux_logging import log_all, log_once
 
@@ -59,51 +29,44 @@ import utils.netex_monkeypatching  # noqa: F401
 T = TypeVar("T")
 
 
-def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
+def gtfs_operator_line_memory(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Operator | Line, None, None]:
     operator: Operator
     print(sys._getframe().f_code.co_name)
-    lines: list[Line] = load_local(db_read, Line)
-    operators_local: list[Operator] = load_local(db_read, Operator)
+    lines: list[Line] = list(db_read.iter_only_objects(txn, Line))
+    operators_local: list[Operator] = list(db_read.iter_only_objects(txn, Operator))
 
     operators: dict[str, Operator] = {}
     for line in lines:
         # GTFS only has the concept agency (operator) hence all variants will become OperatorRef.
         if line.branding_ref is not None:
-            branding: Branding = db_read.get_single(Branding, line.branding_ref.ref, line.branding_ref.version)
+            branding: Branding = cast(Branding, db_read.load_object_by_reference(txn, line.branding_ref))
             operator = project(branding, Operator)
             operators[operator.id] = operator
             line.operator_ref = getRef(operator)
 
         elif line.operator_ref is not None:
             if line.operator_ref.ref not in operators:
-                operator = db_read.get_single(Operator, line.operator_ref.ref, line.operator_ref.version)
+                operator = cast(Operator, db_read.load_object_by_reference(txn, line.operator_ref))
                 operators[operator.id] = operator
                 line.operator_ref = getRef(operator)
 
         elif line.authority_ref is not None:
-            authority: Authority = db_read.get_single(Authority, line.authority_ref.ref, line.authority_ref.version)
+            authority = cast(Authority, db_read.load_object_by_reference(txn, line.authority_ref))
             operator = project(authority, Operator)
             operators[operator.id] = operator
             line.operator_ref = getRef(operator)
 
         elif line.responsibility_set_ref_attribute is not None:
             # TODO: ResponsibilitySet to Operator/Authority should be a separate function
-            responsibility_set: ResponsibilitySet = db_read.get_single(ResponsibilitySet, line.responsibility_set_ref_attribute)
+            responsibility_set = cast(ResponsibilitySet, db_read.load_object_by_reference(txn, getFakeRef(line.responsibility_set_ref_attribute, ResponsibilitySetRef)))
             if responsibility_set is not None and responsibility_set.roles is not None:
                 for role_assignment in responsibility_set.roles.responsibility_role_assignment:
                     if (
                         StakeholderRoleTypeEnumeration.OPERATION in role_assignment.stakeholder_role_type
                         or StakeholderRoleTypeEnumeration.OPERATION_1 in role_assignment.stakeholder_role_type
                     ):
-                        operator = db_read.get_single(
-                            (
-                                db_read.get_class_by_name(role_assignment.responsible_organisation_ref.name_of_ref_class)
-                                if role_assignment.responsible_organisation_ref.name_of_ref_class
-                                else Operator
-                            ),
-                            role_assignment.responsible_organisation_ref.ref,
-                            role_assignment.responsible_organisation_ref.version,
-                        )
+                        # TODO: review!
+                        operator = cast(Operator, db_read.load_object_by_reference(txn, role_assignment.responsible_organisation_ref))
                         operators[operator.id] = operator
                         line.operator_ref = getRef(operator)
 
@@ -132,16 +95,16 @@ def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_d
         if line.operator_ref is None:
             log_all(logging.ERROR, f"Line {line.id} does not have an operator_ref assigned.")
 
-    db_write.insert_objects_on_queue(Operator, list(operators.values()), True)
-    db_write.insert_objects_on_queue(Line, lines, True)
+    yield from operators.values()
+    yield from lines
 
 
 # TODO: move to separate file (calls profiles)
-def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
+def add_calls(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> ServiceJourney:
     if sj.calls:
         return sj
     else:
-        sjp: ServiceJourneyPattern = db_read.get_single(ServiceJourneyPattern, sj.journey_pattern_ref.ref)
+        sjp: ServiceJourneyPattern = db_read.load_object_by_reference(sj.journey_pattern_ref)
         if sjp is None:
             log_all(logging.ERROR, "No SJP")
 
@@ -155,7 +118,7 @@ def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
                         )
                     elif isinstance(sjp.route_ref_or_route_view, RouteRef):
                         sj.route_ref = sjp.route_ref_or_route_view
-                        route: Route = db_read.get_single(Route, sjp.route_ref_or_route_view.ref)
+                        route: Route = db_read.load_object_by_reference(sjp.route_ref_or_route_view)
                         sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view = route.line_ref
 
             if sj.passing_times:
@@ -165,7 +128,7 @@ def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
                 return sj
 
             elif sj.time_demand_type_ref:
-                tdt: TimeDemandType = db_read.get_single(TimeDemandType, sj.time_demand_type_ref.ref)
+                tdt: TimeDemandType = db_read.load_object_by_reference(sj.time_demand_type_ref)
                 CallsProfile.getCallsFromTimeDemandType(sj, sjp, tdt)
                 sj.journey_pattern_ref = None
                 sj.time_demand_type_ref = None
@@ -175,7 +138,7 @@ def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
                 log_all(logging.ERROR, "Unimplemented method to calls")
 
 
-def calendars_to_daytype(db_read: Database, sj: ServiceJourney) -> DayTypeRefsRelStructure | ValidityConditionsRelStructure:
+def calendars_to_daytype(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> DayTypeRefsRelStructure | ValidityConditionsRelStructure:
     vcs: set[str] = set()
     vcs2: list[AvailabilityCondition | AvailabilityConditionRef] = []
 
@@ -390,11 +353,11 @@ def gtfs_day_type(
     return (day_type, my_day_type_assignments, my_operating_period)
 
 
-def gtfs_generate_deprecated_version(db_write: Database) -> Version:
+def gtfs_generate_deprecated_version(db_write: MdbxStorage, txn_write: TXN) -> Version:
     my_from = None
     my_to = None
     last_op = None
-    for op in load_generator(db_write, OperatingPeriod):
+    for op in db_write.iter_only_objects(txn_write, OperatingPeriod):
         op: OperatingPeriod
         dt = op.from_operating_day_ref_or_from_date.to_datetime().date()
         if my_from is None or my_from > dt:
@@ -406,7 +369,7 @@ def gtfs_generate_deprecated_version(db_write: Database) -> Version:
             my_to = dt
             last_op = op
 
-    for dta in load_generator(db_write, DayTypeAssignment):
+    for dta in db_write.iter_only_objects(txn_write, DayTypeAssignment):
         xml_date = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
         if isinstance(xml_date, XmlDate):
             dt = xml_date.to_date()
@@ -422,18 +385,17 @@ def gtfs_generate_deprecated_version(db_write: Database) -> Version:
         version: Version = project(last_op, Version)
         version.start_date = XmlDateTime.from_datetime(datetime.combine(my_from, time.min))
         version.end_date = XmlDateTime.from_datetime(datetime.combine(my_to, time.min))
-        db_write.insert_one_object(version)
+        yield version
     else:
         warnings.warn("No calendars at all?")
 
 
-def gtfs_sj_processing(db_read: Database, db_write: Database):
+def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney | DayTypeAssignment | DayType | OperatingPeriod, None, None]:
     calendar_combinations = []
 
-    def query_sj(db_read: Database) -> Iterator[ServiceJourney]:
-        _load_generator = load_generator(db_read, ServiceJourney)
+    def query_sj(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
         sj: ServiceJourney
-        for sj in _load_generator:
+        for sj in db_read.iter_only_objects(txn, ServiceJourney):
             add_calls(db_read, sj)
             _tmp = calendars_to_daytype(db_read, sj)
             calendar_combinations.append(_tmp)
@@ -451,18 +413,18 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
             """
 
     log_all(logging.INFO, "Processing ServiceJourneys")
-    db_write.insert_objects_on_queue(ServiceJourney, query_sj(db_read))
+    yield from query_sj(db_read, txn)
 
-    def query_daytype(db_read, calendar_combinations):
-        dtas = getIndexByGroup(load_local(db_read, DayTypeAssignment, cursor=True, embedding=True), 'day_type_ref.ref')
+    def query_daytype(db_read: MdbxStorage, txn: TXN, calendar_combinations):
+        # TODO: This does not take embedded DayTypeAssignments
+        dtas = getIndexByGroup(db_read.iter_only_objects(txn, DayTypeAssignment), 'day_type_ref.ref')
 
         for option in calendar_combinations:
             if isinstance(option, ValidityConditionsRelStructure):
                 if len(option.choice) == 1:
                     if isinstance(option.choice[0], AvailabilityConditionRef):
-                        availability_condition = load_local(
-                            db_read, AvailabilityCondition, limit=1, filter_id=option.choice[0].ref, cursor=True, embedding=True
-                        )[0]
+                        # TODO: This does not take embedded AvailabilityConditions
+                        availability_condition = list(db_read.iter_only_objects(txn, AvailabilityCondition, limit=1))[0]
                     elif isinstance(option.choice[0], AvailabilityCondition):
                         availability_condition = option.choice[0]
                     else:
@@ -483,7 +445,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
             elif isinstance(option, DayTypeRefsRelStructure):
                 if len(option.day_type_ref) == 1:
-                    day_type = load_local(db_read, DayType, limit=1, filter_id=option.day_type_ref[0].ref, embedding=True)[0]
+                    day_type = db_read.load_object_by_reference(txn, option.day_type_ref[0])
                     day_type_assignments = dtas[day_type.id]
                     uic_operating_periods = []
                     operating_periods = []
@@ -495,20 +457,20 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                         if isinstance(ref, UicOperatingPeriodRef) or (
                             isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                         ):
-                            uic_operating_periods.append(load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
+                            uic_operating_periods.append(db_read.load_object_by_reference(txn, ref))
                         elif isinstance(ref, OperatingPeriodRef):
-                            r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
+                            r = db_read.load_object_by_reference(txn, ref)
                             if len(r) > 0:
                                 operating_periods.append(r[0])
                             else:
                                 # TODO: we must be able to query child classes directly.
-                                r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
+                                r = db_read.load_object_by_reference(txn, ref)
                                 if len(r) > 0:
                                     uic_operating_periods.append(r[0])
                                 else:
                                     log_all(logging.ERROR, f"{ref} cannot be found.")
                         elif isinstance(ref, OperatingDayRef):
-                            operating_days.append(load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
+                            operating_days.append(db_read.load_object_by_reference(txn, ref))
 
                     if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                         day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -530,7 +492,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                     aggregated_day_type_ref = getRef(aggregated_day_type)
 
                     for day_type_ref in option.day_type_ref:
-                        day_type = load_local(db_read, DayType, limit=1, filter_id=day_type_ref.ref, embedding=True)[0]
+                        day_type = db_read.load_object_by_reference(txn, day_type_ref)
                         day_type_assignments = copy.deepcopy(dtas[day_type.id])
                         uic_operating_periods = []
                         operating_periods = []
@@ -547,21 +509,21 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                                 isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                             ):
                                 uic_operating_periods.append(
-                                    load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0]
+                                    db_read.load_object_by_reference(txn, ref)
                                 )
                             elif isinstance(ref, OperatingPeriodRef):
-                                r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
+                                r = db_read.load_object_by_reference(txn, ref)
                                 if len(r) > 0:
                                     operating_periods.append(r[0])
                                 else:
                                     # TODO: we must be able to query child classes directly.
-                                    r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
+                                    r = db_read.load_object_by_reference(txn, ref)
                                     if len(r) > 0:
                                         uic_operating_periods.append(r[0])
                                     else:
                                         log_all(logging.ERROR, f"{ref} cannot be found.")
                             elif isinstance(ref, OperatingDayRef):
-                                operating_days.append(load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
+                                operating_days.append(db_read.load_object_by_reference(txn, ref))
 
                         if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                             day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -576,12 +538,10 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
     log_all(logging.INFO, "Processing Calendars")
     for day_type, day_type_assignments, operating_periods in query_daytype(db_read, calendar_combinations):
-        db_write.insert_one_object(day_type)
-        db_write.insert_objects_on_queue(DayTypeAssignment, day_type_assignments)
+        yield day_type
+        yield from day_type_assignments
         if operating_periods is not None and len(operating_periods) > 0:
-            db_write.insert_objects_on_queue(OperatingPeriod, operating_periods)
-
-    # db_write.block_until_done()
+            yield from operating_periods
 
 
 def gtfs_calls_generator(db_read: Database, db_write: Database, generator_defaults: dict):

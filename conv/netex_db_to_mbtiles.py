@@ -4,8 +4,19 @@ from typing import Generator, Tuple, Iterator
 import gzip
 
 import netex
-from netex import LocationStructure2, LineString, ScheduledStopPoint, Polygon, MultiSurface, RouteLink, PosList, Route, \
-    Line, ServiceJourney, LinkSequenceProjection
+from netex import (
+    LocationStructure2,
+    LineString,
+    ScheduledStopPoint,
+    Polygon,
+    MultiSurface,
+    RouteLink,
+    PosList,
+    Route,
+    Line,
+    ServiceJourney,
+    LinkSequenceProjection,
+)
 from netexio.database import Database, Tid
 from netexio.dbaccess import recursive_attributes, load_referencing
 from netexio.pickleserializer import MyPickleSerializer
@@ -22,7 +33,8 @@ from collections import defaultdict
 
 
 def chunk_list(lst, dimension):
-    return [lst[i:i + dimension] for i in range(0, len(lst), dimension)]
+    return [lst[i : i + dimension] for i in range(0, len(lst), dimension)]
+
 
 def to_feature(deserialized: Tid, clazz) -> Generator[dict, None, None]:
     for obj, path in recursive_attributes(deserialized, []):
@@ -33,7 +45,7 @@ def to_feature(deserialized: Tid, clazz) -> Generator[dict, None, None]:
                     "coordinates": obj.pos.value,
                 },
                 "properties": {"name": getattr(getattr(deserialized, 'name', None), 'value', None), "id": deserialized.id},
-                "class": clazz
+                "class": clazz,
             }
             yield feature
 
@@ -45,9 +57,8 @@ def to_feature(deserialized: Tid, clazz) -> Generator[dict, None, None]:
                         "type": "LineString",
                         "coordinates": chunk_list(pos_list.value, pos_list.srs_dimension),
                     },
-                    "properties": {"name": getattr(getattr(deserialized, 'name', None), 'value', None),
-                                   "id": deserialized.id},
-                    "class": clazz
+                    "properties": {"name": getattr(getattr(deserialized, 'name', None), 'value', None), "id": deserialized.id},
+                    "class": clazz,
                 }
                 yield feature
 
@@ -74,11 +85,13 @@ def to_feature(deserialized: Tid, clazz) -> Generator[dict, None, None]:
         # For ServiceLink (in the context of EPIP) we can assign which ServiceJourneyPatterns
         # use the ServiceLink, and also find the scope.
 
+
 # from rtree import index as rtree_index
 from collections import defaultdict
 from mapbox_vector_tile import encode
 
-def mercator_to_tile_coords_tms(x: float, y: float, zoom: int, extent: int = 4096) ->  Tuple[int, int, int, int, int]:
+
+def mercator_to_tile_coords_tms(x: float, y: float, zoom: int, extent: int = 4096) -> Tuple[int, int, int, int, int]:
     """
     Zet EPSG:3857-coördinaat om naar (tile_x, tile_y) in TMS en relatieve positie (rel_x, rel_y) binnen de tile.
 
@@ -99,7 +112,7 @@ def mercator_to_tile_coords_tms(x: float, y: float, zoom: int, extent: int = 409
     u = (x + half_size) / world_size
     v = (y + half_size) / world_size  # Let op: y-as omhoog voor TMS
 
-    scale = 2 ** zoom
+    scale = 2**zoom
     tile_x = int(u * scale)
     tile_y_xyz = int((1.0 - v) * scale)
     tile_y_tms = (scale - 1) - tile_y_xyz  # spiegelen t.o.v. XYZ
@@ -112,11 +125,7 @@ def mercator_to_tile_coords_tms(x: float, y: float, zoom: int, extent: int = 409
     return (tile_x, tile_y_tms, zoom, [rel_x, rel_y_tms])
 
 
-def linestring_to_tile_segments_clipped(
-        coordinates: list,
-        zoom: int,
-        extent: int = 4096
-) -> Iterator[tuple[int, int, int, dict[str, list[tuple[int, int]]]]]:
+def linestring_to_tile_segments_clipped(coordinates: list, zoom: int, extent: int = 4096) -> Iterator[tuple[int, int, int, dict[str, list[tuple[int, int]]]]]:
     """
     Split een LineString in segmenten per tegel, geclipt op tegelgrenzen en omgerekend naar lokale tile-coördinaten.
 
@@ -131,7 +140,7 @@ def linestring_to_tile_segments_clipped(
 
     line = LineString(coordinates)
     if zoom < 12:
-        meters_per_pixel = 156543.03 / (2 ** zoom)
+        meters_per_pixel = 156543.03 / (2**zoom)
         simplified = line.simplify(meters_per_pixel, preserve_topology=True)
         line = simplified
 
@@ -141,7 +150,7 @@ def linestring_to_tile_segments_clipped(
     # Wereldbreedte in meters
     half_size = 20037508.342789244
     world_size = 2 * half_size
-    scale = 2 ** zoom
+    scale = 2**zoom
     tile_size = world_size / scale  # in meters
 
     minx, miny, maxx, maxy = line.bounds
@@ -187,12 +196,7 @@ def linestring_to_tile_segments_clipped(
                 # print(rel_coords)
                 # Filter segmenten met minder dan 2 unieke punten
                 if len(rel_coords) >= 2 and len(set(rel_coords)) >= 2:
-                    yield (
-                        tile_x,
-                        tile_y,
-                        zoom,
-                        rel_coords
-                    )
+                    yield (tile_x, tile_y, zoom, rel_coords)
 
 
 def features_to_mvt_tile(features: list[dict]) -> bytes:
@@ -202,10 +206,8 @@ def features_to_mvt_tile(features: list[dict]) -> bytes:
         layer_name = feature.get("class")
         layers[layer_name].append(feature)
 
-    return encode([
-        {"name": name, "features": feats}
-        for name, feats in layers.items()
-    ])
+    return encode([{"name": name, "features": feats} for name, feats in layers.items()])
+
 
 def main(database: str, output_filename: str) -> None:
     # rtree = rtree_index.Index()
@@ -262,7 +264,10 @@ def main(database: str, output_filename: str) -> None:
 
                 for key, value in cursor:
                     obj = db_read.serializer.unmarshall(value, clazz)
-                    if class_name == 'ServiceJourney' and (obj.link_sequence_projection_ref_or_link_sequence_projection is None or not isinstance(obj.link_sequence_projection_ref_or_link_sequence_projection, LinkSequenceProjection)):
+                    if class_name == 'ServiceJourney' and (
+                        obj.link_sequence_projection_ref_or_link_sequence_projection is None
+                        or not isinstance(obj.link_sequence_projection_ref_or_link_sequence_projection, LinkSequenceProjection)
+                    ):
                         continue
 
                     for feature in to_feature(reprojection(obj, "EPSG:3857"), class_name):
@@ -301,34 +306,29 @@ def main(database: str, output_filename: str) -> None:
             'bounds': f"{minxy[0]:.3f},{minxy[1]:.3f},{maxxy[0]:.3f},{maxxy[1]:.3f}",
             'center': f"{centerx:.3f},{centery:.3f},13",
             "description": "Scheduled stops exported as vector tiles",
-            "tilestats": json.dumps({
-                "layerCount": 1,
-                "layers": [
-                    {
-                        "count": 2,
-                        "geometry": "LineString",
-                        "layer": "ServiceJourney"
-                    }
-                ]
-            }),
-            "json": json.dumps({
-                "vector_layers": [{
-                    "id": "ServiceJourney",
-                    "description": "Layer with route links",
-                    "minzoom": 8,
-                    "maxzoom": 18,
-                    "fields": {"id": "String", "name": "String"}
-                }]
-            })
+            "tilestats": json.dumps({"layerCount": 1, "layers": [{"count": 2, "geometry": "LineString", "layer": "ServiceJourney"}]}),
+            "json": json.dumps(
+                {
+                    "vector_layers": [
+                        {
+                            "id": "ServiceJourney",
+                            "description": "Layer with route links",
+                            "minzoom": 8,
+                            "maxzoom": 18,
+                            "fields": {"id": "String", "name": "String"},
+                        }
+                    ]
+                }
+            ),
         }
 
         # print(out.meta)
+
 
 # def routelink_to_link(database: str):
 #    with Database(database, MyPickleSerializer(compression=True), readonly=True) as db_read:
 #        for reference_id, reference_version, reference_class, path in load_referencing(db_read, Route):
 #            if reference_class == Line:
-
 
 
 if __name__ == '__main__':
