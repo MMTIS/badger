@@ -1,7 +1,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import TypeVar, Any
+from typing import TypeVar, Any, Iterator, Generator
 
 from domain.netex.model import (
     Route,
@@ -14,7 +14,9 @@ from domain.netex.model import (
     DayType,
     UicOperatingPeriod,
 )
-from storage.mdbx.core.implementation import MdbxStorage
+from domain.netex.services.recursive_attributes import recursive_attributes
+from old.netexio.dbaccess import recursive_resolve
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX
 
 # from netexio.attributes import update_attr
 # from netexio.database import Database
@@ -28,25 +30,27 @@ from utils.aux_logging import log_all, prepare_logger
 Tid = TypeVar("Tid", bound=EntityStructure)
 
 
-def main(source_database_file: Path, target_database_file: Path, object_type: str, object_filter: str) -> None:
+def filter_db_to_db(source_database_file: Path, target_database_file: Path, clazz: type[EntityStructure], object_filter: str) -> None:
     with MdbxStorage(source_database_file) as db_read:
-        clazz = db_read.idx_class.get(db_read.class_name_idx.get(object_type, None), None)
-        if clazz is None:
-            log_all(logging.ERROR, "{object_type} does not exist.")
-            return
-
         filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, DayTypeAssignment, UicOperatingPeriod}
         filter_set.add(clazz)
 
         with db_read.env.ro_transaction() as txn:
-
-            my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+            my_id = db_read.serializer.encode_key(object_filter, None, clazz, include_clazz=True)
 
             # First: check if the id already exists, then we must overwrite.
+            db_id_idx = txn.open_map(name=DB_ID_IDX)
             full_key = db_id_idx.get(txn, my_id)
 
-            db_read.iter_objects(txn, clazz, db_read.serializer.encode_key())
-        objs: list[Any] = load_local(db_read, db_read.get_class_by_name(object_type), filter_id=object_filter)
+            obj = db_read.load_object_by_full_key(txn, full_key)
+
+            with MdbxStorage(target_database_file, readonly=False) as db_write:
+                with db_write.env.rw_transaction() as txn_write:
+                    def only_values(test: Iterator[Tid]) -> Generator[Tid, None, None]:
+                        for x,y in test:
+                            yield y
+
+                    db_write.insert_any_object_on_queue(txn_write, only_values(db_read.load_references_by_object(txn, obj)))
 
         with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
             # TODO: This is memory intensive, ideally we only keep what we have resolved and yield the objects to write them into the database
@@ -85,6 +89,24 @@ def main(source_database_file: Path, target_database_file: Path, object_type: st
             db_write.insert_one_object(obj)
 
 
+def main(source: str, target: str, object_type: str, object_filter: str) -> None:
+    source_path = Path(source)
+    if not source_path.exists():
+        log_all(logging.ERROR, f"{source_path} does not exist.")
+
+    else:
+        clazz: type[EntityStructure] | None
+        with MdbxStorage(source_path) as db_read:
+            clazz = db_read.idx_class.get(
+                db_read.class_name_idx.get(object_type, None), None
+            )
+            if clazz is None:
+                log_all(logging.ERROR, "{object_type} does not exist.")
+                return
+
+        filter_db_to_db(source_path, Path(target), clazz, object_filter)
+
+
 if __name__ == "__main__":
     import argparse
     import traceback
@@ -105,13 +127,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
-    source_path = Path(args.source)
-    if not source_path.exists():
-        log_all(logging.ERROR, "{source_path} does not exist.")
-
-    else:
-        try:
-            main(source_path, Path(args.target), args.object_type, args.object_filter)
-        except Exception as e:
-            log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
-            raise e
+    try:
+        main(args.source, args.target, args.object_type, args.object_filter)
+    except Exception as e:
+        log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+        raise e
