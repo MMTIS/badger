@@ -23,8 +23,9 @@ from domain.netex.model import (
     StopPointInJourneyPattern,
     PosList,
     ServiceLinkRefStructure,
-    NameOfClassRoutePointRefStructure, NameOfClassPointRefStructure,
+    NameOfClassPointRefStructureType,
 )
+
 from domain.netex.services.ids import getId
 from domain.netex.services.refs import getRef
 from storage.mdbx.core.implementation import MdbxStorage
@@ -38,7 +39,7 @@ class RoutesProfile:
             for projection in ssp.projections.projection_ref_or_projection:
                 if isinstance(projection, PointProjection):
                     if projection.project_to_point_ref:
-                        if projection.project_to_point_ref.name_of_ref_class == NameOfClassPointRefStructure.ROUTE_POINT:
+                        if projection.project_to_point_ref.name_of_ref_class == NameOfClassPointRefStructureType.ROUTE_POINT:
                             yield project(projection.project_to_point_ref, RoutePointRefStructure)
 
     @staticmethod

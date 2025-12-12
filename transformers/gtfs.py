@@ -10,7 +10,7 @@ from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
 from domain.netex.indexes.byid import getIndex
-from domain.netex.model import NameOfClassOperatingPeriodRefStructure, Operator, Line, ServiceJourney, \
+from domain.netex.model import Operator, Line, ServiceJourney, \
     DayTypeRefsRelStructure, ValidityConditionsRelStructure, AvailabilityCondition, AvailabilityConditionRef, Branding, \
     Authority, ResponsibilitySet, StakeholderRoleTypeEnumeration, ResponsibilitySetRef, Version, OperatingPeriod, \
     DayTypeAssignment, OperatingDay, OperatingDayRef, DayOfWeekEnumeration, DayType, UicOperatingPeriod, DayTypeRef, \

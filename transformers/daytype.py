@@ -1,7 +1,7 @@
 from typing import cast
 
 import utils.netex_monkeypatching  # noqa: F401
-from netex import (
+from domain.netex.model import (
     AvailabilityCondition,
     UicOperatingPeriod,
     OperatingDay,
@@ -12,9 +12,9 @@ from netex import (
     DayOfWeekEnumeration,
     UicOperatingPeriodRef,
 )
-from netexio.database import Database
-from netexio.dbaccess import load_local
-from utils.refs import getRef
+# from netexio.database import Database
+# from netexio.dbaccess import load_local
+# from utils.refs import getRef
 from utils.utils import project
 
 

@@ -25,15 +25,15 @@ def infer_operator_from_responsibilityset_and_apply(db_read: Database, db_write:
     def process_journey(object: ServiceJourney | TemplateServiceJourney):
         changed = False
         if (
-            object.operator_ref_or_operator_view is None
+            object.operator_ref_or_operator_view_or_passenger_carrying_requirement_ref_or_passenger_carrying_requirements_view is None
             and object.responsibility_set_ref_attribute is not None
             and object.responsibility_set_ref_attribute in mapping
         ):
-            object.operator_ref_or_operator_view = mapping[object.responsibility_set_ref_attribute]
+            object.operator_ref_or_operator_view_or_passenger_carrying_requirement_ref_or_passenger_carrying_requirements_view = mapping[object.responsibility_set_ref_attribute]
             changed = True
 
         if (
-            object.operator_ref_or_operator_view is not None
+            object.operator_ref_or_operator_view_or_passenger_carrying_requirement_ref_or_passenger_carrying_requirements_view is not None
             and object.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None
             and hasattr(object.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, 'ref')
         ):

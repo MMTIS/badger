@@ -5,11 +5,11 @@ from typing import List, Dict
 from xsdata.models.datatype import XmlDateTime, XmlDate
 
 import utils
-from netex import (
+from domain.netex.indexes.byid import getIndex
+from domain.netex.model import (
     Codespace,
     DataSource,
     Version,
-    VehicleJourney,
     TimetableFrame,
     ServiceJourney,
     ServiceJourneyPattern,
@@ -47,16 +47,13 @@ from netex import (
     Network,
     GroupsOfLinesInFrameRelStructure,
     GroupOfLines,
-    OperatingPeriod,
-    OperatingPeriodVersionStructure,
     UicOperatingPeriod,
-    UicOperatingPeriodRef,
     OperatingPeriodRef,
     RouteLinksInFrameRelStructure,
     RouteView,
     ParticipantRef,
 )
-from utils.refs import getRef, getIndex, getId
+from domain.netex.services.ids import getId
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
 import lxml
 

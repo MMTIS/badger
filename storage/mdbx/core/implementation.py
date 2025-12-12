@@ -310,7 +310,7 @@ class MdbxStorage:
                 yield self.idx_class[class_idx], reference_local_key
             break
 
-    def _load_references_inwards(self, txn: TXN, full_key: bytes) -> Generator[tuple[type, bytes], None, None]:
+    def _load_references_inwards(self, txn: TXN, full_key: bytes) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         db = txn.open_map(DB_REFERENCE_OUTWARD)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows():
@@ -319,7 +319,7 @@ class MdbxStorage:
                     class_idx, referencing_local_key = ByteSerializer.full_key_to_idx(referencing_key)
                     yield self.idx_class[class_idx], referencing_local_key
 
-    def load_references_by_clazz_key(self, txn: TXN, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
+    def load_references_by_clazz_key(self, txn: TXN, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
         if inwards:
@@ -327,7 +327,7 @@ class MdbxStorage:
         else:
             yield from self._load_references(txn, full_key)
 
-    def load_references_by_object(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[tuple[type, bytes], None, None]:
+    def load_references_by_object(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         if hasattr(obj, 'idx'):
             full_key = obj.idx
             if inwards:
@@ -343,15 +343,30 @@ class MdbxStorage:
                 else:
                     yield from self._load_references(txn, full_key)
 
-    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> EntityStructure:
+    def load_references_by_object_values(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[EntityStructure, None, None]:
+        for clazz, key in self.load_references_by_object(txn, obj, inwards):
+            yield self.load_object(txn, clazz, key)
+
+    def load_object_by_id_version(self, txn: TXN, id: str, clazz: type[EntityStructure], version: Optional[str] = None) -> Optional[EntityStructure]:
+        my_id = self.serializer.encode_key(
+            id, version, clazz, include_clazz=True
+        )
+        db_id_idx = txn.open_map(name=DB_ID_IDX)
+        full_key = db_id_idx.get(txn, my_id)
+        return self.load_object_by_full_key(txn, full_key)
+
+    def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Optional[EntityStructure]:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
         with txn.open_map(name=this_clazz_idx) as db:
             value = db.get(txn, key)
-            obj: EntityStructure = self.serializer.unmarshall(value, clazz)
-            return obj
+            if value:
+                obj: EntityStructure = self.serializer.unmarshall(value, clazz)
+                return obj
 
-    def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> EntityStructure:
+        return None
+
+    def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> Tid:
         this_class_idx = self.class_idx[clazz]
         with txn.open_map(name=this_class_idx) as db:
             value = db.get(txn, key)
