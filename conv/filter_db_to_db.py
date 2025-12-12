@@ -36,21 +36,19 @@ def filter_db_to_db(source_database_file: Path, target_database_file: Path, claz
         filter_set.add(clazz)
 
         with db_read.env.ro_transaction() as txn:
-            my_id = db_read.serializer.encode_key(object_filter, None, clazz, include_clazz=True)
-
-            # First: check if the id already exists, then we must overwrite.
-            db_id_idx = txn.open_map(name=DB_ID_IDX)
-            full_key = db_id_idx.get(txn, my_id)
-
-            obj = db_read.load_object_by_full_key(txn, full_key)
+            obj = db_read.load_object_by_id_version(txn, object_filter, clazz)
+            if not obj:
+                log_all(logging.ERROR, f"Object not found: {object_filter}")
+                return
 
             with MdbxStorage(target_database_file, readonly=False) as db_write:
                 with db_write.env.rw_transaction() as txn_write:
-                    def only_values(test: Iterator[Tid]) -> Generator[Tid, None, None]:
-                        for x,y in test:
-                            yield y
+                    db_write.insert_any_object_on_queue(
+                        txn_write,
+                        db_read.load_references_by_object_values(txn, obj, False),
+                    )
 
-                    db_write.insert_any_object_on_queue(txn_write, only_values(db_read.load_references_by_object(txn, obj)))
+
 
         with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
             # TODO: This is memory intensive, ideally we only keep what we have resolved and yield the objects to write them into the database
