@@ -14,7 +14,7 @@
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.mdbx %%dir%%//epip_netex_blablacar.zip"},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/blablacar-assertions.txt %%dir%%/epip_netex_blablacar.zip"},
         {"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_blablacar.zip"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_blablacar.zip domain/schema/netex/xsd/NeTEx_publication.xsd"}
+        {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_blablacar.zip schema/netex/xsd/NeTEx_publication.xsd"}
         ]
   },
   {
@@ -30,7 +30,7 @@
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.mdbx %%dir%%/05-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.mdbx %%dir%%/epip_netex_flixbus.zip"},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/flixbus-assertions.txt %%dir%%/epip_netex_flixbus.zip"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_flixbus.zip domain/schema/netex/xsd/NeTEx_publication.xsd"}
+        {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_flixbus.zip schema/netex/xsd/NeTEx_publication.xsd"}
         ]
   },
 
@@ -48,7 +48,7 @@
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/gtfs_fernbusse.zip"},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/epip_netex_fernbusse.xml.zip"},
         {"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_fernbusse.xml.zip"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip domain/schema/netex/xsd/NeTEx_publication.xsd"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip schema/netex/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%"},
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%/13-%%block%%-map.html 1"},
         {"script": "#tools.ftp_upload", "args": "%%dir%%/epip_netex_fernbusse.xml.zip sbb_ftp"}

@@ -10,7 +10,7 @@
         {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/04-netex-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.mdbx %%dir%%/05-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.mdbx %%dir%%/epip_output.xml.gz"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/epip_output.xml.gz domain/schema/netex/xsd/NeTEx_publication.xsd"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/epip_output.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
         ]
     },
@@ -190,7 +190,7 @@
         {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/schema/netex/xsd/NeTEx_publication.xsd"},
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz schema/netex/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/%%block%%-netex.xml.gz]  %%dir%%/08.mdbx"},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.mdbx %%dir%%/09.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.mdbx %%dir%%/%%block%%-gtfs.zip"},
