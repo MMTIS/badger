@@ -11,6 +11,9 @@ from domain.netex.model import (
     EntityStructure,
     NoticeAssignment,
     PassengerStopAssignment,
+    ServiceJourneyPattern,
+    ServiceJourney,
+    DayTypeAssignment,
 )
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
@@ -140,7 +143,9 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
-    def fetch_all_references_by_class(self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False) -> Generator[type[EntityStructure], None, None]:
+    def fetch_all_references_by_class(
+        self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False
+    ) -> Generator[type[EntityStructure], None, None]:
         # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in refence outward
         # Referenced objects may by itself introduce new references, hence it should be checked if the set contains (already) those
         # When the scan is complete, all referenced objects should be made available via the generator.
@@ -164,8 +169,8 @@ class MdbxStorage:
                     if reference_key not in yielded_set:
                         yielded_set.add(reference_key)
 
-                    # Why is this separate: we don't want to expose objects that we already export,
-                    # but we do want to search if there are any references used.
+                        # Why is this separate: we don't want to expose objects that we already export,
+                        # but we do want to search if there are any references used.
                         partial.add(reference_key)
                     # print(self.idx_class[referencing_class_idx], "->", self.idx_class[reference_class_idx])
                 else:
@@ -351,14 +356,18 @@ class MdbxStorage:
     def load_references_by_clazz_key(self, txn: TXN, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-        for clazz, key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
-            yield this_class_idx, key
+        for full_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
+            this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
+            yield self.idx_class[this_class_idx], key
 
-    def load_references_by_clazz_keys(self, txn: TXN, clazz: type, key: set[bytes], inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
+    def load_references_by_clazz_keys(
+        self, txn: TXN, clazz: type, key: set[bytes], inwards: bool
+    ) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-        for clazz, key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
-            yield this_class_idx, key
+        for full_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
+            this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
+            yield self.idx_class[this_class_idx], key
 
     def load_references_by_object(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         if hasattr(obj, 'idx'):
@@ -384,38 +393,43 @@ class MdbxStorage:
         self,
         txn: TXN,
         full_key: bytes,
+        inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment},
     ) -> Generator[EntityStructure, None, None]:
 
         stack = [full_key]
         visited: set[bytes] = set()
 
-        while stack:
-            identifier = stack.pop()
-
-            if identifier not in visited:
-                visited.add(identifier)
-
-                full_key = identifier
-                obj = self.load_object_by_full_key(txn, full_key)
-                if obj:
-                    yield obj
-
-                    for _referenced_full_key in self.load_references_by_clazz_full_key(txn, full_key, False):
-                        stack.append(_referenced_full_key)
-
         # Ideally we would only check objects that would make sense to check
+        clazz_idxs = [self.class_idx[clazz] for clazz in inward_classes]
 
-        clazz_idxs = [self.class_idx[clazz] for clazz in [NoticeAssignment, PassengerStopAssignment]]
+        while stack:
+            to_visit_inwards: set[bytes] = set([])
+            while stack:
+                identifier = stack.pop()
 
-        for _referenced_full_key in self._load_references_inwards_by_fullkeys(txn, visited):
-            this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
-            if this_clazz_idx in clazz_idxs:
+                if identifier not in visited:
+                    visited.add(identifier)
 
+                    full_key = identifier
+                    obj = self.load_object_by_full_key(txn, full_key)
+                    if obj:
+                        yield obj
 
-    def load_object_by_id_version(self, txn: TXN, id: str, clazz: type[EntityStructure], version: Optional[str] = None) -> tuple[bytes, Optional[EntityStructure]]:
-        my_id = self.serializer.encode_key(
-            id, version, clazz, include_clazz=True
-        )
+                        this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
+                        if this_clazz_idx in clazz_idxs:
+                            to_visit_inwards.add(full_key)
+
+                        for _referenced_full_key in self.load_references_by_clazz_full_key(txn, full_key, False):
+                            stack.append(_referenced_full_key)
+
+            for _referenced_full_key in self._load_references_inwards_by_fullkeys(txn, to_visit_inwards):
+                if _referenced_full_key not in visited:
+                    stack.append(_referenced_full_key)
+
+    def load_object_by_id_version(
+        self, txn: TXN, id: str, clazz: type[EntityStructure], version: Optional[str] = None
+    ) -> Optional[tuple[bytes, Optional[EntityStructure]]]:
+        my_id = self.serializer.encode_key(id, version, clazz, include_clazz=True)
 
         # TODO: Abstract this because
         if version is not None:

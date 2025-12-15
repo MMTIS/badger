@@ -13,16 +13,17 @@ from domain.netex.model import (
     DayTypeAssignment,
     DayType,
     UicOperatingPeriod,
+    NoticeAssignment,
 )
-from domain.netex.services.recursive_attributes import recursive_attributes
-from old.netexio.dbaccess import recursive_resolve
+# from domain.netex.services.recursive_attributes import recursive_attributes
+# from old.netexio.dbaccess import recursive_resolve
 from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX
 
 # from netexio.attributes import update_attr
 # from netexio.database import Database
 # from netexio.dbaccess import recursive_resolve, load_local, load_referencing_inwards
 # from netexio.pickleserializer import MyPickleSerializer
-from transformers.references import split_path
+# from transformers.references import split_path
 
 # from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
@@ -30,26 +31,26 @@ from utils.aux_logging import log_all, prepare_logger
 Tid = TypeVar("Tid", bound=EntityStructure)
 
 
-def filter_db_to_db(source_database_file: Path, target_database_file: Path, clazz: type[EntityStructure], object_filter: str) -> None:
+def filter_db_to_db(source_database_file: Path, target_database_file: Path, clazz: type[EntityStructure], object_filter: str, inward_classes: set[type[EntityStructure]]) -> None:
     with MdbxStorage(source_database_file) as db_read:
-        filter_set = {Route, ServiceJourneyPattern, Line, ScheduledStopPoint, PassengerStopAssignment, DayType, DayTypeAssignment, UicOperatingPeriod}
-        filter_set.add(clazz)
-
         with db_read.env.ro_transaction() as txn:
-            obj = db_read.load_object_by_id_version(txn, object_filter, clazz)
-            if not obj:
+            pair = db_read.load_object_by_id_version(txn, object_filter, clazz)
+            if not pair:
                 log_all(logging.ERROR, f"Object not found: {object_filter}")
                 return
+
+            full_key, obj = pair
 
             with MdbxStorage(target_database_file, readonly=False) as db_write:
                 with db_write.env.rw_transaction() as txn_write:
                     db_write.insert_any_object_on_queue(
                         txn_write,
-                        db_read.load_references_by_object_values(txn, obj, False),
+                        db_read.load_references_by_object_values_dfs(txn, full_key, inward_classes),
                     )
+                    txn_write.commit()
 
 
-
+    """
         with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
             # TODO: This is memory intensive, ideally we only keep what we have resolved and yield the objects to write them into the database
             resolved: list[Any] = []
@@ -85,9 +86,9 @@ def filter_db_to_db(source_database_file: Path, target_database_file: Path, claz
                 update_attr(obj, split, None)
 
             db_write.insert_one_object(obj)
+    """
 
-
-def main(source: str, target: str, object_type: str, object_filter: str) -> None:
+def main(source: str, target: str, object_type: str, object_filter: str, inwards_object_types: list[str]) -> None:
     source_path = Path(source)
     if not source_path.exists():
         log_all(logging.ERROR, f"{source_path} does not exist.")
@@ -102,7 +103,15 @@ def main(source: str, target: str, object_type: str, object_filter: str) -> None
                 log_all(logging.ERROR, "{object_type} does not exist.")
                 return
 
-        filter_db_to_db(source_path, Path(target), clazz, object_filter)
+            inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment}
+            for inwards_object_type in inwards_object_types:
+                idx = db_read.class_name_idx.get(inwards_object_type, None)
+                if not idx:
+                    log_all(logging.WARNING, f"{inwards_object_type} is not a (known) NeTEx class")
+                else:
+                    inward_classes.add(db_read.idx_class[idx])
+
+        filter_db_to_db(source_path, Path(target), clazz, object_filter, inward_classes)
 
 
 if __name__ == "__main__":
@@ -121,12 +130,19 @@ if __name__ == "__main__":
         help="MDBX file to overwrite and store contents of the transformation.",
     )
 
+    parser.add_argument(
+    "inwards_object_types",
+        nargs="*",
+        type=str,
+        help="Optional list of additional object types to be inwards selected"
+    )
+
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
     try:
-        main(args.source, args.target, args.object_type, args.object_filter)
+        main(args.source, args.target, args.object_type, args.object_filter, args.inwards_object_types)
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e
