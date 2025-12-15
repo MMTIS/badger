@@ -1,4 +1,5 @@
 import logging
+import ssl
 import os
 import time
 import json
@@ -205,6 +206,8 @@ def download(folder: str, url: str, regex: str = '', forced: bool = False) -> st
             filename = "source.xml.gz"
         if filename == "":
             filename = "source.zip"
+        if not(filename.endswith(".zip") or filename.endswith(".xml") or filename.endswith(".gz")):
+            filename = "source.zip"
         if not forced:
             # Download only when not exists
             path = os.path.join(folder, filename)
@@ -214,6 +217,7 @@ def download(folder: str, url: str, regex: str = '', forced: bool = False) -> st
         # Download the file
         log_all(logging.INFO, f"Download from: {url}")
         try:
+            ssl._create_default_https_context = ssl._create_unverified_context
             opener = urllib.request.build_opener()
             opener.addheaders = [("User-Agent", "MyApp/1.0")]
             urllib.request.install_opener(opener)
