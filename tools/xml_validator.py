@@ -7,7 +7,8 @@ from utils.aux_logging import (
 )
 import traceback
 from lxml import etree
-from netexio.dbaccess import open_netex_file
+from storage.lxml.core.implementation import XmlStorage
+#from netexio.dbaccess import open_netex_file
 from typing import Any, IO
 from configuration import work_dir
 
@@ -60,7 +61,7 @@ def main(folder: str, xsd_schema: str) -> None:
             if filename.endswith(".xml") or filename.endswith(
                 ".xml.gz"
             ):  # TODO zips are not processed (because might be GTFS)
-                for sub_file, real_filename in open_netex_file(file_full_path):
+                for sub_file, real_filename in XmlStorage.open_netex_file(file_full_path):
                     validate_xml(sub_file, xmlschema)
 
             if filename.endswith(".xsd"):
