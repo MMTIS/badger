@@ -356,18 +356,18 @@ class MdbxStorage:
     def load_references_by_clazz_key(self, txn: TXN, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-        for full_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
-            this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
-            yield self.idx_class[this_class_idx], key
+        for full_referenced_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
+            referenced_clazz_idx, referenced_key = self.serializer.full_key_to_idx(full_referenced_key)
+            yield self.idx_class[referenced_clazz_idx], referenced_key
 
     def load_references_by_clazz_keys(
         self, txn: TXN, clazz: type, key: set[bytes], inwards: bool
     ) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_class_idx = self.class_idx[clazz]
         full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
-        for full_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
-            this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
-            yield self.idx_class[this_class_idx], key
+        for full_referenced_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
+            referenced_clazz_idx, referenced_key = self.serializer.full_key_to_idx(full_key)
+            yield self.idx_class[referenced_clazz_idx], referenced_key
 
     def load_references_by_object(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         if hasattr(obj, 'idx'):
