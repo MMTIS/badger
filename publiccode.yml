@@ -37,11 +37,11 @@ description:
 
       To handle large timetable datasets that exceed available memory, the
       application uses streaming (SAX-based) XML parsing. Each deserialised
-      class instance is stored as an object in a MDBX database
-      organized by object type. Bidirectional references are
-      stored for efficient navigation between related objects.
+      class instance is stored as an object in a MDBX database organized by
+      object type. Bidirectional references are stored for efficient
+      navigation between related objects.
 
-      A graphical user interface is provided to explore the contents of the LMDB
+      A graphical user interface is provided to explore the contents of the MDBX
       database, offering a quick and intuitive way to inspect the data structure
       and relationships. This tool is particularly useful for public transport
       data providers, integrators, and researchers aiming to unify legacy
