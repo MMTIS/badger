@@ -206,7 +206,7 @@ def download(folder: str, url: str, regex: str = '', forced: bool = False) -> st
             filename = "source.xml.gz"
         if filename == "":
             filename = "source.zip"
-        if not(filename.endswith(".zip") or filename.endswith(".xml") or filename.endswith(".gz")):
+        if not (filename.endswith(".zip") or filename.endswith(".xml") or filename.endswith(".gz")):
             filename = "source.zip"
         if not forced:
             # Download only when not exists
