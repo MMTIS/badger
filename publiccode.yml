@@ -37,8 +37,8 @@ description:
 
       To handle large timetable datasets that exceed available memory, the
       application uses streaming (SAX-based) XML parsing. Each deserialised
-      class instance is stored as an object in a Lightning Memory-Mapped
-      Database (LMDB), organized by object type. Bidirectional references are
+      class instance is stored as an object in a MDBX database
+      organized by object type. Bidirectional references are
       stored for efficient navigation between related objects.
 
       A graphical user interface is provided to explore the contents of the LMDB
