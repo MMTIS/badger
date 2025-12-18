@@ -1,11 +1,14 @@
 netex/**
+domain/netex/model/**
 **/.idea
 **/__pycache__/
 **/.venv
 **/*.lmdb/
+**/*.duckdb/
+**/*.mdbx/
 *.pyc
 *.txt
-*.duckdb
+
 *.jar
 uv.lock
 local_configuration.py
