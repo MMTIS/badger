@@ -122,7 +122,7 @@
     "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
 ],
 "scripts": [
- {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+ {"script": "process_url_list", "args": "gtfs2epip"}
 ]
 },
 {
@@ -133,7 +133,7 @@
     "https://download.gtfs.de/germany/fv_free/latest.zip"
 ],
 "scripts": [
- {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+ {"script": "process_url_list", "args": "gtfs2epip"}
 ]
 },
 {
@@ -144,7 +144,7 @@
     "https://www.nvbw.de/fileadmin/user_upload/service/open_data/fahrplandaten_ohne_liniennetz/bwgesamt.zip"
 ],
 "scripts": [
- {"step":"1", "script": "process_url_list", "args": "gtfs2epip"}
+ {"script": "process_url_list", "args": "gtfs2epip"}
 ]
 },
 
@@ -244,11 +244,9 @@
     "https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/181861/checkedResource"
     ],
     "scripts": [
-        {"step":"1", "script": "process_url_list", "args": "netex2epipgtfsuicfix"}
+        {"script": "process_url_list", "args": "netex2epipgtfsuicfix"}
         ]
 },
-
-
 
        {
     "block": "sta_bolzano",
@@ -329,7 +327,6 @@
        {
     "block": "lombardiatrainitalia2",
         "worked":"testing",
-
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/5486",
     "download_url":"https://github.com/user-attachments/files/21719154/IT-ITC4-TRENORD_336_L1.xml.gz",
     "scripts": [
