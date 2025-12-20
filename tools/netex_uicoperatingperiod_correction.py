@@ -1,7 +1,9 @@
 from io import BytesIO
+from pathlib import Path
 
 from utils.aux_logging import *
-from netexio.dbaccess import open_netex_file
+from storage.lxml.core.implementation import XmlStorage
+
 from isal import igzip_threaded
 import os
 import xml.etree.ElementTree as ET
@@ -26,7 +28,10 @@ def modify_xml_content(root, file_path, outfile=None):
 
 def modify_xml_file(file_name, output_filename):
     print(file_name)
-    for f, real_filename in open_netex_file(file_name):
+
+    xml_storage = XmlStorage(Path(file_name))
+
+    for f, real_filename in xml_storage.open_netex_file():
         et = ET.parse(f)
         modify_xml_content(et.getroot(), file_name)
 
