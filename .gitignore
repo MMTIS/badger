@@ -12,3 +12,5 @@ domain/netex/model/**
 *.jar
 uv.lock
 local_configuration.py
+tools/results.xlsx
+tools/~$results.xlsx
