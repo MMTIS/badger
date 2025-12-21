@@ -70,6 +70,12 @@ def log_all(log_level: int, message: str) -> None:
     mylogger.log(log_level, message)
     log_flush()
 
+# log exception
+def log_exception(e:Exception) -> None:
+    mylogger = logging.getLogger("script_runner")
+    mylogger.exception(e)
+    log_flush()
+
 
 # Only prints the message once and continues
 def log_once(log_level: int, key: str, message: str) -> None:
