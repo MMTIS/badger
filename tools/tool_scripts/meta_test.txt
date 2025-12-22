@@ -1,0 +1,34 @@
+#nl epip
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log nl1epip
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log nl4epip
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log nl3
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log nl2
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+
+# basic gtfs
+#python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
+#python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
+#python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log swissmikro
+#python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
+#python -m tools.script_runner ./tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
+#python -m tools.script_runner ./tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
+
+# fr basic
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log fr_aubeepip
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log fr_aubegtfs
+
+
+# it basic
+python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log lombardiatrainitaliaepip
+
+# others
+#python -m tools.script_runner ./tool_scripts/script_regression.txt mylog.log swissmikro
+#python -m tools.script_runner ./tool_scripts/script_regression.txt mylog.log swissinterchange
+
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_sncf_ter
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lux
+

@@ -13,6 +13,7 @@ from utils.aux_logging import (
     log_flush,
     log_write_counts,
     log_print,
+    log_exception,
 )
 from configuration import defaults, processing_data, input_dir, list_scripts
 import urllib.request
@@ -282,6 +283,7 @@ def main(
         # log_once(logging.INFO, "Start", f'Processing block: {block["block"]}')
         step = 0
         script_input_file_path = "NOT SET YET"
+        result = -1
         for script in scripts:
             step = step + 1
             if this_step == 99999:
@@ -397,7 +399,12 @@ def main(
                     f"Command 'remove_file' executed for file: {script_input_file_path}\n",
                 )
                 continue
-            result = load_and_run(script_name, script_args)
+            try:
+                result = load_and_run(script_name, script_args)
+            except Exception as e:
+                print(e)
+                log_exception(e)
+                result = 1
             end_time = time.time()
             execution_time = int(10 * (end_time - start_time)) / 10
 
@@ -430,6 +437,8 @@ def main(
     if not blockexisted:
         log_all(logging.ERROR, f'Block "{todo_block}" not in script file.')
         log_flush()
+    if result == 1:
+        exit(1)
 
 
 if __name__ == "__main__":
