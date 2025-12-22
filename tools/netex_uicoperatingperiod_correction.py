@@ -9,6 +9,7 @@ import os
 import xml.etree.ElementTree as ET
 import zipfile
 
+
 def modify_xml_content(root, file_path, outfile=None):
     # Define the namespace
     namespaces = {'': 'http://www.netex.org.uk/netex'}  # Empty prefix for default namespace
@@ -25,6 +26,7 @@ def modify_xml_content(root, file_path, outfile=None):
 
             if match is not None:
                 ref.attrib['nameOfRefClass'] = 'UicOperatingPeriod'
+
 
 def modify_xml_file(file_path, output_filename):
     xml_storage = XmlStorage(file_path)
@@ -53,19 +55,21 @@ def modify_xml_file(file_path, output_filename):
             with open(output_filename, "wb") as out:
                 et.write(out)
 
-def netex_uicoperatingperiod_correction(infile: Path,outfile: Path):
+
+def netex_uicoperatingperiod_correction(infile: Path, outfile: Path):
     try:
         os.remove(outfile)
     except FileNotFoundError:
         pass
     modify_xml_file(infile, str(outfile))
 
+
 def main(infile: str, outfile: str) -> None:
     # checks the input
-    inpath=Path(infile)
-    outpath=Path(outfile)
-    #calling correction
-    netex_uicoperatingperiod_correction(inpath,outpath)
+    inpath = Path(infile)
+    outpath = Path(outfile)
+    # calling correction
+    netex_uicoperatingperiod_correction(inpath, outpath)
 
 
 if __name__ == '__main__':

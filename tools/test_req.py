@@ -32,14 +32,13 @@ try:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font
 except ImportError as e:
-    print("Error: openpyxl is required to write .xlsx files.\n"
-          "Install it with: pip install openpyxl",
-          file=sys.stderr)
+    print("Error: openpyxl is required to write .xlsx files.\n" "Install it with: pip install openpyxl", file=sys.stderr)
     sys.exit(2)
 
 # Constants
 EXCEL_CELL_MAX_CHARS = 32767
 OUTPUT_TAIL_CHARS = 5000  # keep only last 5000 characters of output
+
 
 def read_commands(path: str, encoding: Optional[str] = None) -> List[str]:
     """
@@ -123,8 +122,10 @@ except Exception:
     OPENPYXL_ILLEGAL_RE = None
 
 import re
+
 # Fallback regex: strip ASCII control chars except tab(0x09), LF(0x0A), CR(0x0D)
 FALLBACK_ILLEGAL_RE = re.compile(r'[\x00-\x08\x0B\x0C\x0E-\x1F]')
+
 
 def remove_illegal_chars(s: str) -> str:
     """
@@ -143,6 +144,7 @@ def remove_illegal_chars(s: str) -> str:
         pass
     return FALLBACK_ILLEGAL_RE.sub("", s)
 
+
 def excel_tail_text(s: str, tail_len: int) -> str:
     """
     Sanitize for Excel and return only the last 'tail_len' characters.
@@ -157,6 +159,7 @@ def excel_tail_text(s: str, tail_len: int) -> str:
         s = s[-EXCEL_CELL_MAX_CHARS:]
     return s
 
+
 def excel_safe_text(s: str) -> str:
     """
     Sanitize for Excel without tailing, but still enforce the maximum cell length.
@@ -165,6 +168,7 @@ def excel_safe_text(s: str) -> str:
     if len(s) > EXCEL_CELL_MAX_CHARS:
         s = s[:EXCEL_CELL_MAX_CHARS]
     return s
+
 
 # ------------------------------------------------------
 
@@ -216,31 +220,12 @@ def parse_args(argv: List[str]) -> argparse.Namespace:
     )
     parser.add_argument("input_file", help="Path to the text file containing commands (one per line).")
     parser.add_argument("output_excel", help="Path to the output Excel file (.xlsx).")
-    parser.add_argument(
-        "--timeout",
-        type=float,
-        default=None,
-        help="Per-command timeout in seconds (default: no timeout)."
-    )
-    parser.add_argument(
-        "--shell",
-        dest="shell",
-        action="store_true",
-        help="Execute commands through the system shell (default)."
-    )
-    parser.add_argument(
-        "--no-shell",
-        dest="shell",
-        action="store_false",
-        help="Execute commands directly without a shell."
-    )
+    parser.add_argument("--timeout", type=float, default=None, help="Per-command timeout in seconds (default: no timeout).")
+    parser.add_argument("--shell", dest="shell", action="store_true", help="Execute commands through the system shell (default).")
+    parser.add_argument("--no-shell", dest="shell", action="store_false", help="Execute commands directly without a shell.")
     parser.set_defaults(shell=True)
 
-    parser.add_argument(
-        "--encoding",
-        default="utf-8",
-        help="Text encoding for decoding process output (default: utf-8)."
-    )
+    parser.add_argument("--encoding", default="utf-8", help="Text encoding for decoding process output (default: utf-8).")
 
     return parser.parse_args(argv)
 
@@ -275,8 +260,7 @@ def main(argv: List[str]) -> int:
         except Exception as e:
             # As a last resort, coerce via encoding replacement to avoid any surprises
             fallback_cmd = excel_safe_text(str(cmd).encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
-            fallback_out = excel_tail_text(str(out).encode("utf-8", errors="replace").decode("utf-8", errors="replace"),
-                                           OUTPUT_TAIL_CHARS)
+            fallback_out = excel_tail_text(str(out).encode("utf-8", errors="replace").decode("utf-8", errors="replace"), OUTPUT_TAIL_CHARS)
             ws.append([fallback_cmd, rc, fallback_out])
 
     # Save workbook
