@@ -3,18 +3,44 @@ import logging
 import sys
 import warnings
 from datetime import timedelta, datetime, time
-from typing import Generator, TypeVar, Iterable, Any, Iterator, cast
+from typing import Generator, TypeVar, Any, cast
 import copy
 
 from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
 from domain.netex.indexes.byid import getIndex
-from domain.netex.model import Operator, Line, ServiceJourney, \
-    DayTypeRefsRelStructure, ValidityConditionsRelStructure, AvailabilityCondition, AvailabilityConditionRef, Branding, \
-    Authority, ResponsibilitySet, StakeholderRoleTypeEnumeration, ResponsibilitySetRef, Version, OperatingPeriod, \
-    DayTypeAssignment, OperatingDay, OperatingDayRef, DayOfWeekEnumeration, DayType, UicOperatingPeriod, DayTypeRef, \
-    TimeDemandType, Route, RouteRef, RouteView, ServiceJourneyPattern, UicOperatingPeriodRef, OperatingPeriodRef
+from domain.netex.model import (
+    Operator,
+    Line,
+    ServiceJourney,
+    DayTypeRefsRelStructure,
+    ValidityConditionsRelStructure,
+    AvailabilityCondition,
+    AvailabilityConditionRef,
+    Branding,
+    Authority,
+    ResponsibilitySet,
+    StakeholderRoleTypeEnumeration,
+    ResponsibilitySetRef,
+    Version,
+    OperatingPeriod,
+    DayTypeAssignment,
+    OperatingDay,
+    OperatingDayRef,
+    DayOfWeekEnumeration,
+    DayType,
+    UicOperatingPeriod,
+    DayTypeRef,
+    TimeDemandType,
+    Route,
+    RouteRef,
+    RouteView,
+    ServiceJourneyPattern,
+    UicOperatingPeriodRef,
+    OperatingPeriodRef,
+)
+from domain.netex.model.name_of_class_operating_period_ref_structure import NameOfClassOperatingPeriodRefStructure
 from domain.netex.services.refs import getRef, getFakeRef
 from storage.mdbx.core.implementation import MdbxStorage
 from transformers.callsprofile import CallsProfile
@@ -58,7 +84,9 @@ def gtfs_operator_line_memory(db_read: MdbxStorage, txn: TXN, generator_defaults
 
         elif line.responsibility_set_ref_attribute is not None:
             # TODO: ResponsibilitySet to Operator/Authority should be a separate function
-            responsibility_set = cast(ResponsibilitySet, db_read.load_object_by_reference(txn, getFakeRef(line.responsibility_set_ref_attribute, ResponsibilitySetRef)))
+            responsibility_set = cast(
+                ResponsibilitySet, db_read.load_object_by_reference(txn, getFakeRef(line.responsibility_set_ref_attribute, ResponsibilitySetRef))
+            )
             if responsibility_set is not None and responsibility_set.roles is not None:
                 for role_assignment in responsibility_set.roles.responsibility_role_assignment:
                     if (
@@ -104,7 +132,7 @@ def add_calls(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> ServiceJour
     if sj.calls:
         return sj
     else:
-        sjp: ServiceJourneyPattern = db_read.load_object_by_reference(sj.journey_pattern_ref)
+        sjp: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
         if sjp is None:
             log_all(logging.ERROR, "No SJP")
 
@@ -118,7 +146,7 @@ def add_calls(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> ServiceJour
                         )
                     elif isinstance(sjp.route_ref_or_route_view, RouteRef):
                         sj.route_ref = sjp.route_ref_or_route_view
-                        route: Route = db_read.load_object_by_reference(sjp.route_ref_or_route_view)
+                        route: Route = db_read.load_object_by_reference(txn, sjp.route_ref_or_route_view)
                         sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view = route.line_ref
 
             if sj.passing_times:
@@ -128,7 +156,7 @@ def add_calls(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> ServiceJour
                 return sj
 
             elif sj.time_demand_type_ref:
-                tdt: TimeDemandType = db_read.load_object_by_reference(sj.time_demand_type_ref)
+                tdt: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
                 CallsProfile.getCallsFromTimeDemandType(sj, sjp, tdt)
                 sj.journey_pattern_ref = None
                 sj.time_demand_type_ref = None
@@ -396,8 +424,8 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
     def query_sj(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
         sj: ServiceJourney
         for sj in db_read.iter_only_objects(txn, ServiceJourney):
-            add_calls(db_read, sj)
-            _tmp = calendars_to_daytype(db_read, sj)
+            add_calls(db_read, txn, sj)
+            _tmp = calendars_to_daytype(db_read, txn, sj)
             calendar_combinations.append(_tmp)
             sj.route_ref = None  # TODO: #112
             yield sj
@@ -432,7 +460,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                         log_once(logging.WARN, "vc-2", "We cannot yet handle other validity conditions")
 
                     day_type, day_type_assignments, operating_days, uic_operating_period = get_day_type_from_availability_condition(
-                        db_read, availability_condition
+                        db_read, txn, availability_condition
                     )
                     day_type, day_type_assignments, operating_period = gtfs_day_type(day_type, day_type_assignments, operating_days, [uic_operating_period], [])
                     if operating_period is not None:
@@ -508,9 +536,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                             if isinstance(ref, UicOperatingPeriodRef) or (
                                 isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
                             ):
-                                uic_operating_periods.append(
-                                    db_read.load_object_by_reference(txn, ref)
-                                )
+                                uic_operating_periods.append(db_read.load_object_by_reference(txn, ref))
                             elif isinstance(ref, OperatingPeriodRef):
                                 r = db_read.load_object_by_reference(txn, ref)
                                 if len(r) > 0:
@@ -537,14 +563,15 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                             yield aggregated_day_type, day_type_assignments, operating_periods
 
     log_all(logging.INFO, "Processing Calendars")
-    for day_type, day_type_assignments, operating_periods in query_daytype(db_read, calendar_combinations):
+    for day_type, day_type_assignments, operating_periods in query_daytype(db_read, txn, calendar_combinations):
         yield day_type
         yield from day_type_assignments
         if operating_periods is not None and len(operating_periods) > 0:
             yield from operating_periods
 
 
-def gtfs_calls_generator(db_read: Database, db_write: Database, generator_defaults: dict):
+"""
+def gtfs_calls_generator(db_read: MdbxStorage, db_write: Database, generator_defaults: dict):
     def query_sj(db_read: Database) -> Generator:
         _load_generator = load_generator(db_read, ServiceJourney)
         sj: ServiceJourney
@@ -974,7 +1001,7 @@ def gtfs_calendar_and_dates(db_read: Database, day_type_ref: DayTypeRef, day_typ
                         )
                     )
 
-
+"""
 """
 def gtfs_calendar_generator(db_read: Database, db_write: Database, generator_defaults: dict):
     # This functions purpose is to transform calendars from NeTEx in such way it can be referenced by GTFS.

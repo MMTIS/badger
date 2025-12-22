@@ -29,8 +29,8 @@ def gtfs_db_to_db(source_database: Path, target_database: Path, clean_database: 
                         db_write.copy_map(txn_read, db_write, txn_write, clazz)
 
                     # Flatten the Operator, Authority, Branding, ResponsibilitySet; Provides Line and Operator
-                    db_write.insert_any_object_on_queue(txn_write, gtfs_operator_line_memory(db_read, txn_read,{}))
-                    db_write.insert_any_object_on_queue(txn_write, gtfs_sj_processing(db_read))
+                    db_write.insert_any_object_on_queue(txn_write, gtfs_operator_line_memory(db_read, txn_read, {}))
+                    db_write.insert_any_object_on_queue(txn_write, gtfs_sj_processing(db_read, txn_read))
 
                     # apply_availability_conditions_via_day_type_ref(db_read, db_write)
 
