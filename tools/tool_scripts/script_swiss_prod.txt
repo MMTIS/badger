@@ -10,7 +10,7 @@
         {"script": "conv.netex_to_db.py", "args": "[%%inputfilepath%%] %%dir%%/03-swiss-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/schema/netex/xsd/NeTEx_publication.xsd"}
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
         ]
   },
 
