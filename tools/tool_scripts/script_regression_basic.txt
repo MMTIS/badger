@@ -150,7 +150,21 @@
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
-
+   {
+    "block": "fr_ardennesepip",
+    "worked":"2025-08-14",
+    "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
+    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0045-0000/fluo-grand-est-fluo08-netex.zip",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.mdbx"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.mdbx"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
+         ]
+  },
 
              {
     "block": "fr_aubegtfs",
@@ -184,9 +198,29 @@
          ]
   },
 
-
     {
-       "block": "swiss4",
+       "block": "nl_filter",
+       "url":"https://data.ndovloket.nl/netex/wpd/",
+       "download_url":"https://data.ndovloket.nl/netex/wpd/NeTEx_WPD_WPD_20251124_20251124.xml.gz",
+        "description":"Primary filter test based on NL",
+        "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "set_defaults", "args": "authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
+        {"script": "conv.filter_db_to_db", "args": "%%dir%%/04.mdbx %%dir%%/05.mdbx Line NL:WPD:Line:HA  [Line Route ServiceJourneyPattern]" },
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05.mdbx %%dir%%/%%block%%-line.xml"},
+        {"script": "conv.filter_db_to_db", "args": "%%dir%%/04.mdbx %%dir%%/06.mdbx Operator NL:WPD:Operator:WPD   [Line Route ServiceJourneyPattern]" },
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06.mdbx %%dir%%/%%block%%-operator.xml"},
+        {"script": "conv.filter_db_to_db", "args": "%%dir%%/04.mdbx %%dir%%/07.mdbx ServiceJourney NL:WPD:ServiceJourney:AMHO-060000   [Line Route ServiceJourneyPattern]" },
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07.mdbx %%dir%%/%%block%%-servicejourney.xml"},
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml domain/schema/netex/xsd/NeTEx_publication.xsd"}
+
+        ]
+    },
+        {
+       "block": "swiss4epip",
        "download_url":"https://github.com/user-attachments/files/18593829/swiss4.zip",
         "description":"Reduced Swiss data set for tests, still a bit large",
         "scripts": [
@@ -196,12 +230,7 @@
         {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/schema/netex/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/%%block%%-netex.xml.gz]  %%dir%%/08.mdbx"},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.mdbx %%dir%%/09.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.mdbx %%dir%%/%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/17-%%block%%-map.html 1"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/schema/netex/xsd/NeTEx_publication.xsd"}
 
         ]
     }
