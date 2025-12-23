@@ -206,7 +206,7 @@ def download(folder: str, url: str, regex: str = '', forced: bool = False) -> st
         if "Resource" in filename:  # for italian data
             filename = "source.xml.gz"
         if filename == "":
-            filename = "source.zip"
+            filename = "source.gz"
         if not (filename.endswith(".zip") or filename.endswith(".xml") or filename.endswith(".gz")):
             filename = "source.zip"
         if not forced:
@@ -266,6 +266,7 @@ def main(
         data = json.load(f)
 
     # go through each block
+    result = -1
     for block in data:
         if url:
             processdir = processing_data + "/" + parent_block + "/" + todo_block + "-" + str(custom_hash(url))
@@ -283,7 +284,7 @@ def main(
         # log_once(logging.INFO, "Start", f'Processing block: {block["block"]}')
         step = 0
         script_input_file_path = "NOT SET YET"
-        result = -1
+
         for script in scripts:
             step = step + 1
             if this_step == 99999:
