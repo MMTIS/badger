@@ -94,3 +94,6 @@ An object in, would be ideally flow as a new object towards the second database.
 For performance reasons we cannot always follow this pattern, because we would like to prevent database access and minimise computing power for already created (similar) objects.
 There are some custom compression patterns we use to retain prefix encoding, with fewer bytes used as table key, this only works for ASCII based ids.
 For writing towards XML we create generators that would be called exactly when the data is being serialised towards XML at element level, just in time.
+
+### Tools
+Badger comes with some tools. Those are described [here](./tool_scripts/README.md)
