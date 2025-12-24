@@ -96,4 +96,4 @@ There are some custom compression patterns we use to retain prefix encoding, wit
 For writing towards XML we create generators that would be called exactly when the data is being serialised towards XML at element level, just in time.
 
 ### Tools
-Badger comes with some tools. Those are described [here](./tool_scripts/README.md)
+Badger comes with some tools. Those are described [here](./tools/README.md)
