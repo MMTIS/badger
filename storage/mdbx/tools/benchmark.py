@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from mdbx import MDBXDBFlags
 from tqdm import tqdm
 
 from domain.netex.services.model_typing import Tid
@@ -17,7 +18,7 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
 
     with storage.env.ro_transaction() as txn:
         for db_name, clazz in db_names.items():
-            db = txn.open_map(db_name)
+            db = txn.open_map(db_name, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             entries = db.get_stat(txn).ms_entries
             start_time = time.perf_counter()
 
@@ -41,7 +42,7 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
             total_elapsed += elapsed
 
         for db_name in (DB_CLASS_IDX, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
-            db = txn.open_map(db_name)
+            db = txn.open_map(db_name, flags=MDBXDBFlags.MDBX_DB_ACCEDE) # TODO: Fix this with the known options
 
             entries = db.get_stat(txn).ms_entries
 

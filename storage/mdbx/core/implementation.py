@@ -26,6 +26,9 @@ DB_UNRESOLVED = bytes(b'_unresolved')
 DB_ID_IDX = bytes(b'_id_idx')
 DB_REFERENCE_OUTWARD = bytes(b'_reference_outward')
 
+DB_UNRESOLVED_FLAGS = MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT
+DB_ID_IDX_FLAGS = MDBXDBFlags.MDBX_DB_DEFAULTS
+DB_REFERENCE_OUTWARD_FLAGS = MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP
 
 class MdbxStorage:
     readonly: bool
@@ -59,17 +62,14 @@ class MdbxStorage:
                     clazz_name = get_object_name(clazz)
                     db_class_idx.put(txn, idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'))
 
-            txn.create_map(name=DB_UNRESOLVED, flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT)
-            txn.create_map(name=DB_ID_IDX)
-            txn.create_map(
-                name=DB_REFERENCE_OUTWARD,
-                flags=MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP,
-            )
+            txn.create_map(name=DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+            txn.create_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
+            txn.create_map(name=DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
             txn.commit()
 
     def _restore_class_idx(self) -> None:
         with self.env.ro_transaction() as txn:
-            with txn.open_map(name=DB_CLASS_IDX) as db_class_idx:
+            with txn.open_map(name=DB_CLASS_IDX, flags=DB_ID_IDX_FLAGS) as db_class_idx:
                 with txn.cursor(db_class_idx) as cur:
                     for idx, name in cur.iter():
                         clazz = self.serializer.name_object[name.decode('utf-8')]
@@ -137,7 +137,7 @@ class MdbxStorage:
         with self.env.rw_transaction() as txn:
             with txn.cursor() as cur:
                 for db_name, _ in cur.iter():
-                    dbi = txn.open_map(name=db_name)
+                    dbi = txn.open_map(name=db_name, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
                     if dbi:
                         dbi.drop(delete=True)
             txn.commit()
@@ -155,7 +155,7 @@ class MdbxStorage:
         yielded_set: set[bytes] = set([])
         partial: set[bytes] = set([])
 
-        db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD)
+        db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
         cursor = txn.cursor(db_reference_outward)
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
@@ -228,9 +228,9 @@ class MdbxStorage:
         if self.readonly:
             raise
 
-        db_unresolved = txn.open_map(name=DB_UNRESOLVED)
-        db_id_idx = txn.open_map(name=DB_ID_IDX)
-        db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
+        db_unresolved = txn.open_map(name=DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        db_id_idx = txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
+        db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         for obj in objects:
             this_class_idx = self.class_idx[obj.__class__]
@@ -272,9 +272,9 @@ class MdbxStorage:
 
         with self.env.rw_transaction() as txn:
             db = txn.create_map(name=this_class_idx)
-            db_unresolved = txn.open_map(name=DB_UNRESOLVED)
-            db_id_idx = txn.open_map(name=DB_ID_IDX)
-            db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD)
+            db_unresolved = txn.open_map(name=DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+            db_id_idx = txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
+            db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
             if empty:
                 db.drop(txn, delete=False)
@@ -310,7 +310,7 @@ class MdbxStorage:
             txn.commit()
 
     def _load_references_by_fullkey(self, txn: TXN, full_key: bytes) -> Generator[bytes, None, None]:
-        db = txn.open_map(DB_REFERENCE_OUTWARD)
+        db = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows(start_key=full_key):
             for referencing_key, reference_key in it:
@@ -326,7 +326,7 @@ class MdbxStorage:
             yield self.idx_class[class_idx], reference_local_key
 
     def _load_references_inwards_by_fullkey(self, txn: TXN, full_key: bytes) -> Generator[bytes, None, None]:
-        db = txn.open_map(DB_REFERENCE_OUTWARD)
+        db = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
@@ -335,7 +335,7 @@ class MdbxStorage:
 
     def _load_references_inwards_by_fullkeys(self, txn: TXN, full_keys: set[bytes]) -> Generator[bytes, None, None]:
         # This will do everything in one sequential scan
-        db = txn.open_map(DB_REFERENCE_OUTWARD)
+        db = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
@@ -377,7 +377,7 @@ class MdbxStorage:
             else:
                 yield from self._load_references(txn, full_key)
         else:
-            with txn.open_map(name=DB_ID_IDX) as db_id_idx:
+            with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
                 key = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
                 full_key = db_id_idx.get(txn, key)
                 if inwards:
@@ -433,7 +433,7 @@ class MdbxStorage:
 
         # TODO: Abstract this because
         if version is not None:
-            db_id_idx = txn.open_map(name=DB_ID_IDX)
+            db_id_idx = txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
             full_key = db_id_idx.get(txn, my_id)
             return full_key, self.load_object_by_full_key(txn, full_key)
 
@@ -447,7 +447,7 @@ class MdbxStorage:
     def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Optional[EntityStructure]:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
-        with txn.open_map(name=this_clazz_idx) as db:
+        with txn.open_map(name=this_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS) as db:
             value = db.get(txn, key)
             if value:
                 obj: EntityStructure = self.serializer.unmarshall(value, clazz)
@@ -457,7 +457,7 @@ class MdbxStorage:
 
     def load_object(self, txn: TXN, clazz: type[Tid], key: bytes) -> Tid:
         this_class_idx = self.class_idx[clazz]
-        with txn.open_map(name=this_class_idx) as db:
+        with txn.open_map(name=this_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS) as db:
             value = db.get(txn, key)
             assert value is not None
             # if value is None:
@@ -468,7 +468,7 @@ class MdbxStorage:
             return obj
 
     def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[EntityStructure]:
-        with txn.open_map(name=DB_ID_IDX) as db_id_idx:
+        with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
             if ref.name_of_ref_class is not None:
                 # The optimal situation, we can search for the id class in the right place
                 name_of_ref_class = str(ref.name_of_ref_class.value if hasattr(ref.name_of_ref_class, 'value') else ref.name_of_ref_class)
@@ -481,7 +481,7 @@ class MdbxStorage:
             if True:
                 print("Fallback...")
                 prefix = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None)
-                cursor = txn.cursor(db=DB_ID_IDX)
+                cursor = txn.cursor(db=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
                 for check_key, resolved_idx in cursor.iter(prefix):
                     if check_key.startswith(prefix):
                         referenced_class_idx, referenced_key = self.serializer.full_key_to_idx(resolved_idx)
@@ -493,7 +493,7 @@ class MdbxStorage:
         return None
 
     def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
-        with txn.open_map(name=self.class_idx[clazz]) as db:
+        with txn.open_map(name=self.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS) as db:
             with txn.cursor(db) as cursor:
                 count = 0
 
@@ -509,7 +509,7 @@ class MdbxStorage:
         self, txn: TXN, clazz: type[EntityStructure], start_key: bytes | None = None, limit: int | None = None
     ) -> Generator[tuple[bytes, Tid], None, None]:
         try:
-            db = txn.open_map(name=self.class_idx[clazz])
+            db = txn.open_map(name=self.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
         except:  # TODO: Better catching by pymdbx proper exceptions
             return
 
@@ -533,7 +533,7 @@ class MdbxStorage:
         We missen hier de afhandeling van db_id's etc.
         with remote_txn.create_map(name=remote_storage.class_idx[clazz]) as db_destination:
             try:
-                with txn.open_map(name=self.class_idx[clazz]) as db_source:
+                with txn.open_map(name=self.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS) as db_source:
                     with txn.cursor(db_source) as cursor:
                         for key, value in cursor.iter():
                             db_destination.put(remote_txn, key, value)

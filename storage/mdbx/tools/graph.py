@@ -6,7 +6,7 @@ from domain.netex.services.model_typing import Tid
 from storage.mdbx.core.implementation import (
     MdbxStorage,
     DB_ID_IDX,
-    DB_REFERENCE_OUTWARD,
+    DB_REFERENCE_OUTWARD, DB_ID_IDX_FLAGS, DB_REFERENCE_OUTWARD_FLAGS,
 )
 
 from collections import defaultdict
@@ -22,12 +22,12 @@ def build_graph(txn: TXN) -> Dict[bytes, Set[bytes]]:
     """
     graph: Dict[bytes, Set[bytes]] = defaultdict(set)
 
-    db_ids = txn.open_map(DB_ID_IDX)
+    db_ids = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
     cursor = txn.cursor(db_ids)
     for _, full_idx in cursor:
         graph.setdefault(full_idx, set())
 
-    db_refs = txn.open_map(DB_REFERENCE_OUTWARD)
+    db_refs = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
     cursor_r = txn.cursor(db_refs)
     for referencing_key, reference_key in cursor_r:
         # zorg dat refererende knoop in graph staat (soms kan referencing_key niet in DB_ID_IDX voorkomen)

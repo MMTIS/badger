@@ -8,7 +8,8 @@ from mdbx.mdbx import DBI, Env
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from storage.interface import Storage
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED, \
+    DB_ID_IDX_FLAGS
 
 
 class MdbxStorageMP(MdbxStorage):
@@ -51,7 +52,7 @@ class MdbxStorageMP(MdbxStorage):
         this_class_idx = self.class_idx[klass]
 
         with self.env.ro_transaction() as txn:
-            db_id_idx = txn.open_map(DB_ID_IDX)
+            db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
 
             # if empty:
             #    txn.drop(db=db, delete=False)
