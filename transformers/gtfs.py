@@ -488,15 +488,12 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                             uic_operating_periods.append(db_read.load_object_by_reference(txn, ref))
                         elif isinstance(ref, OperatingPeriodRef):
                             r = db_read.load_object_by_reference(txn, ref)
-                            if len(r) > 0:
-                                operating_periods.append(r[0])
+                            if isinstance(r, OperatingPeriod):
+                                operating_periods.append(r)
+                            elif isinstance(r, UicOperatingPeriod):
+                                uic_operating_periods.append(r)
                             else:
-                                # TODO: we must be able to query child classes directly.
-                                r = db_read.load_object_by_reference(txn, ref)
-                                if len(r) > 0:
-                                    uic_operating_periods.append(r[0])
-                                else:
-                                    log_all(logging.ERROR, f"{ref} cannot be found.")
+                                log_all(logging.ERROR, f"{ref} cannot be found.")
                         elif isinstance(ref, OperatingDayRef):
                             operating_days.append(db_read.load_object_by_reference(txn, ref))
 
