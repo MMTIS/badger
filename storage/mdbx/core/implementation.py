@@ -312,9 +312,6 @@ class MdbxStorage:
     def _load_references_by_fullkey(self, txn: TXN, full_key: bytes) -> Generator[bytes, None, None]:
         db = txn.open_map(DB_REFERENCE_OUTWARD)
         cursor = txn.cursor(db)
-        print(full_key,len(full_key))
-        if (full_key == b'4\x00\x00\x00h\x07\x00\x00'):
-            print("here we are")
         for it in cursor.iter_dupsort_rows(start_key=full_key):
             for referencing_key, reference_key in it:
                 if referencing_key != full_key:
