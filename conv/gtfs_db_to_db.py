@@ -41,7 +41,7 @@ def gtfs_db_to_db(source_database: Path, target_database: Path, clean_database: 
                     # Extract calendar information
                     # gtfs_calendar_generator(db_read, db_write, {})
 
-                    versions = list(db_read.iter_only_objects(txn_read, Version, b'1'))
+                    versions = list(db_read.iter_only_objects(txn_read, Version, limit=1))
                     if len(versions) == 0:
                         db_write.insert_any_object_on_queue(txn_write, gtfs_generate_deprecated_version(db_write, txn_write))
 
