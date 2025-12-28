@@ -40,7 +40,8 @@ from domain.netex.model import (
     UicOperatingPeriodRef,
     OperatingPeriodRef,
 )
-from domain.netex.model.name_of_class_operating_period_ref_structure import NameOfClassOperatingPeriodRefStructure
+#TODO remove as an correct
+from domain.netex.model.name_of_class_operating_period_ref_structure_type import NameOfClassOperatingPeriodRefStructureType as NameOfClassOperatingPeriodRefStructure
 from domain.netex.services.refs import getRef, getFakeRef
 from storage.mdbx.core.implementation import MdbxStorage
 from transformers.callsprofile import CallsProfile
@@ -85,7 +86,7 @@ def gtfs_operator_line_memory(db_read: MdbxStorage, txn: TXN, generator_defaults
         elif line.responsibility_set_ref_attribute is not None:
             # TODO: ResponsibilitySet to Operator/Authority should be a separate function
             responsibility_set = cast(
-                ResponsibilitySet, db_read.load_object_by_reference(txn, getFakeRef(line.responsibility_set_ref_attribute, ResponsibilitySetRef))
+                ResponsibilitySet, db_read.load_object_by_reference(txn, getFakeRef(line.responsibility_set_ref_attribute, ResponsibilitySetRef,line.version))
             )
             if responsibility_set is not None and responsibility_set.roles is not None:
                 for role_assignment in responsibility_set.roles.responsibility_role_assignment:

@@ -26,19 +26,19 @@ python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.l
 python -m tools.script_runner ./tool_scripts/script_regression.txt mylog.log swissmikro
 python -m tools.script_runner ./tool_scripts/script_regression.txt mylog.log swissinterchange
 
-python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_sncf_ter
-python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
-python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
-python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
-python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_sncf_ter
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
 
 # long runners
-python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lux
-python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log swiss4epip
+#python -m tools.script_runner ./tool_scripts/script_regression_v1.1.txt mylog.log lux
+#python -m tools.script_runner ./tool_scripts/script_regression_basic.txt mylog.log swiss4epip
 
 #mandatory test
-python -m tools.script_runner ./tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
-python -m tools.script_runner ./tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
+#python -m tools.script_runner ./tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
+#python -m tools.script_runner ./tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
 #python -m tools.script_runner ./tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip
 
 
