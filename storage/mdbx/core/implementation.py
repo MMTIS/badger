@@ -1,3 +1,4 @@
+import collections
 from pathlib import Path
 from sys import exception
 from types import TracebackType
@@ -143,10 +144,74 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
-    def fetch_all_references_by_class(
+    def fetch_all_references_by_class(self, txn, clazzes, skip_existing=False):
+        db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD)
+        cursor = txn.cursor(db_reference_outward)
+
+        # map target classes to integer class idx
+        target_idx_ints = {int.from_bytes(self.class_idx[c], 'little') for c in clazzes}
+
+        adjacency = {}  # bytes -> list[bytes]
+        yielded_set = set()  # discovered referenced full-keys
+        from collections import deque
+        frontier = deque()
+
+        # 1) Scan only ranges for classes of interest
+        for class_idx_int in target_idx_ints:
+            start_key = (class_idx_int << 32).to_bytes(8, 'little')
+            # iterate from the first key >= start_key
+            for k, v in cursor.iter(start_key=start_key, from_next=False):
+                # stop as soon as we left this class range
+                k_class = int.from_bytes(k[:4], 'little')
+                if k_class != class_idx_int:
+                    break
+                # k is referencing full_key (8 bytes), v is reference full_key (8 bytes)
+                adjacency.setdefault(k, []).append(v)
+                if v not in yielded_set:
+                    yielded_set.add(v)
+                    frontier.append(v)
+
+        # 2) BFS expand closure using adjacency and on-demand cursor fetch for nodes not in adjacency
+        while frontier:
+            node = frontier.popleft()
+            neighbors = adjacency.get(node)
+            if neighbors is None:
+                # fetch duplicates for node (all outgoing references)
+                neighbors = []
+                for k2, v2 in cursor.iter(start_key=node, from_next=False):
+                    if k2 != node:
+                        break
+                    neighbors.append(v2)
+                adjacency[node] = neighbors
+
+            for ref in neighbors:
+                ref_class_idx = int.from_bytes(ref[:4], 'little')
+                # preserve your original exclusion logic: only expand refs NOT in clazzes
+                if self.idx_class[ref_class_idx] not in clazzes:
+                    if ref not in yielded_set:
+                        yielded_set.add(ref)
+                        frontier.append(ref)
+
+        # 3) Group by class and load in per-class batches
+        grouped = {}
+        for full_ref in yielded_set:
+            class_idx_int = int.from_bytes(full_ref[:4], 'little')
+            grouped.setdefault(class_idx_int, []).append(full_ref)
+
+        for class_idx_int, keys in grouped.items():
+            # translate class_idx_int -> class and then fetch objects. Try to fetch per-class in batch/scan.
+            for full_ref in keys:
+                obj = self.load_object_by_full_key(txn, full_ref)
+                if skip_existing:
+                    if obj.__class__ not in clazzes:
+                        yield obj
+                else:
+                    yield obj
+
+    def fetch_all_references_by_class1(
         self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False
     ) -> Generator[type[EntityStructure], None, None]:
-        # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in refence outward
+        # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in reference outward
         # Referenced objects may by itself introduce new references, hence it should be checked if the set contains (already) those
         # When the scan is complete, all referenced objects should be made available via the generator.
 
@@ -177,7 +242,7 @@ class MdbxStorage:
                     # print(self.idx_class[referencing_class_idx])
                     pass
 
-        # Our selected objects may contain references theirselves, obviously we need to have those too
+        # Our selected objects may contain references themselves, obviously we need to have those too
         partial_new: set[bytes]
 
         while True:
