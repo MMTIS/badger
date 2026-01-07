@@ -28,7 +28,9 @@ stops_txt = {
 routes_txt = {
     'route_id': 'VARCHAR',
     'agency_id': 'VARCHAR',
+    'route_short_name': 'VARCHAR',
     'route_long_name': 'VARCHAR',
+    'route_desc': 'VARCHAR',
     'route_type': 'INTEGER',
     'route_url': 'VARCHAR',
     'route_color': 'CHAR(6)',
