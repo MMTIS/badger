@@ -124,6 +124,7 @@ from domain.netex.model import (
     DayTypeRef,
     EntityStructure,
     Locale,
+    NameOfClassOperatingPeriodRefStructureType,
 )
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
@@ -357,10 +358,10 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
     id = hashlib.md5(';'.join(l_ssp).encode()).hexdigest()[0:8]
 
     for pis in piss:
-        pis.id = getId(StopPointInJourneyPattern, generator_defaults['codespace'], f"{id}-{pis.order}")
+        pis.id = getId(generator_defaults['codespace'], StopPointInJourneyPattern, f"{id}-{pis.order}")
 
     return ServiceJourneyPattern(
-        id=getId(ServiceJourneyPattern, generator_defaults['codespace'], id),
+        id=getId(generator_defaults['codespace'], ServiceJourneyPattern, id),
         version=sj.version,
         route_ref_or_route_view=RouteView(flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view),
         direction_type=sj.direction_type.value if sj.direction_type else None,  # https://github.com/NeTEx-CEN/NeTEx/issues/842
@@ -492,7 +493,7 @@ def get_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dic
                 if d > to_date:
                     to_date = d
 
-        return ServiceCalendar(id=getId(ServiceCalendar, generator_defaults['codespace'], "ServiceCalendar"),
+        return ServiceCalendar(id=getId(generator_defaults['codespace'], ServiceCalendar,  "ServiceCalendar"),
                                version=generator_defaults['version'],
                                from_date=XmlDate.from_date(from_date), to_date=XmlDate.from_date(to_date),
                                day_types=DayTypesRelStructure(day_type_ref_or_day_type=list(day_types.values())),
@@ -587,7 +588,9 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourney | ServiceJourneyPattern | ServiceLink, None, None]:
+    def process(
+        sj: ServiceJourney, db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]
+    ) -> Generator[ServiceJourney | ServiceJourneyPattern | ServiceLink, None, None]:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
@@ -792,7 +795,7 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                 or (
                     hasattr(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, 'name_of_ref_class')
                     and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
-                    == NameOfClassOperatingPeriodRefStructure.UIC_OPERATING_PERIOD
+                    == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 )
             ]
             my_operating_periods: list[OperatingPeriod] = [
@@ -802,7 +805,7 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                 and (
                     dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class is None
                     or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
-                    == NameOfClassOperatingPeriodRefStructure.OPERATING_PERIOD
+                    == NameOfClassOperatingPeriodRefStructureType.OPERATING_PERIOD
                 )
                 and (dta.is_available is None or dta.is_available)
             ]

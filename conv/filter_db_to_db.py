@@ -111,6 +111,8 @@ def main(source: str, target: str, object_type: str, object_filter: str, inwards
                 else:
                     inward_classes.add(db_read.idx_class[idx])
 
+        print(f'source_path: {source_path}')
+        print(f'target_path: {Path(target)}')
         filter_db_to_db(source_path, Path(target), clazz, object_filter, inward_classes)
 
 

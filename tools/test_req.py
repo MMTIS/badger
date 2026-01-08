@@ -251,10 +251,12 @@ def main(argv: List[str]) -> int:
 
     total = len(commands)
     for idx, cmd in enumerate(commands, start=1):
-        print(f"[{idx}/{total}] Running: {cmd}")
+        print(f"\n\n=============================================================\n[{idx}/{total}] Running: {cmd}")
         rc, out = run_command(cmd, shell=args.shell, timeout=args.timeout, text_encoding=args.encoding)
         # Append sanitized results (output limited to last 5000 chars)
-        print(f'Returned {rc}.')
+        print(f'Returned {rc}.\n')
+        print(f"\n\n-------------------------------------------------------------\n\n")
+        print(out)
         try:
             append_result(ws, cmd, rc, out)
         except Exception as e:

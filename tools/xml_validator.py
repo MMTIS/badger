@@ -1,6 +1,8 @@
 # @https://github.com/ue71603, 2024
 import logging
 import os
+from pathlib import Path
+
 from utils.aux_logging import prepare_logger, log_all
 import traceback
 from lxml import etree
@@ -46,20 +48,37 @@ def validate_xml(xml_file: IO[Any], xmlschema: etree.XMLSchema) -> bool:
     return True
 
 
+
 def main(folder: str, xsd_schema: str) -> None:
     xsd_schema = get_absolute_path(xsd_schema, work_dir)
     xmlschema = etree.XMLSchema(etree.parse(xsd_schema))
-    for root, dirs, files in os.walk(folder):
-        for filename in files:
-            log_all(logging.INFO, f"Processing file: {filename}")
-            file_full_path = os.path.join(root, filename)
-            if filename.endswith(".xml") or filename.endswith(".xml.gz"):  # TODO zips are not processed (because might be GTFS)
-                for sub_file, real_filename in XmlStorage.open_netex_file(file_full_path):
-                    validate_xml(sub_file, xmlschema)
 
-            if filename.endswith(".xsd"):
-                xsd_file = os.path.join(root, filename)
-                check_xsd_validity(xsd_file)
+    def process_file_path(file_full_path: str):
+        filename = os.path.basename(file_full_path)
+        if filename.endswith(".xml") or filename.endswith(
+                ".xml.gz"):  # TODO zips are not processed (because might be GTFS)
+            log_all(logging.INFO, f"Processing file: {filename}")
+            for sub_file, real_filename in XmlStorage.open_netex_file(XmlStorage(Path(file_full_path))):
+                validate_xml(sub_file, xmlschema)
+        elif filename.endswith(".xsd"):
+            log_all(logging.INFO, f"Processing XSD-file: {filename}")
+            check_xsd_validity(file_full_path)
+        else:
+            # If you want to skip silently, remove this line
+            log_all(logging.DEBUG, f"Skipping unsupported file type: {filename}")
+
+    if not os.path.exists(folder):
+        log_all(logging.ERROR, f"Provided path does not exist: {folder}")
+        return
+
+    if os.path.isfile(folder):
+        process_file_path(folder)
+    elif os.path.isdir(folder):
+        for root, dirs, files in os.walk(folder):
+            for filename in files:
+                process_file_path(os.path.join(root, filename))
+    else:
+        log_all(logging.ERROR, f"Path is neither a file nor a directory: {folder}")
 
 
 if __name__ == "__main__":

@@ -1,11 +1,12 @@
-from mdbx import MDBXCursorOp
+from mdbx import MDBXCursorOp, MDBXDBFlags
 
 from domain.netex.indexes.inverse_class import collect_classes_index
 from domain.netex.services.model_typing import Tid
 from domain.netex.model import EntityStructure
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
 from domain.utils import get_object_name
-from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_ID_IDX
+from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_ID_IDX, \
+    DB_UNRESOLVED_FLAGS, DB_REFERENCE_OUTWARD_FLAGS, DB_ID_IDX_FLAGS
 from storage.mdbx.serialization.byteserializer import ByteSerializer
 from mdbx.mdbx import TXN
 from typing import Optional, Generator
@@ -51,8 +52,8 @@ def resolve_embeddings(storage: MdbxStorage):
     unresolved_pairs: dict[bytes, set[bytes]] = {}
 
     with storage.env.rw_transaction() as txn:
-        db_unresolved = txn.open_map(DB_UNRESOLVED)
-        db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD)
+        db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor.iter():
@@ -66,11 +67,11 @@ def resolve_embeddings(storage: MdbxStorage):
 
         class_count: dict[type, int] = {}
         for clazz in clazzes:
-            db = txn.open_map(storage.class_idx[clazz])
+            db = txn.open_map(storage.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             class_count[clazz] = db.get_stat(txn).ms_entries
 
         for clazz, count in sorted(class_count.items(), key=lambda item: item[1]):
-            db = txn.open_map(storage.class_idx[clazz])
+            db = txn.open_map(storage.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
                     obj: Tid = storage.serializer.unmarshall(value, clazz)
@@ -92,9 +93,9 @@ def resolve(storage: MdbxStorage) -> None:
     separator = bytes([ByteSerializer.SEPARATOR])
 
     with storage.env.rw_transaction() as txn:
-        db_unresolved = txn.open_map(DB_UNRESOLVED)
-        db_id_idx = txn.open_map(DB_ID_IDX)
-        db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD)
+        db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
+        db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor.iter():
@@ -155,7 +156,7 @@ def resolve(storage: MdbxStorage) -> None:
                                 reference.version = referenced_obj.version
 
                     # TODO: buffer this write to ~10000 objects of the same type?
-                    db = txn.open_map(referencing_class_idx)
+                    db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
                     db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
                 # f = storage.load_object_by_full_key(txn, idx)

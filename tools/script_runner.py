@@ -5,7 +5,7 @@ import time
 import json
 import shutil
 import importlib
-from typing import Any, Optional
+from typing import Any, Optional, Union, List
 
 from utils.aux_logging import (
     prepare_logger,
@@ -112,6 +112,7 @@ def load_and_run(file_name: str, args_string: str) -> Any:
         elif arg == "False":
             result = False
         args1.append(result)
+    print(f'the arguments {args1}')
     result = main_function(*args1)
     return result
 
@@ -188,53 +189,83 @@ def set_defaults(keyvaluestr: str) -> None:
     defaults.update(result)
 
 
-def download(folder: str, url: str, regex: str = '', forced: bool = False) -> str:
+def download_one(folder: str, url: str, regex: str = '', forced: bool = False) -> str:
+    """
+    Download a single URL to folder. Returns the full local path.
+    Raises RuntimeError on failure.
+    """
+    if not os.path.exists(folder):
+        os.makedirs(folder, exist_ok=True)
+
+    # Determine filename heuristics (kept from your original function)
+    filename = os.path.basename(url) if url else ""
+    if filename == "resource":
+        filename = "resource.xml.gz"
+    if filename == "permalink":
+        filename = "swiss.zip"
+    if "?" in filename:
+        filename = "source.zip"
+    if "Resource" in filename:
+        filename = "source.xml.gz"
+    if filename == "":
+        filename = "source.gz"
+    if not (filename.endswith(".zip") or filename.endswith(".xml") or filename.endswith(".gz")):
+        filename = "source.zip"
+
+    local_path = os.path.join(folder, filename)
+
+    # If file already exists and not forced, skip download
+    if not forced and os.path.exists(local_path):
+        log_all(logging.INFO, f"File exists already. Will use: {local_path}")
+        return local_path
+
+    log_all(logging.INFO, f"Download from: {url} -> {local_path}")
     try:
-        # Create the folder if it doesn't exist
-        if not os.path.exists(folder):
-            os.makedirs(folder)
+        # allow unverified SSL if necessary (same as your original)
+        ssl._create_default_https_context = ssl._create_unverified_context
+        opener = urllib.request.build_opener()
+        opener.addheaders = [("User-Agent", "MyApp/1.0")]
+        urllib.request.install_opener(opener)
+        urllib.request.urlretrieve(url, local_path)
+        log_all(logging.INFO, f"File downloaded successfully: {local_path}")
+        return local_path
+    except urllib.error.HTTPError as e:
+        log_all(logging.ERROR, f"HTTP Error: {e.code} - {e.reason} for URL {url}")
+        raise RuntimeError(f"HTTP Error {e.code} for {url}") from e
+    except urllib.error.URLError as e:
+        log_all(logging.ERROR, f"URL Error: {e.reason} for URL {url}")
+        raise RuntimeError(f"URL Error {e.reason} for {url}") from e
+    except Exception as e:
+        log_all(logging.ERROR, f"Unexpected error downloading {url}: {e}")
+        raise
 
-        # Get the filename from the URL
-        filename = os.path.basename(url)
-        # work around for swiss data, where it is "permalink"
-        if filename == "resource":
-            filename = "resource.xml.gz"
-        if filename == "permalink":
-            filename = "swiss.zip"
-        if "?" in filename:  # for data from mobigo, that is fetched by an aspx script with parameters
-            filename = "source.zip"
-        if "Resource" in filename:  # for italian data
-            filename = "source.xml.gz"
-        if filename == "":
-            filename = "source.gz"
-        if not (filename.endswith(".zip") or filename.endswith(".xml") or filename.endswith(".gz")):
-            filename = "source.zip"
-        if not forced:
-            # Download only when not exists
-            path = os.path.join(folder, filename)
-            if os.path.exists(path):
-                log_all(logging.INFO, f"File: {path} exists already.Will use that one")
 
-        # Download the file
-        log_all(logging.INFO, f"Download from: {url}")
-        try:
-            ssl._create_default_https_context = ssl._create_unverified_context
-            opener = urllib.request.build_opener()
-            opener.addheaders = [("User-Agent", "MyApp/1.0")]
-            urllib.request.install_opener(opener)
-            urllib.request.urlretrieve(url, os.path.join(folder, filename))
-            log_all(logging.INFO, "File downloaded successfully.")
+def download_many(folder: str, urls: Union[str, List[str]], regex: str = '', forced: bool = False) -> List[str]:
+    """
+    Accepts either a single URL (str) or a list of URLs.
+    Returns a list of downloaded file paths (one entry per URL).
+    Raises on individual failures.
+    """
+    if isinstance(urls, str):
+        urls_list = [urls]
+    else:
+        urls_list = list(urls)
 
-        except urllib.error.HTTPError as e:
-            log_all(logging.ERROR, f"HTTP Error: {e.code} - {e.reason}")
-        except urllib.error.URLError as e:
-            log_all(logging.ERROR, f"URL Error: {e.reason}")
+    paths: List[str] = []
+    for url in urls_list:
+        path = download_one(folder, url, regex=regex, forced=forced)
+        paths.append(path)
+    return paths
 
-        # Return the downloaded file path
-        return os.path.join(folder, filename)
 
-    except urllib.error.HTTPError:
-        return "FILE NOT FOUND"
+def format_paths_as_list_literal(paths: List[str]) -> str:
+    """
+    Format a list of paths as a single string in the exact format you requested:
+    [filepath1, filepath2, filepath3]
+    Paths will be unquoted (as in your example). If you need quoted strings, change below.
+    """
+    joined = " ".join(paths)
+    return f"{joined}"
 
 
 def remove_file(path: str) -> str:
@@ -369,7 +400,8 @@ def main(
             if script_name == "download_input_file":
                 # Execute the download command. The file(s) under the download_url is copied to a folder
                 folder = script_args
-                script_input_file_path = download(folder, script_download_url)
+                script_input_file_path = format_paths_as_list_literal(download_many(folder, script_download_url))
+                print(f'filepaths: {script_input_file_path}')
                 if script_input_file_path == "FILE NOT FOUND":
                     log_all(logging.ERROR, "No file downloaded")
                     exit(1)

@@ -19,9 +19,8 @@ We might also add tools, that correct common problems in certain data sets.
 ## The XML (NeTEx) validator
 in the `tools` folder there is the a tool for validating xml files.
 ```
-uv run python -m tools.xml.validator path_to_xml_file.xml.zip  path_to_main_xsd_file
+uv run python -m tools.xml_validator path_to_xml_file.xml.zip 
 ```
-`path_to_main_xsd_file` is in `../schema/netex/xsd/netex_publication.xsd` if the project is installed regularly.
 `path_to_xml_file.xml.zip` can be an xml, a zip or a gz file.
 
 ## The GTFS validator

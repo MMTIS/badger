@@ -92,7 +92,7 @@
 #             return (codespace, data_source, version, frame_defaults)
 #
 #     def getResourceFrame(self, operators: list[Operator], id: str = "ResourceFrame") -> ResourceFrame:
-#         resource_frame = ResourceFrame(id=getId(ResourceFrame, self.codespace, id), version=self.version.version)
+#         resource_frame = ResourceFrame(id=getId(self.codespace, ResourceFrame,  id), version=self.version.version)
 #         resource_frame.data_sources = DataSourcesInFrameRelStructure(data_source=[self.data_source])
 #         # resource_frame.zones = ZonesInFrameRelStructure(transport_administrative_zone=[transport_administrative_zone])
 #         resource_frame.organisations = OrganisationsInFrameRelStructure(
@@ -127,7 +127,7 @@
 #
 #             for i in range(0, len(df['route_type'])):
 #                 operational_context = OperationalContext(
-#                     id=getId(OperationalContext, self.codespace, df['route_type'][i]),
+#                     id=getId(self.codespace, OperationalContext,  df['route_type'][i]),
 #                     version=self.version.version,
 #                     vehicle_mode=gtfsRouteTypeToNeTEx(df['route_type'][i]),
 #                 )
@@ -141,13 +141,13 @@
 #         if ':Route:' in shape_id:
 #             return shape_id
 #         else:
-#             return getId(Route, self.codespace, shape_id)
+#             return getId(self.codespace, Route, shape_id)
 #
 #     def get_shape_id_lsp(self, shape_id: str) -> str:
 #         if ':Route:' in shape_id:
 #             return shape_id.replace(':Route:', ':LinkSequenceProjection:')
 #         else:
-#             return getId(LinkSequenceProjection, self.codespace, shape_id)
+#             return getId( self.codespace, LinkSequenceProjection, shape_id)
 #
 #     #
 #     # def getPaths(self):
@@ -368,7 +368,7 @@
 #         if scheduled_stop_points is None:
 #             scheduled_stop_points = self.scheduled_stop_points
 #
-#         service_frame = ServiceFrame(id=getId(ServiceFrame, self.codespace, id), version=self.version.version)
+#         service_frame = ServiceFrame(id=getId(self.codespace, ServiceFrame, id), version=self.version.version)
 #         # service_frame.prerequisites.resource_frame_ref
 #         # setIdVersion(service_frame, self.codespace, "ServiceFrame", self.version)
 #         service_frame.lines = LinesInFrameRelStructure(line=cast(list[FlexibleLine | Line], lines))
@@ -441,7 +441,7 @@
 #         elif ':DayType:' in service_id:
 #             return service_id.replace(':DayType:', ':AvailabilityCondition:')
 #         else:
-#             return getId(AvailabilityCondition, self.codespace, service_id)
+#             return getId(self.codespace, AvailabilityCondition, service_id)
 #
 #     def getAvailabilityConditions(
 #         self,
@@ -555,24 +555,24 @@
 #             for i in range(0, len(transfer_types)):
 #                 feeder_filter = InterchangeRuleParameterStructure(
 #                     scheduled_stop_point_ref=(
-#                         getFakeRef(getId(ScheduledStopPoint, self.codespace, from_stop_ids[i]), ScheduledStopPointRef, self.version.version)
+#                         getFakeRef(getId(self.codespace, ScheduledStopPoint, from_stop_ids[i]), ScheduledStopPointRef, self.version.version)
 #                         if from_stop_location_types[i] == 0
 #                         else None
 #                     ),
 #                     stop_place_ref=(
-#                         getFakeRef(getId(StopPlace, self.codespace, from_stop_ids[i]), StopPlaceRef, self.version.version)
+#                         getFakeRef(getId(self.codespace, StopPlace, from_stop_ids[i]), StopPlaceRef, self.version.version)
 #                         if from_stop_location_types[i] == 1
 #                         else None
 #                     ),
 #                     all_lines_or_lines_in_direction_refs_or_line_in_direction_ref=(
 #                         [
-#                             LineInDirectionRef(line_ref=getFakeRef(getId(Line, self.codespace, from_route_ids[i]), LineRef, self.version.version)),
+#                             LineInDirectionRef(line_ref=getFakeRef(getId(self.codespace, Line, from_route_ids[i]), LineRef, self.version.version)),
 #                         ]
 #                         if from_route_ids[i]
 #                         else [EmptyType2(value='')]
 #                     ),
 #                     service_journey_ref_or_journey_designator_or_service_designator=(
-#                         getFakeRef(getId(ServiceJourney, self.codespace, from_trip_ids[i]), ServiceJourneyRefStructure, self.version.version)
+#                         getFakeRef(getId(self.codespace, ServiceJourney, from_trip_ids[i]), ServiceJourneyRefStructure, self.version.version)
 #                         if from_trip_ids[i]
 #                         else None
 #                     ),
@@ -580,32 +580,31 @@
 #
 #                 distributor_filter = InterchangeRuleParameterStructure(
 #                     scheduled_stop_point_ref=(
-#                         getFakeRef(getId(ScheduledStopPoint, self.codespace, to_stop_ids[i]), ScheduledStopPointRef, self.version.version)
+#                         getFakeRef(getId(self.codespace, ScheduledStopPoint, to_stop_ids[i]), ScheduledStopPointRef, self.version.version)
 #                         if to_stop_location_types[i] == 0
 #                         else None
 #                     ),
 #                     stop_place_ref=(
-#                         getFakeRef(getId(StopPlace, self.codespace, to_stop_ids[i]), StopPlaceRef, self.version.version)
+#                         getFakeRef(getId(self.codespace, StopPlace, to_stop_ids[i]), StopPlaceRef, self.version.version)
 #                         if to_stop_location_types[i] == 1
 #                         else None
 #                     ),
 #                     all_lines_or_lines_in_direction_refs_or_line_in_direction_ref=(
 #                         [
-#                             LineInDirectionRef(line_ref=getFakeRef(getId(Line, self.codespace, to_route_ids[i]), LineRef, self.version.version)),
+#                             LineInDirectionRef(line_ref=getFakeRef(getId(self.codespace, Line, to_route_ids[i]), LineRef, self.version.version)),
 #                         ]
 #                         if to_route_ids[i]
 #                         else [EmptyType2(value='')]
 #                     ),
 #                     service_journey_ref_or_journey_designator_or_service_designator=(
-#                         getFakeRef(getId(ServiceJourney, self.codespace, to_trip_ids[i]), ServiceJourneyRefStructure, self.version.version)
+#                         getFakeRef(getId(self.codespace, ServiceJourney, to_trip_ids[i]), ServiceJourneyRefStructure, self.version.version)
 #                         if to_trip_ids[i]
 #                         else None
 #                     ),
 #                 )
 #
-#                 id = getId(
+#                 id = getId(self.codespace,
 #                     InterchangeRule,
-#                     self.codespace,
 #                     hashlib.md5(
 #                         (
 #                             ';'.join(
@@ -743,7 +742,7 @@
 #
 #                 block_ref = None
 #                 if block_ids[i] is not None:
-#                     block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None, "EXTERNAL")
+#                     block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None, "EXTERNAL")
 #
 #                 # route_ref = None
 #                 lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
@@ -863,7 +862,7 @@
 #                         name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                     )
 #
-#                 from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[i])
+#                 from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[i])
 #                 arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[i])
 #                 departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[i])
 #
@@ -945,7 +944,7 @@
 #
 #                 block_ref = None
 #                 if block_ids[i] is not None:
-#                     block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None, "EXTERNAL")
+#                     block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None, "EXTERNAL")
 #
 #                 # route_ref = None
 #                 lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
@@ -1043,7 +1042,7 @@
 #                         name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                     )
 #
-#                 from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[i])
+#                 from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[i])
 #                 arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[i])
 #                 departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[i])
 #
@@ -1106,7 +1105,7 @@
 #             # ticketing_types = df.get('ticketing_type')
 #
 #             for i in range(0, len(route_ids)):
-#                 availability_condition_key = getId(AvailabilityCondition, self.codespace, service_ids[i])
+#                 availability_condition_key = getId(self.codespace, AvailabilityCondition, service_ids[i])
 #
 #                 availability_conditions_journey = [
 #                     availability_conditions.get(availability_condition_key, None),
@@ -1132,14 +1131,14 @@
 #
 #                 block_ref = None
 #                 if block_ids[i] is not None:
-#                     block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None, "EXTERNAL")
+#                     block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None, "EXTERNAL")
 #
 #                 # route_ref = None
 #                 lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
 #                 shape_id = get_or_none(shape_ids, i)
 #                 if shape_id is not None:
 #                     if shape_id in shape_used:
-#                         lsp = getFakeRef(getId(LinkSequenceProjection, self.codespace, shape_id), LinkSequenceProjectionRef, self.version.version)
+#                         lsp = getFakeRef(getId(self.codespace, LinkSequenceProjection, shape_id), LinkSequenceProjectionRef, self.version.version)
 #                     else:
 #                         lsps = self.getLineStrings(
 #                             {
@@ -1203,7 +1202,7 @@
 #                                 name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                             )
 #
-#                         from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[index_j])
+#                         from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[index_j])
 #                         arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[index_j])
 #                         departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[index_j])
 #
@@ -1239,7 +1238,7 @@
 #                     id=self.get_trip_id(trip_ids[i]),
 #                     version=self.version.version,
 #                     flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(
-#                         getId(Line, self.codespace, route_ids[i]), LineRef, self.version.version
+#                         getId(self.codespace, Line, route_ids[i]), LineRef, self.version.version
 #                     ),
 #                     private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_ids[i], type_value="trip_id")]),
 #                     short_name=getOptionalString(get_or_none(trip_short_names, i)),
@@ -1321,14 +1320,14 @@
 #
 #                 block_ref = None
 #                 if block_ids[i] is not None:
-#                     block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None, "EXTERNAL")
+#                     block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None, "EXTERNAL")
 #
 #                 # route_ref = None
 #                 lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
 #                 shape_id = get_or_none(shape_ids, i)
 #                 if shape_id is not None:
 #                     if shape_id in shape_used:
-#                         lsp = getFakeRef(getId(LinkSequenceProjection, self.codespace, shape_id), LinkSequenceProjectionRef, self.version.version)
+#                         lsp = getFakeRef(getId(self.codespace, LinkSequenceProjection, shape_id), LinkSequenceProjectionRef, self.version.version)
 #                     else:
 #                         lsps = self.getLineStrings(
 #                             {
@@ -1392,7 +1391,7 @@
 #                                 name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                             )
 #
-#                         from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[index_j])
+#                         from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[index_j])
 #                         arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[index_j])
 #                         departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[index_j])
 #
@@ -1426,7 +1425,7 @@
 #                     id=self.get_trip_id(trip_ids[i]),
 #                     version=self.version.version,
 #                     flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(
-#                         getId(Line, self.codespace, route_ids[i]), LineRef, self.version.version
+#                         getId(self.codespace, Line, route_ids[i]), LineRef, self.version.version
 #                     ),
 #                     private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_ids[i], type_value="trip_id")]),
 #                     short_name=getOptionalString(get_or_none(trip_short_names, i)),
@@ -1497,14 +1496,14 @@
 #
 #                     block_ref = None
 #                     if block_ids[i] is not None:
-#                         block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None, "EXTERNAL")
+#                         block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None, "EXTERNAL")
 #
 #                     # route_ref = None
 #                     lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
 #                     shape_id = get_or_none(shape_ids, i)
 #                     if shape_id is not None:
 #                         if shape_id in shape_used:
-#                             lsp = getFakeRef(getId(LinkSequenceProjection, self.codespace, shape_id), LinkSequenceProjectionRef, self.version.version)
+#                             lsp = getFakeRef(getId(self.codespace, LinkSequenceProjection, shape_id), LinkSequenceProjectionRef, self.version.version)
 #                         else:
 #                             lsps = self.getLineStrings(
 #                                 {
@@ -1568,7 +1567,7 @@
 #                                     name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                                 )
 #
-#                             from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[index_j])
+#                             from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[index_j])
 #                             arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[index_j])
 #                             departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[index_j])
 #
@@ -1602,7 +1601,7 @@
 #                         id=self.get_trip_id(trip_ids[i]),
 #                         version=self.version.version,
 #                         flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(
-#                             getId(Line, self.codespace, route_ids[i]), LineRef, self.version.version
+#                             getId(self.codespace, Line, route_ids[i]), LineRef, self.version.version
 #                         ),
 #                         private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_ids[i], type_value="trip_id")]),
 #                         short_name=getOptionalString(get_or_none(trip_short_names, i)),
@@ -1624,7 +1623,7 @@
 #         if ':ServiceJourney:' in trip_id:
 #             return trip_id.replace(':ServiceJourney:', ':TemplateServiceJourney:')
 #         else:
-#             return getId(TemplateServiceJourney, self.codespace, trip_id)
+#             return getId(self.codespace, TemplateServiceJourney, trip_id)
 #
 #     def getTemplateServiceJourneys(
 #         self,
@@ -1656,7 +1655,7 @@
 #             # ticketing_types = df.get('ticketing_type')
 #
 #             for i in range(0, len(route_ids)):
-#                 availability_condition_key = getId(AvailabilityCondition, self.codespace, service_ids[i])
+#                 availability_condition_key = getId(self.codespace, AvailabilityCondition, service_ids[i])
 #
 #                 availability_conditions_journey = [
 #                     availability_conditions.get(availability_condition_key, None),
@@ -1682,14 +1681,14 @@
 #
 #                 block_ref = None
 #                 if block_ids[i] is not None:
-#                     block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None)
+#                     block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None)
 #
 #                 # route_ref = None
 #                 lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
 #                 shape_id = get_or_none(shape_ids, i)
 #                 if shape_id is not None:
 #                     if shape_id in shape_used:
-#                         lsp = getFakeRef(getId(LinkSequenceProjection, self.codespace, shape_id), LinkSequenceProjectionRef, self.version.version)
+#                         lsp = getFakeRef(getId(self.codespace, LinkSequenceProjection, shape_id), LinkSequenceProjectionRef, self.version.version)
 #                     else:
 #                         lsps = self.getLineStrings(
 #                             {
@@ -1753,7 +1752,7 @@
 #                                 name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                             )
 #
-#                         from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[index_j])
+#                         from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[index_j])
 #                         arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[index_j])
 #                         departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[index_j])
 #
@@ -1807,7 +1806,7 @@
 #
 #                         hjgs.append(
 #                             HeadwayJourneyGroup(
-#                                 id=getId(HeadwayJourneyGroup, self.codespace, trip_ids[i] + '_' + start_times[index_j].replace(':', '')),
+#                                 id=getId(self.codespace, HeadwayJourneyGroup, trip_ids[i] + '_' + start_times[index_j].replace(':', '')),
 #                                 first_departure_time=start_time,
 #                                 first_day_offset_or_last_departure_time_or_last_day_offset_or_first_arrival_time_or_last_arrival_time=cast(
 #                                     list[
@@ -1827,10 +1826,10 @@
 #                         )
 #
 #                 template_service_journey = TemplateServiceJourney(
-#                     id=getId(TemplateServiceJourney, self.codespace, trip_ids[i]),
+#                     id=getId(self.codespace, TemplateServiceJourney, trip_ids[i]),
 #                     version=self.version.version,
 #                     flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(
-#                         getId(Line, self.codespace, route_ids[i]), LineRef, self.version.version
+#                         getId(self.codespace, Line, route_ids[i]), LineRef, self.version.version
 #                     ),
 #                     private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_ids[i], type_value="trip_id")]),
 #                     short_name=getOptionalString(get_or_none(trip_short_names, i)),
@@ -1915,14 +1914,14 @@
 #
 #                 block_ref = None
 #                 if block_ids[i] is not None:
-#                     block_ref = getFakeRef(getId(Block, self.codespace, block_ids[i]), BlockRef, None)
+#                     block_ref = getFakeRef(getId(self.codespace, Block, block_ids[i]), BlockRef, None)
 #
 #                 # route_ref = None
 #                 lsp: LinkSequenceProjection | LinkSequenceProjectionRef | None = None
 #                 shape_id = get_or_none(shape_ids, i)
 #                 if shape_id is not None:
 #                     if shape_id in shape_used:
-#                         lsp = getFakeRef(getId(LinkSequenceProjection, self.codespace, shape_id), LinkSequenceProjectionRef, self.version.version)
+#                         lsp = getFakeRef(getId(self.codespace, LinkSequenceProjection, shape_id), LinkSequenceProjectionRef, self.version.version)
 #                     else:
 #                         lsps = self.getLineStrings(
 #                             {
@@ -1984,7 +1983,7 @@
 #                                 name=MultilingualString(value=stop_headsign), front_text=MultilingualString(value=stop_headsign)
 #                             )
 #
-#                         from_point_ref = getId(ScheduledStopPoint, self.codespace, stop_ids[index_j])
+#                         from_point_ref = getId(self.codespace, ScheduledStopPoint, stop_ids[index_j])
 #                         arrival_time, arrival_dayoffset = self.noonTimeToNeTEx(arrival_times[index_j])
 #                         departure_time, departure_dayoffset = self.noonTimeToNeTEx(departure_times[index_j])
 #
@@ -2038,7 +2037,7 @@
 #
 #                         hjgs.append(
 #                             HeadwayJourneyGroup(
-#                                 id=getId(HeadwayJourneyGroup, self.codespace, trip_ids[i] + '_' + start_times[index_j].replace(':', '')),
+#                                 id=getId(self.codespace, HeadwayJourneyGroup, trip_ids[i] + '_' + start_times[index_j].replace(':', '')),
 #                                 first_departure_time=start_time,
 #                                 first_day_offset_or_last_departure_time_or_last_day_offset_or_first_arrival_time_or_last_arrival_time=cast(
 #                                     list[
@@ -2058,10 +2057,10 @@
 #                         )
 #
 #                 template_service_journey = TemplateServiceJourney(
-#                     id=getId(TemplateServiceJourney, self.codespace, trip_ids[i]),
+#                     id=getId(self.codespace, TemplateServiceJourney, trip_ids[i]),
 #                     version=self.version.version,
 #                     flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(
-#                         getId(Line, self.codespace, route_ids[i]), LineRef, self.version.version
+#                         getId(self.codespace, Line, route_ids[i]), LineRef, self.version.version
 #                     ),
 #                     private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_ids[i], type_value="trip_id")]),
 #                     short_name=getOptionalString(get_or_none(trip_short_names, i)),
