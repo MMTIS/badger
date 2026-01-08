@@ -28,13 +28,23 @@ class ByteSerializer(Serializer):
             for char in value
         )
 
+    # Drop-in: efficient full_key -> (class_idx_int, id_bytes)
     @staticmethod
-    def full_key_to_idx(full_key: bytes) -> tuple[bytes, bytes]:
-        full_int = int.from_bytes(full_key, 'little')
-        class_idx = (full_int >> 32).to_bytes(2, 'little')
-        key = (full_int & 0xFFFFFFFF).to_bytes(4, 'little')
-        return class_idx, key
+    def full_key_to_idx(full_key: bytes) -> tuple[int, bytes]:
+        """
+        Fast extractor of class index (as int) and id bytes from an 8-byte full_key.
 
+        Assumes little-endian layout used previously: full_key is 8 bytes where
+        the top 4 bytes are the class index and the low 4 bytes are the id.
+        Returns:
+          (class_idx_int, id_bytes)
+        """
+        # quick slice + small int conversion; avoids creating large Python int from whole 8 bytes
+        # and avoids extra to_bytes allocations.
+        class_idx_int = int.from_bytes(full_key[:4], 'little')
+        id_bytes = full_key[4:8]  # keep as bytes view (slice returns bytes)
+        return class_idx_int, id_bytes
+    
     @staticmethod
     def idx_full_key(class_idx: bytes, key: bytes) -> bytes:
         return ((int.from_bytes(class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')

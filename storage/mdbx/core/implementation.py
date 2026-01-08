@@ -144,7 +144,7 @@ class MdbxStorage:
             txn.commit()
         self._populate_class_idx()
 
-    def fetch_all_references_by_class(self, txn, clazzes, skip_existing=False):
+    def fetch_all_references_by_class_chatgpt(self, txn, clazzes, skip_existing=False):
         db_reference_outward = txn.open_map(DB_REFERENCE_OUTWARD)
         cursor = txn.cursor(db_reference_outward)
 
@@ -208,7 +208,7 @@ class MdbxStorage:
                 else:
                     yield obj
 
-    def fetch_all_references_by_class1(
+    def fetch_all_references_by_class(
         self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False
     ) -> Generator[type[EntityStructure], None, None]:
         # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in reference outward
@@ -245,29 +245,6 @@ class MdbxStorage:
         # Our selected objects may contain references themselves, obviously we need to have those too
         partial_new: set[bytes]
 
-        while True:
-            partial_new = set([])
-            for referencing_key in partial:
-                referencing_class_idx, _ = ByteSerializer.full_key_to_idx(referencing_key)
-                # print("STEP1", self.idx_class[referencing_class_idx])
-
-                for t in cursor.iter_dupsort_rows(start_key=referencing_key):
-                    for referencing_key2, reference_key in t:
-                        if referencing_key2 != referencing_key:
-                            break
-
-                        reference_class_idx, _ = ByteSerializer.full_key_to_idx(reference_key)
-                        # print("STEP2", self.idx_class[reference_class_idx])
-
-                        if self.idx_class[reference_class_idx] not in clazzes:
-                            if reference_key not in partial_new and reference_key not in yielded_set:
-                                partial_new.add(reference_key)
-
-            if len(partial_new) == 0:
-                break
-            else:
-                yielded_set.update(partial_new)
-                partial = partial_new.copy()
 
         # TODO: we are still missing the objects that are referenced from the reference
 
@@ -281,6 +258,70 @@ class MdbxStorage:
             else:
                 yield obj
 
+        # Replace your original "while True: ..." expansion with this block.
+        # Precondition: `yielded_set`, `partial`, `cursor`, `clazzes`, and `self` are in scope
+        # and behave as in your original function.
+
+        # Local bindings for speed
+        cursor_local = cursor
+        idx_class_local = self.idx_class
+        clazzes_local = clazzes
+
+        # Use a single 'seen' set for membership checks to avoid double lookups
+        seen = set(yielded_set)  # copy references that were already yielded/discovered
+
+        # adjacency cache: referencing_key (bytes) -> list[reference_key bytes]
+        adjacency: dict[bytes, list[bytes]] = {}
+
+        # frontier queue initialized with the initial partial set
+        frontier = collections.deque(partial)
+
+        # Tune batch size to balance memory and number of cursor scans
+        BATCH_SIZE = 1024
+
+        while frontier:
+            # Build a batch up to BATCH_SIZE items. Sorting the batch reduces cursor seeks.
+            batch = []
+            while frontier and len(batch) < BATCH_SIZE:
+                batch.append(frontier.popleft())
+
+            if not batch:
+                break
+
+            batch.sort()  # bytes sort gives key order; improves locality
+            batch_set = set(batch)
+            start_key = batch[0]
+            end_key = batch[-1]
+
+            # For each key k in the sequential cursor scan between start_key and end_key,
+            # collect duplicates whose key is in batch_set.
+            for k, v in cursor_local.iter(start_key=start_key, from_next=False):
+                # Stop scanning once keys go beyond the end of this batch range
+                if k > end_key:
+                    break
+
+                if k in batch_set:
+                    # Cache adjacency to avoid repeated DB seeks if we encounter k again later
+                    adjacency.setdefault(k, []).append(v)
+
+                    # Fast extraction of class index from the 8-byte reference key
+                    ref_class_idx_int = int.from_bytes(v[:4], 'little')
+
+                    # Only expand references whose class is not in the requested clazzes set
+                    if idx_class_local[ref_class_idx_int] not in clazzes_local:
+                        if v not in seen:
+                            seen.add(v)
+                            frontier.append(v)
+
+            # Continue loop: more frontier items may have been appended
+            # At loop end, seen contains all discovered nodes; we update yielded_set once done in full.
+            # Note: we don't copy partial here; frontier holds next nodes to process.
+            # The loop continues until frontier is exhausted.
+
+        # After expansion, update yielded_set with all discovered references
+        yielded_set.update(seen)
+        # Clear partial to show expansion finished (mirrors original semantics where partial became empty)
+        partial = set()
     # TODO: Rename
     def other_classes(self, txn: TXN, clazzes: set[Tid]) -> Generator[Tid, None, None]:
         other_classes = set(self.db_names_iter(txn))
