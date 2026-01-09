@@ -12,7 +12,17 @@
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
-
+           {
+    "block": "netex2epipnovalidation,
+    "description": "Script to transform a downloaded file from a general netex to an epip",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-%%block%%-netex.xml.gz"}
+         ]
+  },
              {
     "block": "netex2epipgtfs",
     "description": "Script to transform a downloaded file from a general netex to an epip and gtfs",
