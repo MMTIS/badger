@@ -483,6 +483,11 @@ class MdbxStorage:
                     str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True
                 )
                 full_key = db_id_idx.get(txn, key)
+                if full_key==None:
+                    # TODO means that a reference can't be resolved in the source data
+                    print(f"found empty full_key {key}")
+                    full_key=db_id_idx.get(txn, key)
+                    raise Exception(f"Can't load element from key {key}.")
                 return self.load_object_by_full_key(txn, full_key)
 
             if True:
