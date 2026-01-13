@@ -1,4 +1,19 @@
     [
+{
+  "block": "eurostar",
+  "worked":"xx",
+  "download_url":"https://integration-storage.dm.eurostar.com/gtfs-prod/gtfs_static_commercial_v2.zip",
+  "url":"https://transport.data.gouv.fr/datasets/eurostar-gtfs-plan-de-transport-et-temps-reel",
+  "description":"Eurostar",
+    "scripts": [
+     {"script": "clean_tmp", "args": "%%dir%%"},
+      {"script": "download_input_file", "args": "%%dir%%"},
+      {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+      {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
+      {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
+      {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"}
+       ]
+},
 
               {
     "block": "lux",

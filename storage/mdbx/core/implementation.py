@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 from sys import exception
 from types import TracebackType
@@ -57,7 +58,7 @@ class MdbxStorage:
             raise
 
         with self.env.rw_transaction() as txn:
-            with txn.create_map(name=DB_CLASS_IDX) as db_class_idx:
+            with txn.create_map(name=DB_CLASS_IDX, flags= DB_ID_IDX_FLAGS) as db_class_idx:
                 for idx, clazz in enumerate(self.serializer.name_object.values()):
                     clazz_name = get_object_name(clazz)
                     db_class_idx.put(txn, idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'))
@@ -146,7 +147,7 @@ class MdbxStorage:
     def fetch_all_references_by_class(
         self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False
     ) -> Generator[type[EntityStructure], None, None]:
-        # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in refence outward
+        # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in reference outward
         # Referenced objects may by itself introduce new references, hence it should be checked if the set contains (already) those
         # When the scan is complete, all referenced objects should be made available via the generator.
 
@@ -177,26 +178,32 @@ class MdbxStorage:
                     # print(self.idx_class[referencing_class_idx])
                     pass
 
-        # Our selected objects may contain references theirselves, obviously we need to have those too
+        # Our selected objects may contain references themselves, obviously we need to have those too
         partial_new: set[bytes]
 
         while True:
             partial_new = set([])
+            # print(f'Partial length: {len(partial)}')
             for referencing_key in partial:
                 referencing_class_idx, _ = ByteSerializer.full_key_to_idx(referencing_key)
-                # print("STEP1", self.idx_class[referencing_class_idx])
-
+                # print("STEP1", self.idx_class[referencing_class_idx], referencing_key)
+                toc=0
                 for t in cursor.iter_dupsort_rows(start_key=referencing_key):
+                    # print(f'{referencing_key}')
+                    toc=toc+1
                     for referencing_key2, reference_key in t:
+                        referencing_class_idx2, _ = ByteSerializer.full_key_to_idx(referencing_key2)
+                        # print("STEP2", self.idx_class[referencing_class_idx2], referencing_key2)
                         if referencing_key2 != referencing_key:
                             break
-
                         reference_class_idx, _ = ByteSerializer.full_key_to_idx(reference_key)
-                        # print("STEP2", self.idx_class[reference_class_idx])
-
+                        # print("    STEP2", self.idx_class[reference_class_idx], reference_key)
                         if self.idx_class[reference_class_idx] not in clazzes:
                             if reference_key not in partial_new and reference_key not in yielded_set:
                                 partial_new.add(reference_key)
+                    break
+                # print(f'  end loop 2: {toc}   {str(datetime.now())}')
+            # print(f'  end loop 1: {len(partial_new)} -  {str(datetime.now())}')
 
             if len(partial_new) == 0:
                 break
