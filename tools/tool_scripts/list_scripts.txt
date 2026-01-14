@@ -13,7 +13,7 @@
          ]
   },
            {
-    "block": "netex2epipnovalidation,
+    "block": "netex2epipnovalidation",
     "description": "Script to transform a downloaded file from a general netex to an epip",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
