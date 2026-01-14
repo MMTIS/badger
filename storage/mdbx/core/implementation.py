@@ -201,7 +201,7 @@ class MdbxStorage:
                         if self.idx_class[reference_class_idx] not in clazzes:
                             if reference_key not in partial_new and reference_key not in yielded_set:
                                 partial_new.add(reference_key)
-                    break
+                    break # We only want the single needle, which is found by the start_key.
                 # print(f'  end loop 2: {toc}   {str(datetime.now())}')
             # print(f'  end loop 1: {len(partial_new)} -  {str(datetime.now())}')
 
