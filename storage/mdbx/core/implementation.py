@@ -183,27 +183,19 @@ class MdbxStorage:
 
         while True:
             partial_new = set([])
-            # print(f'Partial length: {len(partial)}')
             for referencing_key in partial:
                 referencing_class_idx, _ = ByteSerializer.full_key_to_idx(referencing_key)
-                # print("STEP1", self.idx_class[referencing_class_idx], referencing_key)
-                toc=0
                 for t in cursor.iter_dupsort_rows(start_key=referencing_key):
-                    # print(f'{referencing_key}')
-                    toc=toc+1
                     for referencing_key2, reference_key in t:
                         referencing_class_idx2, _ = ByteSerializer.full_key_to_idx(referencing_key2)
-                        # print("STEP2", self.idx_class[referencing_class_idx2], referencing_key2)
+                        # we skip when we can't find a matching key
                         if referencing_key2 != referencing_key:
                             break
                         reference_class_idx, _ = ByteSerializer.full_key_to_idx(reference_key)
-                        # print("    STEP2", self.idx_class[reference_class_idx], reference_key)
                         if self.idx_class[reference_class_idx] not in clazzes:
                             if reference_key not in partial_new and reference_key not in yielded_set:
                                 partial_new.add(reference_key)
                     break
-                # print(f'  end loop 2: {toc}   {str(datetime.now())}')
-            # print(f'  end loop 1: {len(partial_new)} -  {str(datetime.now())}')
 
             if len(partial_new) == 0:
                 break
@@ -483,10 +475,8 @@ class MdbxStorage:
                     str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True
                 )
                 full_key = db_id_idx.get(txn, key)
-                if full_key==None:
-                    # TODO means that a reference can't be resolved in the source data
-                    print(f"found empty full_key {key}")
-                    full_key=db_id_idx.get(txn, key)
+                if full_key is None:
+                    # TODO means that a reference can't be resolved in the source data. Perhaps we want to generate dummy ones.
                     raise Exception(f"Can't load element from key {key}.")
                 return self.load_object_by_full_key(txn, full_key)
 
