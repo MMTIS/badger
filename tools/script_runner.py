@@ -136,7 +136,7 @@ def clean_tmp(f: str) -> None:
         if os.path.isfile(item_path):
             # Remove file if it matches the extensions
             if (
-                item.endswith(".duckdb") or item.endswith(".tmp") or item.endswith("lmdb") or item.endswith("mdb")
+                item.endswith(".duckdb") or item.endswith(".tmp") or item.endswith(".lmdb") or item.endswith(".mdb") or item.endswith(".dat") or item.endswith(".lck")
             ):  # logs are NOT cleaned (as at least one is already locked)
                 try:
                     os.remove(item_path)
