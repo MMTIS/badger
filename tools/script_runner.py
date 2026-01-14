@@ -145,6 +145,10 @@ def clean_tmp(f: str) -> None:
         elif os.path.isdir(item_path):
             # Recursively clean subdirectory
             clean_tmp(item_path)
+            # in the case of .mdbx folders we remove those
+            if item.endswith(".mdbx"):
+                #it should be empty, so we can clean it
+                os.rmdir(item_path)
 
 
 # removes a given processed folder
