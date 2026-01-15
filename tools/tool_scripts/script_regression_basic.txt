@@ -146,7 +146,7 @@
              {
     "block": "fr_aubeepip",
     "worked":"2025-08-14",
-    "description":"Aube from Grand-Est. Attention: file is fixed in time"
+    "description":"Aube from Grand-Est. Attention: file is fixed in time",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0046-0000-1",
     "download_url":"https://transport.data.gouv.fr/resources/80416/download?token=v5xpZG7L_m--NS5EIpKQUJVmY3QILYXXSHymLtnsLhc",
     "scripts": [
@@ -162,7 +162,7 @@
     "block": "fr_ardennesepip",
     "worked":"2025-08-14",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
-    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0045-0000/fluo-grand-est-fluo08-netex.zip",
+    "download_url":"https://transport.data.gouv.fr/resources/80414/download?token=v5xpZG7L_m--NS5EIpKQUJVmY3QILYXXSHymLtnsLhc",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -178,7 +178,7 @@
     "block": "fr_aubegtfs",
     "worked":"2025-08-14",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0046-0000-1",
-    "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0046-0000/fluo-grand-est-fluo10-netex.zip",
+    "download_url":"https://transport.data.gouv.fr/resources/80415/download?token=v5xpZG7L_m--NS5EIpKQUJVmY3QILYXXSHymLtnsLhc",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
