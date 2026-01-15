@@ -262,7 +262,7 @@ def extract(archive: zipfile.ZipFile, database: Path) -> None:
             del frequencies
             del stop_times
             del routes
-            del agency
+            del agencies
             del stops
 
             transfers = [GtfsProfile.projectInterchangeRuleToTransfer(transfer) for transfer in db_read.iter_only_objects(txn_read, InterchangeRule)] + [
