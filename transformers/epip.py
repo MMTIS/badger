@@ -579,8 +579,10 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                 if service_journey_pattern.direction_type is None and route.direction_type is not None:
                     service_journey_pattern.direction_type = route.direction_type.value
 
-                if service_journey_pattern.direction_ref_or_direction_view is None:
-                    service_journey_pattern.direction_ref_or_direction_view = route.direction_ref
+                # if Direction does not exist, then we should not invent it here. We should rely on Direction_Type then.
+                # Otherwise, we would need to add it to the database 2026-01-16
+                # if service_journey_pattern.direction_ref_or_direction_view is None:
+                #    service_journey_pattern.direction_ref_or_direction_view = route.direction_ref
 
                 if service_journey_pattern.distance is None:
                     route.distance = service_journey_pattern.distance
@@ -656,8 +658,9 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                 if isinstance(pis, StopPointInJourneyPattern)
             ]
 
-            # Ater the Routes to ServiceLinks!
+            # After the Routes to ServiceLinks!
             recover_line_ref(sj, service_journey_pattern, db_read, txn)
+
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
