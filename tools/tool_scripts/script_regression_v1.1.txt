@@ -1,10 +1,58 @@
     [
+{
+  "block": "eurostar",
+  "worked":"xx",
+  "download_url":"https://integration-storage.dm.eurostar.com/gtfs-prod/gtfs_static_commercial_v2.zip",
+  "url":"https://transport.data.gouv.fr/datasets/eurostar-gtfs-plan-de-transport-et-temps-reel",
+  "description":"Eurostar",
+    "scripts": [
+     {"script": "clean_tmp", "args": "%%dir%%"},
+      {"script": "download_input_file", "args": "%%dir%%"},
+      {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+      {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
+      {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
+      {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"}
+       ]
+},
+{
+  "block": "trenitaliagtfs",
+  "worked":"xx",
+  "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1080596/checkedResource",
+  "url":"https://www.cciss.it/nap/mmtis/public/catalog/Organisation/1077484",
+    "scripts": [
+     {"script": "clean_tmp", "args": "%%dir%%"},
+      {"script": "download_input_file", "args": "%%dir%%"},
+      {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/06-gtfs.mdbx"},
+      {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.mdbx %%dir%%/07-gtfs.mdbx"},
+      {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+
+       ]
+},
+{
+  "block": "trenitalia",
+  "worked":"xx",
+  "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1080596/checkedResource",
+  "url":"https://www.cciss.it/nap/mmtis/public/catalog/Organisation/1077484",
+  "description":"Trenitalia",
+    "scripts": [
+      {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.mdbx"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz netex/schema/xsd/NeTEx_publication.xsd"}
+
+       ]
+},
+
 
               {
     "block": "lux",
     "worked":"testing",
     "url":"https://data.public.lu/fr/datasets/horaires-et-arrets-des-transport-publics-netex/",
-    "download_url":"https://data.public.lu/fr/datasets/r/84097665-453b-41c7-ae8e-98574c747c4a",
+    "download_url":"https://data.public.lu/fr/datasets/r/e3c3f7b2-7867-451c-84fd-91f6d939c37e",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -364,9 +412,9 @@
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},

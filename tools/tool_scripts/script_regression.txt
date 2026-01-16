@@ -3,6 +3,7 @@
     {
     "block": "swissmikro",
     "download_url":"https://github.com/user-attachments/files/18201746/swiss_mikro.zip",
+    "working":"tbd",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},

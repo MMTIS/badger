@@ -136,7 +136,7 @@ def clean_tmp(f: str) -> None:
         if os.path.isfile(item_path):
             # Remove file if it matches the extensions
             if (
-                item.endswith(".duckdb") or item.endswith(".tmp") or item.endswith("lmdb") or item.endswith("mdb")
+                item.endswith(".duckdb") or item.endswith(".tmp") or item.endswith(".lmdb") or item.endswith(".mdb") or item.endswith(".dat") or item.endswith(".lck")
             ):  # logs are NOT cleaned (as at least one is already locked)
                 try:
                     os.remove(item_path)
@@ -145,6 +145,10 @@ def clean_tmp(f: str) -> None:
         elif os.path.isdir(item_path):
             # Recursively clean subdirectory
             clean_tmp(item_path)
+            # in the case of .mdbx folders we remove those
+            if item.endswith(".mdbx"):
+                #it should be empty, so we can clean it
+                os.rmdir(item_path)
 
 
 # removes a given processed folder

@@ -65,7 +65,7 @@ def main(folder: str, xsd_schema: str) -> None:
             check_xsd_validity(file_full_path)
         else:
             # If you want to skip silently, remove this line
-            log_all(logging.DEBUG, f"Skipping unsupported file type: {filename}")
+            log_all(logging.INFO, f"Skipping unsupported file type: {filename}")
 
     if not os.path.exists(folder):
         log_all(logging.ERROR, f"Provided path does not exist: {folder}")

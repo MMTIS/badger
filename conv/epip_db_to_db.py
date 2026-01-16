@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Generator
 
+import mdbx
+
 from domain.netex.model import (
     Codespace,
     ScheduledStopPoint,
@@ -155,7 +157,6 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                     # we will now take our original database, fetch all the references for the classes that we will have
                     # in the EPIP database, copied or created.
                     # TODO: We don't have to insert classes which are later directly copied or created,
-
                     target_db.insert_any_object_on_queue(txn_write, source_db.fetch_all_references_by_class(txn_read, other_referenced_classes, False))
 
                     for clazz in [
