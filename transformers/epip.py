@@ -607,11 +607,13 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 
         elif sj.calls:
             if sj.journey_pattern_ref:
+                # we found a journey_pattern_ref and are therefore happy
                 pass
                 # service_journey_pattern: ServiceJourneyPattern = db_read.get_single(ServiceJourneyPattern,
                 #                                                            sj.journey_pattern_ref.ref,
                 #                                                            sj.journey_pattern_ref.version)
             else:
+                # we generate a ServiceJourneyPattern from the calls
                 service_journey_pattern = service_journey_pattern_from_calls(sj, generator_defaults)
                 sj.journey_pattern_ref = getRef(service_journey_pattern)
 
@@ -620,21 +622,22 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
             # )
 
         elif sj.journey_pattern_ref and sj.time_demand_type_ref:
+            #generate PassingTimes from the ServiceJourneyPattern and the TimeDemandType
             service_journey_pattern: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
             time_demand_type: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
             CallsProfile.getPassingTimesFromTimeDemandType(sj, service_journey_pattern, time_demand_type)
 
         else:
+            # works for EPIP without TimeDemandType so, only warning and we set the service_journey_pattern to the sj ones
             log_all(
-                logging.ERROR,
+                logging.WARNING,
                 f"No matching timing transformation found for journey: {sj}",
             )
 
         # If we already know that this generated SJP already exists, we should not even add it.
         if sj.journey_pattern_ref.ref in sjp_ids:
             pass
-
-        elif service_journey_pattern is None:
+        elif sj.journey_pattern_ref is None:
             log_all(logging.ERROR, f'No service journey pattern for journey: {sj} {sj.journey_pattern_ref}')
 
         if service_journey_pattern is not None and service_journey_pattern.id not in sjp_ids:
