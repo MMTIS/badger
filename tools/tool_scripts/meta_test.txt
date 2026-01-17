@@ -1,2 +1,18 @@
 # Current set of scripts to run in sequence
+
+#nl epip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1epip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4epip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl3
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl2
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+
+# basic gtfs generation
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
+
+# basic gtfs loading
 python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
+
+# combined
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
