@@ -16,3 +16,6 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt m
 
 # combined
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
