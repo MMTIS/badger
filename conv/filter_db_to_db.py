@@ -123,14 +123,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Filter the input by an object")
     parser.add_argument("source", type=str, help="MDBX file to use as input of the transformation.")
 
-    parser.add_argument('object_type', type=str, help='The NeTEx object type to filter, for example ServiceJourney')
-    parser.add_argument('object_filter', type=str, help='The object filter to apply.')
-
     parser.add_argument(
         "target",
         type=str,
         help="MDBX file to overwrite and store contents of the transformation.",
     )
+
+    parser.add_argument('object_type', type=str, help='The NeTEx object type to filter, for example ServiceJourney')
+    parser.add_argument('object_filter', type=str, help='The object filter to apply.')
 
     parser.add_argument(
     "inwards_object_types",
