@@ -578,35 +578,6 @@
   },
 
 
-       {
-       "block": "swiss-prod-filter",
-           "worked":"testing",
-
-       "download_url":"https://github.com/user-attachments/files/21801570/swiss-tl.zip",
-    "description":"Filter",
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "set_defaults", "args": "forced_db_size=70000000000;authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.swiss_to_db.py", "args": "%%inputfilepath%% %%dir%%/03-swiss-import.mdbx"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.mdbx %%dir%%/04-netex-database.mdbx"},
-        {"script": "conv.filter_db_to_db", "args": "%%dir%%/04-netex-database.mdbx Line ch:2:Line:151.M.m1 %%dir%%/05-netex.mdbx  Line Route ServiceJourneyPattern" },
-        {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/05-netex.mdbx %%dir%%/tl-m1.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/tl-m1.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
-         {"script": "conv.filter_db_to_db", "args": "%%dir%%/04-netex-database.mdbx Line ch:2:Line:151.B.1%%dir%%/08-netex.mdbx  Line Route ServiceJourneyPattern" },
-        {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/08-netex.mdbx %%dir%%/tl-B1.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/tl-B1.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.filter_db_to_db", "args": "%%dir%%/04-netex-database.mdbx Operator ch:1:Operator:151 %%dir%%/11-netex.mdbx  " },
-        {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/11-netex.mdbx %%dir%%/select_by_operator.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/select_by_operator.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
-         {"script": "conv.filter_db_to_db", "args": "%%dir%%/04-netex-database.mdbx ServiceJourney ch:1:ServiceJourney:&lt;NoGlobalID&gt;_92013H.j25_372 %%dir%%/14-netex.mdbx  " },
-        {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/14-netex.mdbx %%dir%%/select_by_sj.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/select_by_sj.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
-
-               ]
-  },
-
-
   {
     "block": "at-test",
         "worked":"not-working",
