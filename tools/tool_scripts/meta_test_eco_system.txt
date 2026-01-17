@@ -18,16 +18,15 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt m
 
 # combined
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
 
 # filter
 python -m tools.script_runner ./tools/tool_scripts/script_regression.v1.1.txt mylog.log filter1
 
 # NOT WORKING
 # ===========
-#transformation of interchanges not working for Switzerland
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
 
 # Problem with SimplePointVersionStructure: #84
 python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_ardennesepip
