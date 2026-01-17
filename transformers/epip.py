@@ -13,6 +13,7 @@ from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
 from domain.netex.indexes.byid import getIndex
+from domain.netex.services.recursive_attributes import recursive_attributes
 from domain.netex.services.refs import getRef, getFakeRef
 from domain.netex.services.ids import getId
 from storage.mdbx.core.implementation import MdbxStorage
@@ -93,6 +94,7 @@ from domain.netex.model import (
     ValidityConditionsRelStructure,
     AvailabilityCondition,
     JourneyMeeting,
+    InterchangeRule,
     TariffZone,
     TariffZonesInFrameRelStructure,
     ZonesInFrameRelStructure,
@@ -1218,10 +1220,10 @@ def export_epip_network_offer(
     return publication_delivery
 
 
-def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
+def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange | InterchangeRule | JourneyMeeting, None, None]:
     print(sys._getframe().f_code.co_name)
 
-    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange, None, None]:
+    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange | InterchangeRule | JourneyMeeting, None, None]:
         # _load_generator = load_generator(db_read, InterchangeRule)
         # for interchange_rule in _load_generator:
         #     interchange_rule: InterchangeRule
@@ -1230,12 +1232,16 @@ def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_d
 
         journey_meeting: JourneyMeeting
         for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
+            #TODO MG: Suggest just returing JourneyMeetings
             # TODO: I want the from_journey ref having the "correct" name_of_ref_class
             service_journey_interchange: ServiceJourneyInterchange = project(
                 journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
             )
-            yield service_journey_interchange
+            yield journey_meeting
 
+        interchange_rule: InterchangeRule
+        for interchange_rule in db_read.iter_only_objects(txn, InterchangeRule):
+            yield interchange_rule
         """
         _load_generator = load_generator(db_read, InterchangeRule)
         for interchange_rule in _load_generator:
