@@ -92,7 +92,7 @@ def check_string(input_string: str) -> bool:
 
 def load_and_run(file_name: str, args_string: str) -> Any:
 
-    module_name = file_name.rstrip(".py")
+    module_name = file_name.removesuffix(".py")
     mod = importlib.import_module(module_name)
     main_function = getattr(mod, "main")
 
