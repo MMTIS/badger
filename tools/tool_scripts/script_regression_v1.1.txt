@@ -668,7 +668,7 @@
       {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
       {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
       {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%07-%%block%%-netex.xml.gz] %%dir%%/08-import.mdbx "},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/07-%%block%%-netex.xml.gz] %%dir%%/08-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/08-import.mdbx %%dir%%/09-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/09-netex-database.mdbx %%dir%%/10-%%block%%-full-netex.xml.gz"},
          {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f2-netex.mdbx Line Eurostar:Line:DEDTM-FRPNO  [Line Route ServiceJourneyPattern]" },
