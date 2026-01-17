@@ -67,7 +67,7 @@
 
            {
     "block": "swissinterchangeepip",
-    "download_url":"https://github.com/user-attachments/files/24531737/swiss_interchange.zip",
+    "download_url":"https://github.com/user-attachments/files/24689648/swiss_interchange.zip",
     "working":"yes, but no validation as not complete",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
@@ -81,7 +81,7 @@
   },
            {
     "block": "swissinterchangegtfs",
-    "download_url":"https://github.com/user-attachments/files/24531737/swiss_interchange.zip",
+    "download_url":"https://github.com/user-attachments/files/24689648/swiss_interchange.zip",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},

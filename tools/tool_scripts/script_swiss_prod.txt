@@ -15,6 +15,21 @@
   },
 
        {
+       "block": "swiss-prod-epip-1",
+       "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
+    "description":"Full swiss NeTEx dataset => EPIP",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "set_defaults", "args": "forced_db_size=70000000000;authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.swiss_to_db.py", "args": "%%inputfilepath%% %%dir%%/03-swiss-import.mdbx"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.mdbx %%dir%%/04-netex-database.mdbx"},
+        {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
+        ]
+  },
+
+       {
        "block": "swiss-prod-epip-mp",
        "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
     "description":"Full swiss NeTEx dataset => EPIP",
@@ -28,7 +43,6 @@
         {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
         ]
   },
-
          {
        "block": "swiss-prod-gtfs",
        "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
