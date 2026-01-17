@@ -283,12 +283,11 @@ def insert_database(
                     if localname in all_classes_with_xml_time:
                         recursive_replace(object, current_zoneinfo)
 
-                # I think we can remove this with NeTEx 2.0 2026-01-17 MG
-                #if hasattr(clazz, "order"):
-                #    if order is None:
-                #        warnings.warn(f"{localname} {id} does not have a required order, setting it to 1.")
-                #        order = 1
-                #        object.order = order
+                if hasattr(clazz, "order"):
+                    if order is None:
+                        warnings.warn(f"{localname} {id} does not have a required order, setting it to 1.")
+                        order = 1
+                        object.order = order
 
                 # TODO: Als we deze nu eens vervangen voor een lijst van objecten, tot het object type wijzigt.
                 if clazz != obj_clazz or len(obj_list) > 10000:
