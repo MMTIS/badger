@@ -1,7 +1,7 @@
 [
        {
        "block": "swiss-prod-epip",
-       "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2025/permalink",
+       "download_url":"https://data.opentransportdata.swiss/dataset/timetablenetex_2026/permalink",
     "description":"Full swiss NeTEx dataset => EPIP",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
