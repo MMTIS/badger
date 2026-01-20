@@ -54,6 +54,21 @@ class ByteSerializer(Serializer):
 
         return bytes(encoded_bytes)
 
+    def encode_prefix(self, id: str, version: str | None, clazz: Optional[type[Tid]] = None, include_clazz: bool = False) -> bytes:
+        encoded_bytes = bytearray()
+
+        encoded_bytes.extend(ByteSerializer.encode_string(id))
+        encoded_bytes.append(ByteSerializer.SEPARATOR)
+
+        if version is not None and version != "any":
+            encoded_bytes.extend(ByteSerializer.encode_string(version))
+            encoded_bytes.append(ByteSerializer.SEPARATOR)
+
+            if include_clazz and clazz is not None:
+                encoded_bytes.extend(self.class_idx[clazz])
+
+        return bytes(encoded_bytes)
+
     def split_key(self, key: bytes) -> list[bytes]:
         return key.split(bytes([ByteSerializer.SEPARATOR]))
 
