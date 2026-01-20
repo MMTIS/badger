@@ -1230,18 +1230,22 @@ def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_d
         #     service_journey_interchange: ServiceJourneyInterchange = project(interchange_rule, ServiceJourneyInterchange)
         #     yield service_journey_interchange
 
-        journey_meeting: JourneyMeeting
-        for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
-            #TODO MG: Suggest just returing JourneyMeetings
-            # TODO: I want the from_journey ref having the "correct" name_of_ref_class
-            service_journey_interchange: ServiceJourneyInterchange = project(
-                journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
-            )
-            yield journey_meeting
+        # journey_meeting: JourneyMeeting
+        # for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
+        #    #TODO MG: Suggest just returing JourneyMeetings
+        #    # TODO: I want the from_journey ref having the "correct" name_of_ref_class
+        #    service_journey_interchange: ServiceJourneyInterchange = project(
+        #        journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
+        #    )
+        #    yield journey_meeting
 
-        interchange_rule: InterchangeRule
-        for interchange_rule in db_read.iter_only_objects(txn, InterchangeRule):
-            yield interchange_rule
+        # interchange_rule: InterchangeRule
+        # for interchange_rule in db_read.iter_only_objects(txn, InterchangeRule):
+        #     yield interchange_rule
+        #TODO interchange_rule and journey_meeting should be handled at some point.
+        sji: ServiceJourneyInterchange
+        for sji in db_read.iter_only_objects(txn, ServiceJourneyInterchange):
+             yield sji
         """
         _load_generator = load_generator(db_read, InterchangeRule)
         for interchange_rule in _load_generator:
