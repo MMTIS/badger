@@ -1243,9 +1243,7 @@ def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_d
         # for interchange_rule in db_read.iter_only_objects(txn, InterchangeRule):
         #     yield interchange_rule
         #TODO interchange_rule and journey_meeting should be handled at some point.
-        sji: ServiceJourneyInterchange
-        for sji in db_read.iter_only_objects(txn, ServiceJourneyInterchange):
-             yield sji
+        yield from db_read.iter_only_objects(txn, ServiceJourneyInterchange)
         """
         _load_generator = load_generator(db_read, InterchangeRule)
         for interchange_rule in _load_generator:
