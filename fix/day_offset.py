@@ -153,9 +153,9 @@ def fix_passing_times(service_journey: ServiceJourney):
     return changed
 
 
-def main(source_database_file: Path) -> None:
+def main(source_database_file: str) -> None:
     # This function tries to resolve invalid time order within ServiceJourneys for both Passing Times and Calls.
-    with MdbxStorage(source_database_file, readonly=False) as source_db:
+    with MdbxStorage(Path(source_database_file), readonly=False) as source_db:
         with source_db.env.rw_transaction() as txn_write:
 
             def all_sj() -> Generator[ServiceJourney, None, None]:
