@@ -722,64 +722,75 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
 
     else:
         day_types = getIndex(
-            list(
-                itertools.chain.from_iterable(
+            [
+                x
+                for x in itertools.chain.from_iterable(
                     [service_calendar.day_types.day_type_ref_or_day_type_dummy for service_calendar in service_calendars if service_calendar.day_types]
                 )
-            )
+                if isinstance(x, DayType)
+            ]
             + list(
                 db_read.iter_only_objects(txn, DayType)
             )  # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
         )
+
         uic_operating_periods = getIndex(
-            list(
-                itertools.chain.from_iterable(
+            [
+                x
+                for x in itertools.chain.from_iterable(
                     [
                         service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
                         for service_calendar in service_calendars
                         if service_calendar.operating_periods
                     ]
                 )
-            )
-            + list(
-                db_read.iter_only_objects(txn, UicOperatingPeriod)
-            )  # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
+                if isinstance(x, UicOperatingPeriod)
+            ]
+            + list(db_read.iter_only_objects(txn, UicOperatingPeriod))
+            # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
         )
-        day_type_assignments = list(
-            itertools.chain.from_iterable(
+
+        operating_periods = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_periods
+                    ]
+                )
+                if isinstance(x, OperatingPeriod)
+            ]
+            + list(db_read.iter_only_objects(txn, OperatingPeriod))
+            # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
+        )
+
+        operating_days = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_days.operating_day_ref_or_operating_day
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_days
+                    ]
+                )
+                if isinstance(x, OperatingDay)
+            ]
+            + list(db_read.iter_only_objects(txn, OperatingDay))
+            # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
+        )
+
+        day_type_assignments = [
+            x
+            for x in itertools.chain.from_iterable(
                 [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
             )
-        ) + list(
+            if isinstance(x, DayTypeAssignment)
+        ] + list(
             db_read.iter_only_objects(txn, DayTypeAssignment)
         )  # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
-        operating_periods = getIndex(
-            list(
-                itertools.chain.from_iterable(
-                    [
-                        service_calendar.day_type_assignments.day_type_assignment
-                        for service_calendar in service_calendars
-                        if service_calendar.day_type_assignments
-                    ]
-                )
-            )
-            + list(
-                db_read.iter_only_objects(txn, OperatingPeriod)
-            )  # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
-        )
-        operating_days = getIndex(
-            list(
-                itertools.chain.from_iterable(
-                    [
-                        service_calendar.day_type_assignments.day_type_assignment
-                        for service_calendar in service_calendars
-                        if service_calendar.day_type_assignments
-                    ]
-                )
-            )
-            + list(
-                db_read.iter_only_objects(txn, OperatingDay)
-            )  # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
-        )
 
         # result_day_type = []
         # result_day_type_assignments = []
