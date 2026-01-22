@@ -22,8 +22,9 @@
   "scripts": [
     {"script": "clean_tmp", "args": "%%dir%%"},
     {"script": "download_input_file", "args": "%%dir%%"},
-    {"script": "tools.netex_remove_illegal_characters", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-    {"script": "conv.netex_to_db", "args": "[03-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
+    {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+    {"script": "tools.netex_remove_illegal_characters", "args": "%%dir%%/03-trenitalia.xml.gz %%dir%%/04-trenitalia.xml.gz"},
+    {"script": "conv.netex_to_db", "args": "[%%dir%%/04-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
     {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
     {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-gtfs.mdbx"},
     {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
