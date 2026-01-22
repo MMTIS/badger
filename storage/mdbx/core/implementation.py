@@ -467,6 +467,7 @@ class MdbxStorage:
 
     def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[EntityStructure]:
         with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
+            # TODO: With our current schema, we always will have a name_of_ref_class filled in.
             if ref.name_of_ref_class is not None:
                 # The optimal situation, we can search for the id class in the right place
                 name_of_ref_class = str(ref.name_of_ref_class.value if hasattr(ref.name_of_ref_class, 'value') else ref.name_of_ref_class)
@@ -474,15 +475,14 @@ class MdbxStorage:
                     str(ref.ref), ref.version if hasattr(ref, "version") else None, self.idx_class[self.class_name_idx[name_of_ref_class]], include_clazz=True
                 )
                 full_key = db_id_idx.get(txn, key)
-                if full_key is None:
-                    # TODO means that a reference can't be resolved in the source data. Perhaps we want to generate dummy ones.
-                    raise Exception(f"Can't load element from key {key}.")
-                return self.load_object_by_full_key(txn, full_key)
+                if full_key is not None:
+                    return self.load_object_by_full_key(txn, full_key)
 
             if True:
+                # TODO: Fallback should not happen, because the references should already have been updated, but since we are here
                 print("Fallback...")
-                prefix = self.serializer.encode_key(str(ref.ref), ref.version if hasattr(ref, "version") else None)
-                cursor = txn.cursor(db=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
+                prefix = self.serializer.encode_prefix(str(ref.ref), None, False)
+                cursor = txn.cursor(db_id_idx)
                 for check_key, resolved_idx in cursor.iter(prefix):
                     if check_key.startswith(prefix):
                         referenced_class_idx, referenced_key = self.serializer.full_key_to_idx(resolved_idx)
@@ -491,6 +491,9 @@ class MdbxStorage:
                         return self.load_object(txn, self.idx_class[referenced_class_idx], referenced_key)
                     else:
                         break
+
+        # TODO means that a reference can't be resolved in the source data. Perhaps we want to generate dummy ones.
+        raise Exception(f"Can't load element from key {ref.ref} via {key}.")
         return None
 
     def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:

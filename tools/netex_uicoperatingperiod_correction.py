@@ -75,7 +75,7 @@ def main(infile: str, outfile: str) -> None:
 if __name__ == '__main__':
     import argparse
 
-    log_all(logging.INFO, f"Start processing UicOperatingPeriod problem")
+    log_all(logging.INFO, f"Start processing UicOperatingPeriod problem. This code adds NameOfClass for the usage of UicOperatingPeriod in OperatingPeriods.")
 
     argument_parser = argparse.ArgumentParser(description='Processing UicOperatingPeriodRef')
     argument_parser.add_argument('input', help='NeTEx file with problematic UicOperatingPeriodRef')

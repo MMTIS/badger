@@ -2,7 +2,17 @@ import logging
 import traceback
 from pathlib import Path
 
-from domain.netex.model import DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea, InterchangeRule, Version
+from domain.netex.model import (
+    DataSource,
+    Codespace,
+    StopPlace,
+    PassengerStopAssignment,
+    ScheduledStopPoint,
+    StopArea,
+    InterchangeRule,
+    Version,
+    ServiceCalendar,
+)
 from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import prepare_logger, log_all
 
@@ -28,6 +38,8 @@ def gtfs_db_to_db(source_database: Path, target_database: Path, clean_database: 
                 with db_read.env.ro_transaction() as txn_read:
                     for clazz in [DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea, InterchangeRule, Version]:
                         db_write.copy_map(txn_read, db_write, txn_write, clazz)
+
+                    # service_calendars: List[ServiceCalendar] = list(db_read.iter_only_objects(txn_read, ServiceCalendar))
 
                     # Flatten the Operator, Authority, Branding, ResponsibilitySet; Provides Line and Operator
                     db_write.insert_any_object_on_queue(txn_write, gtfs_operator_line_memory(db_read, txn_read, {}))

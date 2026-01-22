@@ -242,7 +242,9 @@ def extract(archive: zipfile.ZipFile, database: Path) -> None:
                         if template_service_journey.journey_pattern_ref
                         else None
                     )
-                    assert service_journey_pattern is not None, f"{template_service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
+                    assert (
+                        service_journey_pattern is not None
+                    ), f"{template_service_journey.id} does not have a ServiceJourneyPattern, but defines passing times."
                     CallsProfile.getCallsFromTimetabledPassingTimes(template_service_journey, service_journey_pattern)
 
                 trip = GtfsProfile.projectServiceJourneyToTrip(template_service_journey, service_journey_pattern)

@@ -181,9 +181,10 @@ def embedding_obj_iter(
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
-        if hasattr(obj, "id") and obj.id is not None:
-            if (ignore is None or obj.__class__ not in ignore) and (interesting_classes is None or obj.__class__ in interesting_classes):
-                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj, path
+        if obj.__class__.__name__ in serializer.name_object: # TODO: The object should not even enter here
+            if hasattr(obj, "id") and obj.id is not None:
+                if (ignore is None or obj.__class__ not in ignore) and (interesting_classes is None or obj.__class__ in interesting_classes):
+                    yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj, path
 
 
 def only_embedding(
