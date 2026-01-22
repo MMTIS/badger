@@ -632,14 +632,14 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         else:
             # works for EPIP without TimeDemandType so, only warning and we set the service_journey_pattern to the sj ones
             log_all(
-                logging.WARNING,
+                logging.ERROR,
                 f"No matching timing transformation found for journey: {sj}",
             )
 
         # If we already know that this generated SJP already exists, we should not even add it.
         if sj.journey_pattern_ref.ref in sjp_ids:
             pass
-        elif sj.journey_pattern_ref is None:
+        elif service_journey_pattern is None:
             log_all(logging.ERROR, f'No service journey pattern for journey: {sj} {sj.journey_pattern_ref}')
 
         if service_journey_pattern is not None and service_journey_pattern.id not in sjp_ids:
