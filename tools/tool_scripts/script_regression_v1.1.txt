@@ -19,18 +19,17 @@
   "worked":"xx",
   "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/1080596/checkedResource",
   "url":"https://www.cciss.it/nap/mmtis/public/catalog/Organisation/1077484",
-    "scripts": [
-     {"script": "clean_tmp", "args": "%%dir%%"},
-      {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "#tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.mdbx "},
-        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
-      {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/02-gtfs.mdbx %%dir%%/07-gtfs.mdbx"},
-      {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
-
-       ]
+  "scripts": [
+    {"script": "clean_tmp", "args": "%%dir%%"},
+    {"script": "download_input_file", "args": "%%dir%%"},
+    {"script": "tools.netex_remove_illegal_characters", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+    {"script": "conv.netex_to_db", "args": "[03-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
+    {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
+    {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-gtfs.mdbx"},
+    {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
+    {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+    {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+    ]
 },
 {
   "block": "trenitalia",
