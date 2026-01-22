@@ -10,7 +10,7 @@
         {"script": "conv.netex_to_db.py", "args": "[%%inputfilepath%%] %%dir%%/03-swiss-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
         ]
   },
 
@@ -25,7 +25,7 @@
         {"script": "conv.swiss_to_db.py", "args": "%%inputfilepath%% %%dir%%/03-swiss-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
         ]
   },
 
@@ -40,7 +40,7 @@
         {"script": "conv.swiss_to_db_mp.py", "args": "%%inputfilepath%% %%dir%%/03-swiss-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-swiss-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
+        {"script": "tools.xml_validator.py", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
         ]
   },
          {
@@ -54,7 +54,7 @@
         {"script": "conv.swiss_to_db.py", "args": "%%inputfilepath%% %%dir%%/03.mdbx"},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs.py", "args": "%%dir%%/04.mdbx %%dir%%/%%block%%-gtfs-zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs-zip %%dir%%"}
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/04.mdbx %%dir%%/%%block%%-gtfs-zip"}
         ]
   }
 
