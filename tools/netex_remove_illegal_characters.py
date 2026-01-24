@@ -9,6 +9,15 @@ from utils.aux_logging import *
 from storage.lxml.core.implementation import XmlStorage
 
 from isal import igzip_threaded
+import codecs
+
+def my_replace_error(exc):
+    # exc is a UnicodeDecodeError instance
+    # return a tuple (replacement_string, position_to_resume)
+    return ('?', exc.end)
+
+
+
 
 # Some Italian files have illegal characters in their stops. We asked them to improve on that, but they didn't so we fix it here.
 
@@ -18,13 +27,16 @@ def _read_stream_as_text(stream) -> str:
     Read bytes or text from a stream and return a Unicode string.
     Replace any invalid UTF-8 sequences with the replacement character.
     """
+    codecs.register_error('myreplace', my_replace_error)
+
     # Try to read bytes first
     try:
         # Some XmlStorage file handles may be binary; read bytes
         data = stream.read()
         # If stream.read() returns str, keep it. If bytes, decode with replacement.
         if isinstance(data, bytes):
-            text = data.decode("utf-8", errors="replace")
+            text = data.decode('utf-8', errors='myreplace')
+            print("ping")
         else:
             # It's already str: ensure that any undecodable parts are replaced
             # (str in Python are already Unicode; nothing to do).
@@ -35,7 +47,7 @@ def _read_stream_as_text(stream) -> str:
             stream.seek(0)
         except Exception:
             pass
-        wrapper = TextIOWrapper(stream, encoding="utf-8", errors="replace")
+        wrapper = TextIOWrapper(stream, encoding="utf-8", errors="ignore")
         text = wrapper.read()
         try:
             wrapper.detach()
