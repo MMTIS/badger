@@ -585,8 +585,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                         )
                         if operating_period is not None:
                             operating_period = [operating_period]
-
-                        all_operating_periods.update(getIndex(operating_period))
+                            all_operating_periods.update(getIndex(operating_period))
 
                         yield day_type, day_type_assignments, operating_period
                     else:
