@@ -284,7 +284,7 @@ def insert_database(
                         recursive_replace(object, current_zoneinfo)
 
                 if hasattr(clazz, "order"):
-                    if order is None:
+                    if order is None or order=="0": # order is non-negative. We have found data where it is 0, so we set it to 1 too
                         warnings.warn(f"{localname} {id} does not have a required order, setting it to 1.")
                         order = 1
                         object.order = order
