@@ -23,11 +23,11 @@
     {"script": "clean_tmp", "args": "%%dir%%"},
     {"script": "download_input_file", "args": "%%dir%%"},
     {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-    {"script": "tools.netex_remove_illegal_characters", "args": "%%dir%%/03-trenitalia.xml.gz %%dir%%/04-trenitalia.xml.gz"},
-    {"script": "conv.netex_to_db", "args": "[%%dir%%/04-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
+    {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
     {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
     {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-gtfs.mdbx"},
     {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
+    {"script": "tools.gtfs_sanitize_stops", "args": "%%dir%%/08-%%block%%-gtfs.zip"},
     {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
     {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
     ]
@@ -42,8 +42,7 @@
       {"script": "clean_tmp", "args": "%%dir%%"},
       {"script": "download_input_file", "args": "%%dir%%"},
       {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-      {"script": "tools.netex_remove_illegal_characters", "args": "%%dir%%/03-trenitalia.xml.gz %%dir%%/04-trenitalia.xml.gz"},
-      {"script": "conv.netex_to_db", "args": "[%%dir%%/04-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
+      {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx"},
       {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
       {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
       {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz netex/schema/xsd/NeTEx_publication.xsd"}
@@ -151,7 +150,6 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
-        {"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -258,7 +256,6 @@
        {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
-        {"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -301,15 +298,15 @@
 
        {
     "block": "sta_bolzano",
-        "worked":"testing",
+        "worked":"NoticeAssignment Duplicate Key-Sequence. Duplicate key-sequence ['IT:ITH1:NoticeAssignment:03100T.26a1119158_12:', 'any']",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Asset/2219",
-    "download_url":"https://github.com/user-attachments/files/21854921/resource.zip",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/2219/checkedResource",
     "description": "original source: https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/2219/resource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "#tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.mdbx "},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
@@ -326,13 +323,13 @@
 
       {
     "block": "sta_trentino",
-        "worked":"testing",
+        "worked":"LineString needs id that start with a letter not a digit",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/2013",
-    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/6114/resource",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/6114/checkedResource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "#tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%inputfilepath%% ] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
@@ -349,9 +346,9 @@
   },
        {
     "block": "lombardiatrainitalia",
-        "worked":"2025-08-15",
+        "worked":"Not all fields of key identity-constraint '{http://www.netex.org.uk/netex}TimetabledPassingTime_AnyVersionedKey' evaluate to a node., line 113603",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/5486",
-    "download_url":"https://github.com/user-attachments/files/21719149/IT-ITC4-TRENITALIA_126_L1.xml.gz",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/310527/checkedResource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -360,9 +357,9 @@
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
@@ -373,21 +370,21 @@
 
 
        {
-    "block": "lombardiatrainitalia2",
+    "block": "lombardiatrennord",
         "worked":"testing",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/5486",
-    "download_url":"https://github.com/user-attachments/files/21719154/IT-ITC4-TRENORD_336_L1.xml.gz",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131494/checkedResource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
-        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
+        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx"},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
@@ -395,12 +392,9 @@
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
   },
-
-
-       {
+  {
     "block": "lombardiafunbus",
-        "worked":"2025-08-15",
-
+    "worked":"key-sequence ['IT:ITC4:OPERATOR:CO.MO._FUN_&_BUS_SCARL-6', 'any']",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Asset/131346",
     "download_url":"https://github.com/user-attachments/files/21719780/IT-ITC4-COMO-FUNBUS_191_L1.xml.gz",
     "scripts": [
@@ -408,8 +402,6 @@
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
-        {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
-        {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
@@ -419,14 +411,13 @@
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
-  },
+    },
 
-       {
+    {
     "block": "lombardiavarese",
-        "worked":"testing",
-
+    "worked":"No match found for key-sequence ['IT:ITC4:OPERATOR:AMSC_SPA-5', 'any'] of keyref ",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Asset/131116",
-    "download_url":"https://github.com/user-attachments/files/21719886/IT-ITC4-AMSC_310_L1.xml.gz",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/131116/checkedResource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -443,37 +434,34 @@
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
   },
-
-
-       {
+  {
     "block": "lombardiamovibus",
-        "worked":"2025-08-15",
-
+    "worked":" line 139, in getOptionalMultilingualString",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Asset/132195",
-    "download_url":"https://github.com/user-attachments/files/21719983/IT-ITC4-MOVIBUS_274_L1.xml.gz",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/132195/checkedResource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/02-import.mdbx "},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
-        {
+  {
     "block": "5t",
-        "worked":"problem ",
-
+    "worked":"GTFS validation problem_trip_id mutliple times",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/6",
-    "download_url":"https://github.com/user-attachments/files/21722348/IT-ITC1-TRENITALIA_L1.xml.gz",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/241/checkedResource",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -492,12 +480,11 @@
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
   },
-        {
+  {
     "block": "5t_ciri",
-        "worked":"problem ",
-
+    "worked":"problem in gtfs_db_to_db",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/6",
-    "download_url":"https://github.com/user-attachments/files/21822327/IT-ITC1-TRENITALIA_L1.zip",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/194547/checkedResource",
     "description":"manually fixed problem",
      "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
@@ -507,9 +494,9 @@
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
         {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
@@ -517,69 +504,61 @@
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
   },
-
-        {
-    "block": "5t_2",
-        "worked":"problem in GTFS",
-
-    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/6",
-    "download_url":"https://github.com/user-attachments/files/21722695/IT-ITC1-CCA-NO_L1.xml.gz",
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
-        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
-        {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
-        {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
-         ]
-  },
-
-
-        {
-    "block": "5t_3",
-        "worked":"problem",
-
-    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Asset/130388",
-    "download_url":"https://github.com/user-attachments/files/21722923/IT-ITC1-SH-MOB-TO_L3.1.xml.gz",
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
-        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
-        {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
-        {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
-        {"script": "tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
-         ]
-  },
-
 
   {
+    "block": "5t_2",
+    "worked":"problem in GTFS",
+    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/141",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/807/checkedResource",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
+        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
+        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+  {
+    "block": "5t_3",
+    "worked":"problem",
+    "url":"https://www.cciss.it/nap/mmtis/public/catalog/Asset/130388",
+    "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/130388/checkedResource",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03-trenitalia.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
+        {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
+        {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%inputfilepath%%"},
+        {"script": "#tools.netex_stats", "args": "%%inputfilepath%%"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
+        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+         ]
+  },
+  {
     "block": "at-test",
-        "worked":"not-working",
-
+    "worked":"not-working",
     "url":"https://www.mobilitydata.gv.at/en/downloads",
     "download_url":"https://github.com/user-attachments/files/21723014/20250804-2148_netex_vmobil_2025.zip",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.mdbx "},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/03-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.mdbx "},
