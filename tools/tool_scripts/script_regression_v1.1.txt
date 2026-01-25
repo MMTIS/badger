@@ -1,7 +1,7 @@
     [
 {
   "block": "eurostar",
-  "worked":"xx",
+  "worked":"works",
   "download_url":"https://integration-storage.dm.eurostar.com/gtfs-prod/gtfs_static_commercial_v2.zip",
   "url":"https://transport.data.gouv.fr/datasets/eurostar-gtfs-plan-de-transport-et-temps-reel",
   "description":"Eurostar",
@@ -76,7 +76,7 @@
 
            {
     "block": "fr_ardennes",
-    "worked":"2025-08-14",
+    "worked":"error_gtfs_db_to_db",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0045-0000",
     "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0045-0000/fluo-grand-est-fluo08-netex.zip",
     "scripts": [
@@ -98,7 +98,7 @@
 
              {
     "block": "fr_aube",
-    "worked":"2025-08-14",
+    "worked":"xml validation error",
     "url":"https://transport.data.gouv.fr/datasets/fr-200052264-t0046-0000-1",
     "download_url":"https://www.datagrandest.fr/metadata/fluo-grand-est/FR-200052264-T0046-0000/fluo-grand-est-fluo10-netex.zip",
     "scripts": [
@@ -120,7 +120,7 @@
 
   {
     "block": "fr_sncf_ter",
-    "worked":"2025-08-14",
+    "worked":"error",
     "url":"https://transport.data.gouv.fr/datasets/horaires-sncf",
     "download_url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-opendata-sncf-netex.zip",
     "scripts": [
@@ -144,7 +144,7 @@
 
   {
     "block": "fr_sncf_gtfs",
-    "worked":"2025-08-14",
+    "worked":"error",
     "url":"https://transport.data.gouv.fr/datasets/horaires-sncf",
     "download_url":"https://eu.ftp.opendatasoft.com/sncf/plandata/export-opendata-sncf-gtfs.zip",
     "scripts": [
