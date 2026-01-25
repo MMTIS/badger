@@ -594,7 +594,7 @@
   },
   {
   "block": "filter1",
-  "worked":"testing",
+  "worked":"2026-01-25",
   "download_url":"https://integration-storage.dm.eurostar.com/gtfs-prod/gtfs_static_commercial_v2.zip",
   "url":"https://transport.data.gouv.fr/datasets/eurostar-gtfs-plan-de-transport-et-temps-reel",
   "description":"Eurostar",
