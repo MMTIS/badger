@@ -25,7 +25,7 @@ def my_replace_error(exc):
 def _read_stream_as_text(stream) -> str:
     """
     Read bytes or text from a stream and return a Unicode string.
-    Replace any invalid UTF-8 sequences with the replacement character.
+    Ignore any invalid UTF-8 sequences might be a bad idea, so to be improved necessary, because Italian data has bad handling of UTF_8 TODO
     """
     codecs.register_error('myreplace', my_replace_error)
 
@@ -35,7 +35,7 @@ def _read_stream_as_text(stream) -> str:
         data = stream.read()
         # If stream.read() returns str, keep it. If bytes, decode with replacement.
         if isinstance(data, bytes):
-            text = data.decode('utf-8', errors='myreplace')
+            text = data.decode('utf-8', errors='ignore')
             print("ping")
         else:
             # It's already str: ensure that any undecodable parts are replaced
@@ -59,23 +59,6 @@ def _read_stream_as_text(stream) -> str:
         except Exception:
             pass
     return text
-
-
-def modify_xml_content(root, file_path, outfile=None):
-    # Define the namespace
-    namespaces = {'': 'http://www.netex.org.uk/netex'}  # Empty prefix for default namespace
-    ET.register_namespace('', 'http://www.netex.org.uk/netex')
-    # Find all OperatingPeriodRef elements using the default namespace
-    for ref in root.iterfind(".//OperatingPeriodRef", namespaces):
-        if 'nameOfRefClass' in ref.attrib:
-            continue
-        else:
-            target_id = ref.attrib.get('ref')
-            if not target_id:
-                continue
-            match = root.find(f".//UicOperatingPeriod[@id='{target_id}']", namespaces)
-            if match is not None:
-                ref.attrib['nameOfRefClass'] = 'UicOperatingPeriod'
 
 
 def modify_xml_file(file_path: Path, output_filename: str):
@@ -104,9 +87,6 @@ def modify_xml_file(file_path: Path, output_filename: str):
                 # If parsing still fails, write a helpful error and re-raise
                 logging.error("XML parse error in %s: %s", real_filename, e)
                 raise
-
-            # Apply your modification
-            modify_xml_content(et.getroot(), file_path.name)
 
             # Write output depending on extension
             if output_filename.endswith(".gz"):
