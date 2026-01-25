@@ -42,13 +42,15 @@
 },
 
              {
-    "block": "netex2epipgtfsuicfix",
+    "block": "netex2epipgtf_it_fixing",
     "description": "Script to transform a downloaded file from a general netex to an epip and gtfs",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.zip"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.zip] %%dir%%/04.mdbx"},
+        {"script": "tools.netex_remove_illegal_characters", "args": "%%dir%%/03.zip %%dir%%/04.zip"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/04.zip] %%dir%%/04.mdbx"},
+        {"script": "fix.day_offset", "args": "%%dir%%/04.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/04.mdbx %%dir%%/05.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05.mdbx %%dir%%/06-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/06-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},

@@ -162,7 +162,7 @@
 
 {
 "block":"mobigo-list",
-"worked":"2025-08-14",
+"worked":"2026-01-24",
 "description":"List of some mobigo data to fetch and transform",
 "download_urls":[
     "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
@@ -229,14 +229,13 @@
 
   {
     "block": "aura",
-    "worked":"problems_testing",
+    "worked":"problem step 5: conv_epip_db_to_db",
     "download_url":"https://api.oura3.cityway.fr/dataflow/offre-tc/download?provider=OURA&dataFormat=GTFS&dataProfil=OPENDATA",
     "description":"aggregat Aura",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
-        {"script": "#remove_file", "args": "%%inputfilepath%%"},
         {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -252,7 +251,7 @@
 
   {
     "block": "mobigo-jura",
-    "worked":"problem_with_folium",
+    "worked":"gtfs_db_to_db",
     "download_url":"https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
     "description":"Réseau interurbain Mobigo! mer Dateien",
       "scripts": [
