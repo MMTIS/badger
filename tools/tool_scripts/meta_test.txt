@@ -1,19 +1,27 @@
 # Current set of scripts to run in sequence
+#v1.1
 
-#nl epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl3
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl2
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log trenitaliagtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log eurostar
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_ardennes
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_aube
 
-# basic gtfs generation
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
-
-# basic gtfs loading
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
-
-# combined
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
-
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log mobigo-jura
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log sta_bolzano
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log sta_trentino
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiatrainitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiatrennord
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiafunbus
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiavarese
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiamovibus
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t_2
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_bas_rhin
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t_ciri
+#at
+#deutschland
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log trenitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_sncf_ter
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_sncf_gtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log nvbw-list
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lux
