@@ -619,10 +619,8 @@
     {"script": "tools.xml_validator.py", "args": "%%dir%%/select_by_operator.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
     {"script": "tools.xml_validator.py", "args": "%%dir%%/select_by_sj.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
     ]
-  }
-
-
-         {
+  },
+  {
     "block": "mmri_1a",
     "url":"https://github.com/plannerstack/testset",
     "download_url":"https://github.com/user-attachments/files/24860255/1a.zip",
