@@ -619,9 +619,9 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                 service_journey_pattern = service_journey_pattern_from_calls(sj, generator_defaults)
                 sj.journey_pattern_ref = getRef(service_journey_pattern)
 
-            # sj.passing_times = TimetabledPassingTimesRelStructure(
-            #     timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
-            # )
+            sj.passing_times = TimetabledPassingTimesRelStructure(
+                 timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
+            )
 
         elif sj.journey_pattern_ref and sj.time_demand_type_ref:
             #generate PassingTimes from the ServiceJourneyPattern and the TimeDemandType

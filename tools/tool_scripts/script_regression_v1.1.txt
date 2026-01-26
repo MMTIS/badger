@@ -621,4 +621,21 @@
     ]
   }
 
+
+         {
+    "block": "mmri_1a",
+    "url":"https://github.com/plannerstack/testset",
+    "download_url":"https://github.com/user-attachments/files/24860255/1a.zip",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+        {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/04-gtfs.mdbx"},
+        {"script": "conv.epip_db_to_db", "args": "%%dir%%/04-gtfs.mdbx %%dir%%/05-epip.mdbx"},
+        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-epip.mdbx %%dir%%/06-%%block%%-netex.xml.gz"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/06-%%block%%-netex.xml.gz] %%dir%%/07-epip.mdbx"},
+        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/07-epip.mdbx %%dir%%/08-gtfs.mdbx"},
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/09-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/09-%%block%%-gtfs.zip %%dir%%"}
+         ]}
 ]

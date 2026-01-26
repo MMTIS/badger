@@ -446,7 +446,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
     yield from query_sj(db_read, txn)
 
     def query_daytype(db_read: MdbxStorage, txn: TXN, calendar_combinations):
-        service_calendars: List[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
+        service_calendars: list[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
 
         all_day_type_assignments = [
             x
@@ -585,6 +585,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                         )
                         if operating_period is not None:
                             operating_period = [operating_period]
+
                             all_operating_periods.update(getIndex(operating_period))
 
                         yield day_type, day_type_assignments, operating_period
