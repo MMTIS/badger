@@ -295,7 +295,7 @@ def extract(archive: zipfile.ZipFile, database: Path) -> None:
             versions = list(db_read.iter_only_objects(txn_read, Version))
             if datasources and len(datasources) > 0:
                 ds = datasources[0]
-                feed_publisher_name = str(ds.name.content[0]) if ds and ds.name else defaults["feed_publisher_name"]
+                feed_publisher_name = str(ds.name.content[0].value) if ds and ds.name else defaults["feed_publisher_name"]
             else:
                 feed_publisher_name = defaults["feed_publisher_name"]
 
