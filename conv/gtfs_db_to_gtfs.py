@@ -11,7 +11,6 @@ from transformers.gtfsprofile import GtfsProfile
 from domain.netex.model import (
     Line,
     StopPlace,
-    Codespace,
     ScheduledStopPoint,
     PassengerStopAssignment,
     Authority,
@@ -31,7 +30,6 @@ from domain.netex.model import (
     Quay,
     FareScheduledStopPoint,
     ScheduledStopPointRef,
-    LevelRef,
     Level,
 )
 
@@ -56,7 +54,6 @@ def extract(archive: zipfile.ZipFile, database: Path) -> None:
     with MdbxStorage(database, readonly=True) as db_read:
         with db_read.env.ro_transaction() as txn_read:
             datasources: List[DataSource] = list(db_read.iter_only_objects(txn_read, DataSource, limit=1))
-            codespaces: List[Codespace] = list(db_read.iter_only_objects(txn_read, Codespace, limit=1))
 
             authority: Authority
             for authority in db_read.iter_only_objects(txn_read, Authority):
@@ -293,30 +290,28 @@ def extract(archive: zipfile.ZipFile, database: Path) -> None:
 
             # TODO: This concept is deprecated, we need to store the CompositeFrame ValidBetween on something.
             versions = list(db_read.iter_only_objects(txn_read, Version))
-            if datasources and len(datasources) > 0:
-                ds = datasources[0]
-                feed_publisher_name = str(ds.name.content[0].value) if ds and ds.name else defaults["feed_publisher_name"]
-            else:
-                feed_publisher_name = defaults["feed_publisher_name"]
 
-            GtfsProfile.writeToZipFile(
-                archive,
-                'feed_info.txt',
-                [
-                    {
-                        'feed_publisher_name': feed_publisher_name,
-                        'feed_publisher_url': codespaces[0].xmlns_url if codespaces else defaults["feed_publisher_url"],
-                        'feed_lang': 'en',  # TODO
-                        'default_lang': 'en',  # TODO
-                        'feed_start_date': (dt := versions[0].start_date) and str(dt.to_datetime().date()).replace('-', '') if len(versions) > 0 else '',
-                        'feed_end_date': (dt := versions[0].end_date) and str(dt.to_datetime().date()).replace('-', '') if len(versions) > 0 else '',
-                        'feed_version': str(datetime.date.today()).replace('-', ''),
-                        'feed_contact_email': '',
-                        'feed_contact_url': '',
-                    }
-                ],
-                write_header=True,
-            )
+            if len(datasources) > 0:
+                ds = datasources[0]
+
+                GtfsProfile.writeToZipFile(
+                    archive,
+                    'feed_info.txt',
+                    [
+                        {
+                            'feed_publisher_name': str(ds.name.content[0].value) if ds and ds.name else defaults["feed_publisher_name"],
+                            'feed_publisher_url': ds.url if ds and ds.url else defaults["feed_publisher_url"],
+                            'feed_lang': 'en',  # TODO
+                            'default_lang': 'en',  # TODO
+                            'feed_start_date': (dt := versions[0].start_date) and str(dt.to_datetime().date()).replace('-', '') if len(versions) > 0 else '',
+                            'feed_end_date': (dt := versions[0].end_date) and str(dt.to_datetime().date()).replace('-', '') if len(versions) > 0 else '',
+                            'feed_version': str(datetime.date.today()).replace('-', ''),
+                            'feed_contact_email': ds.email if ds and ds.email else '',
+                            'feed_contact_url': '',
+                        }
+                    ],
+                    write_header=True,
+                )
 
 
 def main(netex: str, gtfs: str) -> None:
