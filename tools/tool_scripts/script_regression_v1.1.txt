@@ -715,7 +715,7 @@
     {
     "block": "mmri_1g2",
     "url":"https://github.com/plannerstack/testset",
-    "download_url":"https://github.com/user-attachments/files/24885597/1g2.zip",
+    "download_url":"https://github.com/user-attachments/files/24887040/1g2.zip",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -732,7 +732,7 @@
              {
     "block": "mmri_1g3",
     "url":"https://github.com/plannerstack/testset",
-    "download_url":"https://github.com/user-attachments/files/24885603/1g3.zip",
+    "download_url":"https://github.com/user-attachments/files/24887043/1g3.zip",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
