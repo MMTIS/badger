@@ -11,6 +11,56 @@ import zipfile
 import xml.etree.ElementTree as ET
 from typing import Iterable, Set
 
+import re
+import xml.etree.ElementTree as ET
+from typing import Union
+
+_id_starts_with_digit = re.compile(r'^\d')
+
+import re
+import xml.etree.ElementTree as ET
+
+_id_starts_with_digit = re.compile(r'^\d')
+
+def fix_linestring_ids(root: ET.Element,
+                       consider_namespaces: bool = False) -> None:
+    """
+    Ensure all LineString elements have an id attribute that starts with a letter.
+    If an id starts with a digit, prefix it with "fix-".
+    Modifies the tree in place.
+
+    Parameters:
+    - root: ET.Element — the root element to search under
+    - consider_namespaces: bool — if False (default), match elements by local name
+                                    (ignores namespaces). If True, match only when
+                                    the tag exactly equals 'LineString' or a namespaced
+                                    tag that includes the namespace braces.
+    Returns:
+    - None
+    """
+    def local_name(tag: str) -> str:
+        if tag.startswith('{'):
+            return tag.split('}', 1)[1]
+        return tag
+
+    for elem in root.iter():
+        if consider_namespaces:
+            # match only when the full tag equals 'LineString' or any namespaced variant
+            # (i.e. exact tag including namespace) — this means only tags that end with
+            # 'LineString' but keep their namespace are matched as well.
+            # To be strict: require the local name to be exactly 'LineString' but keep namespace considered
+            match = (elem.tag == 'LineString') or (elem.tag.startswith('{') and local_name(elem.tag) == 'LineString')
+            if not match:
+                continue
+        else:
+            # ignore namespace, match solely by local name
+            if local_name(elem.tag) != 'LineString':
+                continue
+
+        id_val = elem.get('id')
+        if id_val and _id_starts_with_digit.match(id_val):
+            elem.set('id', 'fix-' + id_val)
+
 
 def remove_id_and_version_from_tags(root: ET.Element,
                                     target_tags: Iterable[str] = ("Location", "Centroid"),
@@ -88,8 +138,9 @@ def process_file(file_path, output_filename):
         replace_versionref_with_version(et.getroot())
         #removes id and version from elements like Centroid and Location
         remove_id_and_version_from_tags(et.getroot())
+        # Fixes the line string id to become valid
+        fix_linestring_ids(et.getroot())
         filecounter =filecounter+1
-        artifical_file_name="file"
         # Comes from xml.py
         if output_filename.endswith(".gz"):
             with igzip_threaded.open(  # type: ignore
