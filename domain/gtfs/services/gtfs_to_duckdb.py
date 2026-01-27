@@ -45,8 +45,6 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                         break
                 detector.close()
 
-                print("Detector done")
-
                 assert detector.result is not None, "Detector must have a result"
 
                 with zip_file.open(filename, mode='r') as f:
