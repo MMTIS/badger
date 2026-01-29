@@ -7,7 +7,7 @@ from storage.lxml.core.implementation import XmlStorage
 from isal import igzip_threaded
 import os
 import zipfile
-from typing import Set, List
+from typing import Set, List, Dict, Tuple
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -24,86 +24,58 @@ def _local_name(tag: str) -> str:
     return tag
 
 def simplify_version(root: ET.Element,
-                     elements_to_ignore: Iterable[str] = ("PublicationDelivery", "ResourceFrame","SiteFrame", "CalendarFrame",
-                                                          "ServiceFrame","TimetableFrame","COMMON","TypeOfFrame"),
-                     consider_namespaces: bool = False) -> None:
+                     elements_to_exclude: Iterable[str] = (),
+                     consider_namespaces: bool = False
+                     ) -> None:
     """
-    Normalize version attribute values in-place.
+    Count concrete versions globally (excluding elements_to_exclude), select the
+    most frequent concrete version if it appears at least 10 times, and replace
+    all version="any" with that chosen version.
 
-    Additional checks:
-      - Prefer the most used version that is not "any" as the canonical value.
-      - Compute the count of "any".
-      - If there are other version values (excluding canonical and "any") that appear
-        more than 5 times, emit a warning.
-      - If all values are "any", canonical will be "any".
-
-    Parameters:
-      root: Element — root element to traverse
-      elements_to_ignore: iterable of element names to skip
-      consider_namespaces: if False, compare element local-names; if True, compare elem.tag exactly.
-
-    Returns:
-      None (modifies tree in place)
+    Returns the applied version string if replacement was done, otherwise None.
     """
-    versions = []
+    excluded = set(elements_to_exclude)
 
+    # Count all version values globally (including None and "any")
+    counts = Counter()
     for elem in root.iter():
-        if consider_namespaces:
-            if elem.tag in elements_to_ignore:
-                continue
-        else:
-            if _local_name(elem.tag) in elements_to_ignore:
-                continue
+        tag_key = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if not tag_key or tag_key in excluded:
+            continue
+        counts[elem.get("version")] += 1
 
-        v = elem.get('version')
-        if v is not None:
-            versions.append(v)
+    # Filter to concrete versions (not None and not "any") and pick the most common
+    concrete_counts = {v: n for v, n in counts.items() if v is not None and v != "any"}
+    if not concrete_counts:
+        return None
 
-    if not versions:
-        return
+    # pick the version with highest count; tie-break deterministically by lexical order
+    chosen_version = max(concrete_counts.items(), key=lambda item: (item[1], item[0]))[0]
+    chosen_count = concrete_counts[chosen_version]
 
-    counts = Counter(versions)
+    # apply only if chosen_count >= 10
+    if chosen_count < 10:
+        return None
 
-    any_count = counts.get('any', 0)
-
-    # Find the most common value that is not "any"
-    non_any_items = [(val, cnt) for val, cnt in counts.items() if val != 'any']
-    if non_any_items:
-        # sort by count desc, then by value for deterministic tie-break
-        non_any_items.sort(key=lambda x: (-x[1], x[0]))
-        most_common_non_any, most_common_non_any_count = non_any_items[0]
-        canonical = most_common_non_any
-    else:
-        # only "any" exists
-        canonical = 'any'
-        most_common_non_any = None
-        most_common_non_any_count = 0
-
-    # Check for other values (excluding canonical and 'any') appearing more than 5 times
-    others_over_5 = [(val, cnt) for val, cnt in counts.items()
-                     if val not in (canonical, 'any') and cnt > 5]
-
-    # Issue warnings if needed
-    if any_count > 0:
-        log_print(f"Found 'any' {any_count} time(s). Using canonical version '{canonical}'.")
-
-    if others_over_5:
-        # list the problematic values
-        details = ", ".join(f"'{v}':{c}" for v, c in others_over_5)
-        log_print(f"Found other version values occurring more than 5 times: {details}. Aborting this function")
-        return
-
-    # Finally overwrite all version attributes (except ignored elements)
+    # replace all "any" with chosen_version (excluding excluded tags)
     for elem in root.iter():
-        if consider_namespaces:
-            if elem.tag in elements_to_ignore:
-                continue
-        else:
-            if _local_name(elem.tag) in elements_to_ignore:
-                continue
+        tag_key = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if not tag_key or tag_key in excluded:
+            continue
+        if elem.get("version") == "any":
+            elem.set("version", chosen_version)
 
-        if elem.get('version') is not None:
-            elem.set('version', canonical)
+    return None
+
+def local_name_from_attr(attr_name):
+    # Clark notation "{ns}local" -> "local"
+    if attr_name.startswith('{'):
+        end = attr_name.find('}')
+        if end != -1:
+            return attr_name[end+1:]
+    # Prefixed form "ns:local" -> "local"
+    return attr_name.split(':', 1)[-1]
+
 
 def fix_linestring_ids(root: ET.Element,
                        consider_namespaces: bool = False) -> None:
@@ -140,9 +112,14 @@ def fix_linestring_ids(root: ET.Element,
             if local_name(elem.tag) != 'LineString':
                 continue
 
-        id_val = elem.get('id')
-        if id_val and _id_starts_with_digit.match(id_val):
-            elem.set('id', 'fix-' + id_val)
+        for attr_name, attr_val in list(elem.attrib.items()):
+            local_attr_name = local_name_from_attr(attr_name)
+            if local_attr_name == 'id':
+                id_val = attr_val
+                if id_val and _id_starts_with_digit.match(id_val):
+                    # preserve original attribute key (including namespace) when setting
+                    elem.set(attr_name, 'fix-' + id_val)
+                break
 
 
 def remove_id_and_version_from_tags(root: ET.Element,
@@ -211,6 +188,69 @@ def replace_versionref_with_version(root: ET.Element,
             elem.set("version", val)
 
 
+def include_order_in_id(root: ET.Element,
+                        elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment"),
+                        consider_namespaces: bool = False) -> None:
+    """
+    Walk the element tree rooted at `root` and for each element whose tag matches one of
+    `elements_to_process`, take its "order" attribute and add it to its "id" attribute
+    separated by a hyphen ("-").
+
+    The function modifies the tree in place and returns None.
+
+    Parameters:
+    - root: the root Element to start the search from.
+    - elements_to_process: iterable of tag names to process. If consider_namespaces is False,
+      these should be local names (without namespace). If consider_namespaces is True,
+      these should match the element.tag value (including namespace braces).
+    - consider_namespaces: whether to treat the provided names as namespace-aware (True)
+      or to match only the local name part of element.tag (False).
+    """
+    # Normalize set for faster membership tests
+    targets = set(elements_to_process)
+
+    for elem in root.iter():
+        tag_to_check = elem.tag if consider_namespaces else (elem.tag.rsplit('}', 1)[-1] if isinstance(elem.tag, str) and elem.tag.startswith('{') else elem.tag)
+        if tag_to_check in targets:
+            order = elem.get("order")
+            id_val = elem.get("id")
+            if not order:
+                # nothing to append
+                continue
+            if not id_val:
+                # if there is no id, we can either skip or set id to order; here we set id to order
+                elem.set("id", order)
+                continue
+            # Avoid duplicating the suffix if already present
+            suffix = f"-{order}"
+            if id_val.endswith(suffix):
+                continue
+            elem.set("id", f"{id_val}{suffix}")
+
+def change_order_0(root: ET.Element,
+                   elements_to_process: Iterable[str] = ("PassengerStopAssignment",),
+                   consider_namespaces: bool = False) -> None:
+    """
+    Traverse the XML tree rooted at `root` and for each element whose tag matches one of
+    `elements_to_process`, if it has an attribute 'order' with value "0", replace it with "1".
+    The tree is modified in place; the function returns None.
+
+    Parameters
+    - root: ElementTree Element root to process.
+    - elements_to_process: iterable of tag names to process. By default ("PassengerStopAssignment",).
+      If consider_namespaces is False (default) the comparison uses the local tag name (namespace stripped).
+      If consider_namespaces is True the comparison uses the full tag (including namespace in "{uri}local" form).
+    - consider_namespaces: whether to compare tags including namespace part.
+    """
+    # normalize elements_to_process to a set for fast membership tests
+    names = set(elements_to_process)
+
+    for elem in root.iter():
+        tag_to_check = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if tag_to_check in names:
+            # Check for 'order' attribute exactly equal to the string "0"
+            if elem.get("order") == "0":
+                elem.set("order", "1")
 
 def process_file(file_path, output_filename, actions: Iterable[str] | None = None):
     # normalize actions to a set for fast membership checks
@@ -242,7 +282,28 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         # simplify versions if possible: especially if there are only any and one other
         if "REMOVEAMBIGUOUSANY" in actions_set or not actions_set:
             log_print(" simplify versions if possible: especially if there are only any and one other")
-            # call corresponding function...
+            simplify_version(et.getroot())
+
+        if "FIXORDER0" in actions_set or not actions_set:
+            log_print("some files contain order='0'. We replace it with order='1'")
+            change_order_0(et.getroot())
+
+        #if "ADDIDVERSIONT" in actions_set or not actions_set:
+        #    log_print("in the French data we encounter problematic PassingTimes. The passing time have only a version and the StopPOintInJourneyRefPatternRef is missing in TimetabledPassingTime")
+        #    fix_french_passing_time_problems(et.getroot())
+        #some older versions used order as part of the uniqueness. Now things must be unique with id+version. So we transpose the order into id for some files
+        #This should only be done for elements that are NOT referenced (because we don't adapt the reference)
+
+        if "INCLUDEORDERINID" in actions_set or not actions_set:
+            log_print("include order in the id of some elements")
+            include_order_in_id(et.getroot())
+
+        if "SIMPLIFYVERSION" in actions_set or not actions_set:
+            log_print("use only any for some elements")
+            simplify_version(et.getroot())
+
+
+
     filecounter = filecounter + 1
     # Comes from xml.py
     if output_filename.endswith(".gz"):
