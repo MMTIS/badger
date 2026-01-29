@@ -481,7 +481,7 @@
   },
   {
     "block": "5t_ciri",
-    "worked":"problem in gtfs_db_to_db",
+    "worked":"email not  exportet to agency",
     "url":"https://www.cciss.it/nap/mmtis/public/catalog/Dataset/6",
     "download_url":"https://www.cciss.it/nap/mmtis/public/api/v1/download/blob/Asset/194547/checkedResource",
     "description":"next 5t set",
@@ -497,6 +497,7 @@
         {"script": "conv.netex_to_db", "args": "[%%dir%%/08-%%block%%-netex.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_sanitize_stops", "args": "%%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
