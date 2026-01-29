@@ -1,0 +1,369 @@
+from io import BytesIO
+from pathlib import Path
+
+from utils.aux_logging import *
+from storage.lxml.core.implementation import XmlStorage
+
+from isal import igzip_threaded
+import os
+import zipfile
+from typing import Set, List, Dict, Tuple
+import re
+import xml.etree.ElementTree as ET
+from collections import Counter
+from typing import Iterable
+
+
+_id_starts_with_digit = re.compile(r'^\d')
+
+
+
+def _local_name(tag: str) -> str:
+    if tag.startswith('{'):
+        return tag.split('}', 1)[1]
+    return tag
+
+def simplify_version(root: ET.Element,
+                     elements_to_exclude: Iterable[str] = (),
+                     consider_namespaces: bool = False
+                     ) -> None:
+    """
+    Count concrete versions globally (excluding elements_to_exclude), select the
+    most frequent concrete version if it appears at least 10 times, and replace
+    all version="any" with that chosen version.
+
+    Returns the applied version string if replacement was done, otherwise None.
+    """
+    excluded = set(elements_to_exclude)
+
+    # Count all version values globally (including None and "any")
+    counts = Counter()
+    for elem in root.iter():
+        tag_key = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if not tag_key or tag_key in excluded:
+            continue
+        counts[elem.get("version")] += 1
+
+    # Filter to concrete versions (not None and not "any") and pick the most common
+    concrete_counts = {v: n for v, n in counts.items() if v is not None and v != "any"}
+    if not concrete_counts:
+        return None
+
+    # pick the version with highest count; tie-break deterministically by lexical order
+    chosen_version = max(concrete_counts.items(), key=lambda item: (item[1], item[0]))[0]
+    chosen_count = concrete_counts[chosen_version]
+
+    # apply only if chosen_count >= 10
+    if chosen_count < 10:
+        return None
+
+    # replace all "any" with chosen_version (excluding excluded tags)
+    for elem in root.iter():
+        tag_key = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if not tag_key or tag_key in excluded:
+            continue
+        if elem.get("version") == "any":
+            elem.set("version", chosen_version)
+
+    return None
+
+def local_name_from_attr(attr_name):
+    # Clark notation "{ns}local" -> "local"
+    if attr_name.startswith('{'):
+        end = attr_name.find('}')
+        if end != -1:
+            return attr_name[end+1:]
+    # Prefixed form "ns:local" -> "local"
+    return attr_name.split(':', 1)[-1]
+
+
+def fix_linestring_ids(root: ET.Element,
+                       consider_namespaces: bool = False) -> None:
+    """
+    Ensure all LineString elements have an id attribute that starts with a letter.
+    If an id starts with a digit, prefix it with "fix-".
+    Modifies the tree in place.
+
+    Parameters:
+    - root: ET.Element — the root element to search under
+    - consider_namespaces: bool — if False (default), match elements by local name
+                                    (ignores namespaces). If True, match only when
+                                    the tag exactly equals 'LineString' or a namespaced
+                                    tag that includes the namespace braces.
+    Returns:
+    - None
+    """
+    def local_name(tag: str) -> str:
+        if tag.startswith('{'):
+            return tag.split('}', 1)[1]
+        return tag
+
+    for elem in root.iter():
+        if consider_namespaces:
+            # match only when the full tag equals 'LineString' or any namespaced variant
+            # (i.e. exact tag including namespace) — this means only tags that end with
+            # 'LineString' but keep their namespace are matched as well.
+            # To be strict: require the local name to be exactly 'LineString' but keep namespace considered
+            match = (elem.tag == 'LineString') or (elem.tag.startswith('{') and local_name(elem.tag) == 'LineString')
+            if not match:
+                continue
+        else:
+            # ignore namespace, match solely by local name
+            if local_name(elem.tag) != 'LineString':
+                continue
+
+        for attr_name, attr_val in list(elem.attrib.items()):
+            local_attr_name = local_name_from_attr(attr_name)
+            if local_attr_name == 'id':
+                id_val = attr_val
+                if id_val and _id_starts_with_digit.match(id_val):
+                    # preserve original attribute key (including namespace) when setting
+                    elem.set(attr_name, 'fix-' + id_val)
+                break
+
+
+def remove_id_and_version_from_tags(root: ET.Element,
+                                    target_tags: Iterable[str] = ("Location", "Centroid"),
+                                    consider_namespaces: bool = False) -> None:
+    """
+    Remove attributes 'id' and 'version' from elements whose tag is in target_tags.
+    Operates in-place on the tree rooted at `root`.
+
+    Parameters:
+    - root: xml.etree.ElementTree.Element - root element (or any element) to process.
+    - target_tags: iterable of tag names to target (default: ("Location", "Centroid")).
+      If your XML uses namespaces, these should match either the raw tag values
+      (e.g. "{http://...}Location") when consider_namespaces is False,
+      or the local names (e.g. "Location") when consider_namespaces is True.
+    - consider_namespaces: if True, compare the localname (strip namespace) when checking tags.
+    """
+    targets: List[str] = set(target_tags)
+
+    def localname(tag: str) -> str:
+        if tag.startswith("{"):
+            return tag.split("}", 1)[1]
+        return tag
+
+    for elem in root.iter():
+        tag_to_check = localname(elem.tag) if consider_namespaces else elem.tag
+        if tag_to_check in targets:
+            # remove attributes if present
+            elem.attrib.pop("id", None)
+            elem.attrib.pop("version", None)
+
+def replace_versionref_with_version(root: ET.Element,
+                                     exclude_tags: Iterable[str] = ("TypeOfFrameRef",),
+                                     consider_namespaces: bool = False) -> None:
+    """
+    Replace attributes named 'versionRef' with 'version' (same value) for all elements
+    in the tree rooted at `root`, except for elements whose tag is in `exclude_tags`.
+
+    This function modifies the tree in place.
+
+    Parameters:
+    - root: xml.etree.ElementTree.Element - root element (or any element) to process.
+    - exclude_tags: iterable of tag names to exclude (default: ("TypeOfFrameRef",)).
+      If your XML uses namespaces, these should match the raw tag values (including namespace),
+      unless consider_namespaces=True (see below).
+    - consider_namespaces: if True, the function compares the localname of the tag
+      (stripping any namespace) when checking the exclude list.
+    """
+    exclude_set: List[str] = set(exclude_tags)
+
+    def localname(tag: str) -> str:
+        # strip namespace if present: "{ns}local" -> "local"
+        if tag.startswith("{"):
+            return tag.split("}", 1)[1]
+        return tag
+
+    for elem in root.iter():
+        tag_to_check = localname(elem.tag) if consider_namespaces else elem.tag
+        if tag_to_check in exclude_set:
+            continue
+
+        if "versionRef" in elem.attrib:
+            # keep value, set new attribute, remove old
+            val = elem.attrib.pop("versionRef")
+            # if "version" exists it will be overwritten with the same value (or you can choose to keep)
+            elem.set("version", val)
+
+
+def include_order_in_id(root: ET.Element,
+                        elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment"),
+                        consider_namespaces: bool = False) -> None:
+    """
+    Walk the element tree rooted at `root` and for each element whose tag matches one of
+    `elements_to_process`, take its "order" attribute and add it to its "id" attribute
+    separated by a hyphen ("-").
+
+    The function modifies the tree in place and returns None.
+
+    Parameters:
+    - root: the root Element to start the search from.
+    - elements_to_process: iterable of tag names to process. If consider_namespaces is False,
+      these should be local names (without namespace). If consider_namespaces is True,
+      these should match the element.tag value (including namespace braces).
+    - consider_namespaces: whether to treat the provided names as namespace-aware (True)
+      or to match only the local name part of element.tag (False).
+    """
+    # Normalize set for faster membership tests
+    targets = set(elements_to_process)
+
+    for elem in root.iter():
+        tag_to_check = elem.tag if consider_namespaces else (elem.tag.rsplit('}', 1)[-1] if isinstance(elem.tag, str) and elem.tag.startswith('{') else elem.tag)
+        if tag_to_check in targets:
+            order = elem.get("order")
+            id_val = elem.get("id")
+            if not order:
+                # nothing to append
+                continue
+            if not id_val:
+                # if there is no id, we can either skip or set id to order; here we set id to order
+                elem.set("id", order)
+                continue
+            # Avoid duplicating the suffix if already present
+            suffix = f"-{order}"
+            if id_val.endswith(suffix):
+                continue
+            elem.set("id", f"{id_val}{suffix}")
+
+def change_order_0(root: ET.Element,
+                   elements_to_process: Iterable[str] = ("PassengerStopAssignment",),
+                   consider_namespaces: bool = False) -> None:
+    """
+    Traverse the XML tree rooted at `root` and for each element whose tag matches one of
+    `elements_to_process`, if it has an attribute 'order' with value "0", replace it with "1".
+    The tree is modified in place; the function returns None.
+
+    Parameters
+    - root: ElementTree Element root to process.
+    - elements_to_process: iterable of tag names to process. By default ("PassengerStopAssignment",).
+      If consider_namespaces is False (default) the comparison uses the local tag name (namespace stripped).
+      If consider_namespaces is True the comparison uses the full tag (including namespace in "{uri}local" form).
+    - consider_namespaces: whether to compare tags including namespace part.
+    """
+    # normalize elements_to_process to a set for fast membership tests
+    names = set(elements_to_process)
+
+    for elem in root.iter():
+        tag_to_check = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if tag_to_check in names:
+            # Check for 'order' attribute exactly equal to the string "0"
+            if elem.get("order") == "0":
+                elem.set("order", "1")
+
+def process_file(file_path, output_filename, actions: Iterable[str] | None = None):
+    # normalize actions to a set for fast membership checks
+    if actions is None:
+        actions_set = set()
+    else:
+        actions_set = set(actions)
+
+    xml_storage = XmlStorage(file_path)
+    filecounter = 0
+    for f, real_filename in xml_storage.open_netex_file():
+        et = ET.parse(f)
+
+        # replaces versionRef with version for most elements
+        if "VERSIONREF" in actions_set or not actions_set:
+            log_print("Replaces versionRef with version for most elements.")
+            replace_versionref_with_version(et.getroot())
+
+        # removes id and version from elements like Centroid and Location
+        if "REMOVEUNNECESSARYIDTAGS" in actions_set or not actions_set:
+            log_print("Removes id and version from elements like Centroid and Location")
+            remove_id_and_version_from_tags(et.getroot())
+
+        # Fixes the line string id to become valid
+        if "FIXLINESTRINGID" in actions_set or not actions_set:
+            log_print("Fixes the line string id to become valid")
+            fix_linestring_ids(et.getroot())
+
+        # simplify versions if possible: especially if there are only any and one other
+        if "REMOVEAMBIGUOUSANY" in actions_set or not actions_set:
+            log_print(" simplify versions if possible: especially if there are only any and one other")
+            simplify_version(et.getroot())
+
+        if "FIXORDER0" in actions_set or not actions_set:
+            log_print("some files contain order='0'. We replace it with order='1'")
+            change_order_0(et.getroot())
+
+        #if "ADDIDVERSIONT" in actions_set or not actions_set:
+        #    log_print("in the French data we encounter problematic PassingTimes. The passing time have only a version and the StopPOintInJourneyRefPatternRef is missing in TimetabledPassingTime")
+        #    fix_french_passing_time_problems(et.getroot())
+        #some older versions used order as part of the uniqueness. Now things must be unique with id+version. So we transpose the order into id for some files
+        #This should only be done for elements that are NOT referenced (because we don't adapt the reference)
+
+        if "INCLUDEORDERINID" in actions_set or not actions_set:
+            log_print("include order in the id of some elements")
+            include_order_in_id(et.getroot())
+
+        if "SIMPLIFYVERSION" in actions_set or not actions_set:
+            log_print("use only any for some elements")
+            simplify_version(et.getroot())
+
+
+
+    filecounter = filecounter + 1
+    # Comes from xml.py
+    if output_filename.endswith(".gz"):
+        with igzip_threaded.open(  # type: ignore
+                output_filename,
+                "wb",
+                compresslevel=3,
+                threads=3,
+                block_size=2 * 10 ** 8,
+        ) as out:
+            et.write(out)
+    elif output_filename.endswith(".zip"):
+        with zipfile.ZipFile(output_filename, "a", zipfile.ZIP_DEFLATED) as zf:
+            buffer = BytesIO()
+            et.write(buffer, encoding='utf-8', xml_declaration=True)
+            xml_bytes = buffer.getvalue()
+            if "<ZipInfo" in real_filename:
+                zf.writestr(f"file_{filecounter}.xml", xml_bytes)
+            else:
+                zf.writestr(real_filename, xml_bytes)
+    else:
+        with open(output_filename, "wb") as out:
+            et.write(out)
+
+
+
+def ensure_same_extension(input_path: str, output_path: str) -> None:
+    if Path(input_path).suffix != Path(output_path).suffix:
+        raise ValueError(f"File extensions differ: {input_path} ({Path(input_path).suffix!r}) != "
+                         f"{output_path} ({Path(output_path).suffix!r})")
+
+def netex_processing(infile: Path, outfile: Path, actions : Iterable[str] | None = None):
+    # we need to have the same extension for this step to work
+    ensure_same_extension(str(infile),str(outfile))
+
+    try:
+        os.remove(outfile)
+    except FileNotFoundError:
+        pass
+    process_file(infile, str(outfile),actions)
+
+
+def main(infile: str, outfile: str, actions : Iterable[str] | None = None) -> None:
+    # checks the input
+    inpath = Path(infile)
+    outpath = Path(outfile)
+    # calling correction
+    netex_processing(inpath, outpath,actions=actions)
+
+
+if __name__ == '__main__':
+    import argparse
+
+    log_all(logging.INFO, f"Some French files contain versionRef instead of version in many places. This removes them. Also id/version are removed from Centroid/Location")
+
+    argument_parser = argparse.ArgumentParser(description='Removing unnecessary versionRef and replacing them with version')
+    argument_parser.add_argument('input', help='NeTEx file with problematic versionRef')
+    argument_parser.add_argument('actions', nargs='+', default=set(), help='actions to take')
+    argument_parser.add_argument('output', help='NeTEx outputfile')
+
+    args = argument_parser.parse_args()
+
+    main(args.input, args.output, args.actions)

@@ -178,13 +178,15 @@ def main(gtfs_zip_file: str, map_file: str, limitation: int) -> None:
     ).add_to(m)
 
     for i in range(len(stop_coords_list)):
-        p = folium.PolyLine(
-            locations=stop_coords_list[i],
-            tooltip=route_names[i],
-            smooth_factor=10,
-            color=generate_random_dark_color(),
-        )  # type: ignore
-        p.add_to(trips_group)
+        if i != 0:
+            p = folium.PolyLine(
+                locations=stop_coords_list[i],
+                tooltip=route_names[i],
+                smooth_factor=10,
+                color=generate_random_dark_color(),
+            )  # type: ignore
+            p.add_to(trips_group)
+
 
     folium.LayerControl().add_to(m)
     start_time = time.time()

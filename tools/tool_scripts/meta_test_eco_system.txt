@@ -2,22 +2,15 @@
 # =======
 
 #nl epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl3
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl2
-
-
-# basic gtfs generation
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
 
 # basic gtfs loading
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_aubegtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log swissmikro
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
 
-# combined
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
 python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
 
 
@@ -46,11 +39,10 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt my
 
 # long runners
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lux
-#python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swiss4epip
 
 #mandatory test
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
-#python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip-1
 
 

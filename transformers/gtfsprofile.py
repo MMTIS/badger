@@ -129,15 +129,16 @@ class GtfsProfile:
 
     @staticmethod
     def getOptionalMultilingualString(multilingual_string: MultilingualString | List[MultilingualString] | None) -> str | None:
+        mstring  : MultilingualString =None
         if isinstance(multilingual_string, List):
             if len(multilingual_string) > 0:
-                multilingual_string = multilingual_string[0]
+                mstring = multilingual_string[0]
             else:
-                multilingual_string = None
-
-        if multilingual_string is not None:
-            return str(multilingual_string.content[0])
-
+                mstring = None
+        else:
+            mstring=multilingual_string
+        if mstring is not None:
+            return mstring.content
         return None
 
     @staticmethod
