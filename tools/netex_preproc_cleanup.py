@@ -7,7 +7,7 @@ from storage.lxml.core.implementation import XmlStorage
 from isal import igzip_threaded
 import os
 import zipfile
-from typing import Set, List, Dict, Tuple
+from typing import Set, List, Dict, Tuple, Optional
 import re
 import xml.etree.ElementTree as ET
 from collections import Counter
@@ -76,6 +76,39 @@ def local_name_from_attr(attr_name):
     # Prefixed form "ns:local" -> "local"
     return attr_name.split(':', 1)[-1]
 
+def set_emails(root: ET.Element, consider_namespaces: bool = False) -> None:
+    """
+    Walk the XML tree under root and set all <Email> elements that have no meaningful
+    text to 'opendata@sbb.ch'.
+
+    An Email element is considered empty if:
+    - elem.text is None
+    - elem.text is empty or only whitespace
+    - elem.text (after stripping) equals the literal 'none' (case-insensitive)
+
+    If consider_namespaces is True, elements are matched by local-name only,
+    so namespaced <ns:Email> elements are also found. Otherwise only tag == 'Email'.
+    """
+    target = "Email"
+    replacement = "opendata@sbb.ch"
+
+    for elem in root.iter():
+        tag_matches = (
+            (consider_namespaces and _local_name(elem.tag) == target)
+            or (not consider_namespaces and elem.tag == target)
+        )
+        if not tag_matches:
+            continue
+
+        text: Optional[str] = elem.text
+        if text is None:
+            elem.text = replacement
+            continue
+
+        # Normalize text for checks
+        stripped = text.strip()
+        if stripped == "" or stripped.lower() == "none":
+            elem.text = replacement
 
 def fix_linestring_ids(root: ET.Element,
                        consider_namespaces: bool = False) -> None:
@@ -302,7 +335,9 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("use only any for some elements")
             simplify_version(et.getroot())
 
-
+        if "FIXEMAILNONE" in actions_set or not actions_set:
+            log_print("Remove a 'None' in the eMail.")
+            set_emails(et.getroot())
 
     filecounter = filecounter + 1
     # Comes from xml.py
