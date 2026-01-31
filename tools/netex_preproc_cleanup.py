@@ -338,6 +338,13 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
+        if "ADDIDVERSION" in actions_set or not actions_set:
+            log_print("Adds id and version to a a set of Tags")
+            #TODO
+        if "ADDHTTPSURL" in actions_set or not actions_set:
+            log_print("GTFS demands real URL so, we need to add them before")
+            #TODO
+
 
     filecounter = filecounter + 1
     # Comes from xml.py

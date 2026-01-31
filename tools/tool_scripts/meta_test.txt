@@ -1,6 +1,6 @@
 # Current set of scripts to run in sequence
 #v1.1
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
+#python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log swissmikro
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
@@ -8,8 +8,8 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt my
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
 python -m tools.script_runner ./tools/tool_scripts/script_regression.v1.1.txt mylog.log filter1
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennesepip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aubeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiatrainitalia
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
