@@ -226,7 +226,7 @@ def replace_versionref_with_version(root: ET.Element,
 
 
 def include_order_in_id(root: ET.Element,
-                        elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment"),
+                        elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment","AlternativeName"),
                         consider_namespaces: bool = False) -> None:
     """
     Walk the element tree rooted at `root` and for each element whose tag matches one of
@@ -292,7 +292,7 @@ def change_order_0(root: ET.Element,
 
 
 def add_id_version(root: ET.Element,
-                   include_tags: Iterable[str] = ("AlternativeName","AlternativeText"),
+                   include_tags: Iterable[str] = ("AlternativeName","AlternativeText", "OperatorRef"),
                    consider_namespaces: bool = False) -> None:
     """
     Add a unique id attribute (if missing) and version="any" (if missing)
@@ -461,7 +461,7 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             add_id_version(et.getroot())
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
-            #TODO
+            make_url_useful(et.getroot())
 
 
     filecounter = filecounter + 1

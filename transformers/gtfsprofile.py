@@ -15,6 +15,7 @@ from utils.utils import to_seconds
 from domain.netex.model import (
     Line,
     MultilingualString,
+    TextType,
     InfoLinksRelStructure,
     ScheduledStopPoint,
     StopPlace,
@@ -138,6 +139,8 @@ class GtfsProfile:
         else:
             mstring=multilingual_string
         if mstring is not None:
+            if isinstance(multilingual_string.content[0], TextType):
+                return mstring.content[0].value
             return mstring.content
         return None
 
