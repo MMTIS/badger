@@ -1,35 +1,17 @@
 # Current set of scripts to run in sequence
 #v1.1
-#python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
 python -m tools.script_runner ./tools/tool_scripts/script_regression.v1.1.txt mylog.log filter1
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiatrainitalia
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log mobigo-jura
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log sta_bolzano
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log sta_trentino
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiatrennord
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiamovibus
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log trenitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t_ciri
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t_2
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_bas_rhin
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log 5t_ciri
-#at
-#deutschland
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log trenitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lombardiatrennord
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log sta_bolzano
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log sta_trentino
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiatrainitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lux
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_sncf_ter
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log fr_sncf_gtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log nvbw-list
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt meta.log lux
-
-python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
-python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
 python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip-1

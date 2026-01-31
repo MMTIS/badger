@@ -1,3 +1,4 @@
+import uuid
 from io import BytesIO
 from pathlib import Path
 
@@ -13,6 +14,9 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from typing import Iterable
 
+from urllib.parse import urlparse
+
+FALLBACK_URL = "https://opentransportdata.swiss"
 
 _id_starts_with_digit = re.compile(r'^\d')
 
@@ -285,6 +289,120 @@ def change_order_0(root: ET.Element,
             if elem.get("order") == "0":
                 elem.set("order", "1")
 
+
+
+def add_id_version(root: ET.Element,
+                   include_tags: Iterable[str] = ("AlternativeName","AlternativeText"),
+                   consider_namespaces: bool = False) -> None:
+    """
+    Add a unique id attribute (if missing) and version="any" (if missing)
+    to elements under root whose tag matches include_tags.
+
+    Parameters:
+    - root: xml.etree.ElementTree.Element -- root element to search.
+    - include_tags: iterable of tag names to include (local names). If
+      consider_namespaces is True, the items should match the full tag
+      (including namespace braces) or you can still pass local names and
+      they'll match local part only (behavior below).
+    - consider_namespaces: if False (default), matching is done against the
+      local part of the tag (namespace is ignored). If True, full tag string
+      (including namespace) is used for matching; however local names in
+      include_tags will still match as convenience.
+    """
+    # Normalize include_tags into a set for efficient membership tests
+    include_set = set(include_tags)
+
+    for elem in root.iter():
+        tag_for_match = elem.tag if consider_namespaces else _local_name(elem.tag)
+
+        # allow include_tags to contain either full tag or local name when consider_namespaces True:
+        matches = False
+        if consider_namespaces:
+            if tag_for_match in include_set:
+                matches = True
+            else:
+                # also accept local names in include_tags for convenience
+                if _local_name(elem.tag) in include_set:
+                    matches = True
+        else:
+            if tag_for_match in include_set:
+                matches = True
+
+        if not matches:
+            continue
+
+        # Add id if missing
+        if "id" not in elem.attrib:
+            # generate unique id; prefix 'id-' so it's a valid name and more readable
+            new_id = "id-" + uuid.uuid4().hex
+            elem.set("id", new_id)
+
+        # Add version if missing
+        if "version" not in elem.attrib:
+            elem.set("version", "any")
+
+
+def _is_valid_url(url: str) -> bool:
+    """
+    Consider a URL valid if it has a scheme (http/https) and a netloc.
+    """
+    try:
+        parsed = urlparse(url)
+    except Exception:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    # netloc is required (domain or host)
+    if not parsed.netloc:
+        return False
+    return True
+
+def make_url_useful(root: ET.Element, consider_namespaces: bool = False) -> None:
+    """
+    Normalize and validate text content of elements named 'Url'.
+
+    For each matching element:
+    - Trim whitespace from text.
+    - If the text already looks like a valid URL with http/https, keep it.
+    - Else, try prepending 'https://' and validate again.
+    - If still invalid, set text to FALLBACK_URL.
+
+    The function mutates elements in-place and returns None.
+    """
+    for elem in root.iter():
+        tag_for_match = elem.tag if consider_namespaces else _local_name(elem.tag)
+        if tag_for_match != "Url":
+            continue
+
+        text = elem.text or ""
+        text = text.strip()
+
+        if not text:
+            elem.text = FALLBACK_URL
+            continue
+
+        # If already valid (has scheme and netloc), keep it
+        if _is_valid_url(text):
+            elem.text = text
+            continue
+
+        # If missing scheme, try prepending https:// and validate
+        # But avoid double-adding if it already starts with something like "//host"
+        candidate = text
+        parsed = urlparse(candidate)
+        if not parsed.scheme:
+            # handle protocol-relative URLs like //example.com -> add https:
+            if candidate.startswith("//"):
+                candidate = "https:" + candidate
+            else:
+                candidate = "https://" + candidate
+
+        if _is_valid_url(candidate):
+            elem.text = candidate
+        else:
+            # final fallback
+            elem.text = FALLBACK_URL
+
 def process_file(file_path, output_filename, actions: Iterable[str] | None = None):
     # normalize actions to a set for fast membership checks
     if actions is None:
@@ -340,7 +458,7 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             set_emails(et.getroot())
         if "ADDIDVERSION" in actions_set or not actions_set:
             log_print("Adds id and version to a a set of Tags")
-            #TODO
+            add_id_version(et.getroot())
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
             #TODO
