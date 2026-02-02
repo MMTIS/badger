@@ -361,7 +361,7 @@ def _is_valid_url(url: str) -> bool:
 
 
 def remove_refs(root: ET.Element,
-                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef"),
+                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef", "ParentSiteRef"),
                 consider_namespaces: bool = False) -> None:
     """
     Remove elements whose tag is in include_tags from the tree rooted at root.
@@ -496,10 +496,6 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
-
-        if "ADDIDVERSION" in actions_set or not actions_set:
-            log_print("Adds id and version to a a set of Tags")
-            add_id_version(et.getroot())
 
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
