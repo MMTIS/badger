@@ -47,7 +47,7 @@
       {"script": "fix.day_offset", "args": "%%dir%%/03-import.mdbx "},
       {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
       {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
-      {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz netex/schema/xsd/NeTEx_publication.xsd"}
+      {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
       ]
 },
 {
@@ -58,13 +58,14 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03-import.mdbx"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02.zip"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/02.zip] %%dir%%/03-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.mdbx %%dir%%/07-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz netex/schema/xsd/NeTEx_publication.xsd"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -306,7 +307,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02-trenitalia.xml.gz"},
-        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02-trenitalia.xml.gz %%dir%%/03-trenitalia.xml.gz [ADDIDVERSION FIXLINESTRINGID]"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02-trenitalia.xml.gz %%dir%%/03-trenitalia.xml.gz [INCLUDEORDERINID ADDIDVERSION FIXLINESTRINGID REMOVESOMEREFS]"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
@@ -377,13 +378,13 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02.xml.gz"},
-        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02.xml.gz %%dir%%/03-trenitalia.xml.gz [REMOVEAMBIGUOUSANY]"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02.xml.gz %%dir%%/03.xml.gz [ADDIDVERSION REMOVEAMBIGUOUSANY]"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/07-netex-database.mdbx %%dir%%/08-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/08-gtfs.mdbx "},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/08-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
