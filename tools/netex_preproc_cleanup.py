@@ -98,8 +98,8 @@ def set_emails(root: ET.Element, consider_namespaces: bool = False) -> None:
 
     for elem in root.iter():
         tag_matches = (
-            (consider_namespaces and _local_name(elem.tag) == target)
-            or (not consider_namespaces and elem.tag == target)
+            (not consider_namespaces and _local_name(elem.tag) == target)
+            or (consider_namespaces and elem.tag == target)
         )
         if not tag_matches:
             continue
@@ -160,7 +160,7 @@ def fix_linestring_ids(root: ET.Element,
 
 
 def remove_id_and_version_from_tags(root: ET.Element,
-                                    target_tags: Iterable[str] = ("Location", "Centroid"),
+                                    target_tags: Iterable[str] = ("Location", "Centroid", "responsibilitySets"),
                                     consider_namespaces: bool = False) -> None:
     """
     Remove attributes 'id' and 'version' from elements whose tag is in target_tags.
