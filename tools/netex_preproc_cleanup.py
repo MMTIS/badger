@@ -357,6 +357,47 @@ def _is_valid_url(url: str) -> bool:
         return False
     return True
 
+
+
+def remove_refs(root: ET.Element,
+                include_tags: Iterable[str] = ("SupplyContactRef",),
+                consider_namespaces: bool = False) -> None:
+    """
+    Remove elements whose tag is in include_tags from the tree rooted at root.
+
+    Parameters:
+    - root: ElementTree Element to process (modified in-place).
+    - include_tags: iterable of tag names (local names or full tags) to remove.
+      Default removes 'SupplyContactRef'.
+    - consider_namespaces: if False (default), matching is done on local names
+      (namespace is ignored). If True, include_tags may contain either full
+      tag strings (with {namespace}) or local names; both will be accepted.
+    """
+    include_set = set(include_tags)
+
+    # We need parent access to remove children. Element.iter() does not provide parent,
+    # so iterate over all parents and examine their direct children.
+    for parent in root.iter():
+        # create a list of children to remove to avoid modifying the list while iterating
+        to_remove = []
+        for child in list(parent):
+            tag_for_match = child.tag if consider_namespaces else _local_name(child.tag)
+
+            matches = False
+            if consider_namespaces:
+                # accept full tag or local name in include_set
+                if child.tag in include_set or _local_name(child.tag) in include_set:
+                    matches = True
+            else:
+                if tag_for_match in include_set:
+                    matches = True
+
+            if matches:
+                to_remove.append(child)
+
+        for child in to_remove:
+            parent.remove(child)
+
 def make_url_useful(root: ET.Element, consider_namespaces: bool = False) -> None:
     """
     Normalize and validate text content of elements named 'Url'.
