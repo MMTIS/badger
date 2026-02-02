@@ -360,7 +360,7 @@ def _is_valid_url(url: str) -> bool:
 
 
 def remove_refs(root: ET.Element,
-                include_tags: Iterable[str] = ("SupplyContactRef",),
+                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef"),
                 consider_namespaces: bool = False) -> None:
     """
     Remove elements whose tag is in include_tags from the tree rooted at root.
@@ -468,7 +468,7 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
 
         # Fixes the line string id to become valid
         if "FIXLINESTRINGID" in actions_set or not actions_set:
-            log_print("Fixes the line string id to become valid")
+            log_print("Fixes the line string id to become valid as it is not allowed to start with a number.")
             fix_linestring_ids(et.getroot())
 
         # simplify versions if possible: especially if there are only any and one other
@@ -479,12 +479,6 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXORDER0" in actions_set or not actions_set:
             log_print("some files contain order='0'. We replace it with order='1'")
             change_order_0(et.getroot())
-
-        #if "ADDIDVERSIONT" in actions_set or not actions_set:
-        #    log_print("in the French data we encounter problematic PassingTimes. The passing time have only a version and the StopPOintInJourneyRefPatternRef is missing in TimetabledPassingTime")
-        #    fix_french_passing_time_problems(et.getroot())
-        #some older versions used order as part of the uniqueness. Now things must be unique with id+version. So we transpose the order into id for some files
-        #This should only be done for elements that are NOT referenced (because we don't adapt the reference)
 
         if "INCLUDEORDERINID" in actions_set or not actions_set:
             log_print("include order in the id of some elements")
@@ -497,13 +491,18 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
+
         if "ADDIDVERSION" in actions_set or not actions_set:
             log_print("Adds id and version to a a set of Tags")
             add_id_version(et.getroot())
+
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
             make_url_useful(et.getroot())
 
+        if "REMOVESOMEREFS" in actions_set or not actions_set:
+            log_print("Removing some Refs that are not present as elements and not relevant.")
+            remove_refs(et.getroot())
 
     filecounter = filecounter + 1
     # Comes from xml.py
