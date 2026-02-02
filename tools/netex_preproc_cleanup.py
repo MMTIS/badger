@@ -358,6 +358,47 @@ def _is_valid_url(url: str) -> bool:
         return False
     return True
 
+
+
+def remove_refs(root: ET.Element,
+                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef"),
+                consider_namespaces: bool = False) -> None:
+    """
+    Remove elements whose tag is in include_tags from the tree rooted at root.
+
+    Parameters:
+    - root: ElementTree Element to process (modified in-place).
+    - include_tags: iterable of tag names (local names or full tags) to remove.
+      Default removes 'SupplyContactRef'.
+    - consider_namespaces: if False (default), matching is done on local names
+      (namespace is ignored). If True, include_tags may contain either full
+      tag strings (with {namespace}) or local names; both will be accepted.
+    """
+    include_set = set(include_tags)
+
+    # We need parent access to remove children. Element.iter() does not provide parent,
+    # so iterate over all parents and examine their direct children.
+    for parent in root.iter():
+        # create a list of children to remove to avoid modifying the list while iterating
+        to_remove = []
+        for child in list(parent):
+            tag_for_match = child.tag if consider_namespaces else _local_name(child.tag)
+
+            matches = False
+            if consider_namespaces:
+                # accept full tag or local name in include_set
+                if child.tag in include_set or _local_name(child.tag) in include_set:
+                    matches = True
+            else:
+                if tag_for_match in include_set:
+                    matches = True
+
+            if matches:
+                to_remove.append(child)
+
+        for child in to_remove:
+            parent.remove(child)
+
 def make_url_useful(root: ET.Element, consider_namespaces: bool = False) -> None:
     """
     Normalize and validate text content of elements named 'Url'.
@@ -428,7 +469,7 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
 
         # Fixes the line string id to become valid
         if "FIXLINESTRINGID" in actions_set or not actions_set:
-            log_print("Fixes the line string id to become valid")
+            log_print("Fixes the line string id to become valid as it is not allowed to start with a number.")
             fix_linestring_ids(et.getroot())
 
         if "ADDIDVERSION" in actions_set or not actions_set:
@@ -444,12 +485,6 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("some files contain order='0'. We replace it with order='1'")
             change_order_0(et.getroot())
 
-        #if "ADDIDVERSIONT" in actions_set or not actions_set:
-        #    log_print("in the French data we encounter problematic PassingTimes. The passing time have only a version and the StopPOintInJourneyRefPatternRef is missing in TimetabledPassingTime")
-        #    fix_french_passing_time_problems(et.getroot())
-        #some older versions used order as part of the uniqueness. Now things must be unique with id+version. So we transpose the order into id for some files
-        #This should only be done for elements that are NOT referenced (because we don't adapt the reference)
-
         if "INCLUDEORDERINID" in actions_set or not actions_set:
             log_print("include order in the id of some elements")
             include_order_in_id(et.getroot())
@@ -462,10 +497,17 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
 
+        if "ADDIDVERSION" in actions_set or not actions_set:
+            log_print("Adds id and version to a a set of Tags")
+            add_id_version(et.getroot())
+
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
             make_url_useful(et.getroot())
 
+        if "REMOVESOMEREFS" in actions_set or not actions_set:
+            log_print("Removing some Refs that are not present as elements and not relevant.")
+            remove_refs(et.getroot())
 
     filecounter = filecounter + 1
     # Comes from xml.py

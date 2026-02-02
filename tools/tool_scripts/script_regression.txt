@@ -71,7 +71,8 @@
      "url":"https://data.ndovloket.nl/netex/teso/",
      "description":"nl2 test with list",
      "download_urls":[
-         "https://github.com/user-attachments/files/24975791/nlsmall.zip"
+         "https://github.com/user-attachments/files/24983072/nlsmall.zip"
+
          ],
      "scripts": [
          {"script": "process_url_list", "args": "netex2epipgtfs"}

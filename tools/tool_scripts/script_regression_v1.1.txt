@@ -515,7 +515,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02.xml.gz"},
-        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02.xml.gz %%dir%%/03.xml.gz [FADDHTTPSURL REMOVEUNNECESSARYIDTAGS]"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02.xml.gz %%dir%%/03.xml.gz [FADDHTTPSURL REMOVEUNNECESSARYIDTAGS REMOVESOMEREFS]"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
