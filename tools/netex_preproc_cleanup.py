@@ -292,10 +292,11 @@ def change_order_0(root: ET.Element,
 
 
 def add_id_version(root: ET.Element,
-                   include_tags: Iterable[str] = ("AlternativeName","AlternativeText", "OperatorRef"),
+                   include_tags: Iterable[str] = ("AlternativeName","AlternativeText", "OperatorRef","DayTypeRef","LineRef",
+                                                "ScheduledStopPointRef", "ServiceJourneyPatternRef", "PassingTime","StopPointInJourneyPatternRef"),
                    consider_namespaces: bool = False) -> None:
     """
-    Add a unique id attribute (if missing) and version="any" (if missing)
+    Add a unique id attribute (if missing) and version="any" (if missing)11
     to elements under root whose tag matches include_tags.
 
     Parameters:
@@ -430,6 +431,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("Fixes the line string id to become valid")
             fix_linestring_ids(et.getroot())
 
+        if "ADDIDVERSION" in actions_set or not actions_set:
+            log_print("Adds id and version to a a set of Tags")
+            add_id_version(et.getroot())
+
         # simplify versions if possible: especially if there are only any and one other
         if "REMOVEAMBIGUOUSANY" in actions_set or not actions_set:
             log_print(" simplify versions if possible: especially if there are only any and one other")
@@ -456,9 +461,7 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
-        if "ADDIDVERSION" in actions_set or not actions_set:
-            log_print("Adds id and version to a a set of Tags")
-            add_id_version(et.getroot())
+
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
             make_url_useful(et.getroot())
