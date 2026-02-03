@@ -66,6 +66,10 @@ T = TypeVar("T")
 
 gtfs_id_lookup = {}  # TODO: better way?
 
+def advanced_round(coord:float, length:int) -> str | float:
+    if coord is None:
+        return ''
+    return round(coord, 7)
 
 class GtfsProfile:
     empty_stop_time = {
@@ -554,8 +558,8 @@ class GtfsProfile:
                 or GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.short_name)
             ),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(scheduled_stop_point.tariff_zones),
             'stop_url': scheduled_stop_point.url or '',
             'location_type': 0,
@@ -567,6 +571,8 @@ class GtfsProfile:
         }
 
         return stop
+
+
 
     @staticmethod
     def projectStopEntranceToStop(stop_entrance: StopPlaceEntrance, parent: StopPlace, transformer: Transformer | None = None) -> dict[str, Any]:
@@ -588,8 +594,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_entrance.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_entrance.name) or GtfsProfile.getOptionalMultilingualString(stop_entrance.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_entrance.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(stop_entrance.tariff_zones),
             'stop_url': stop_entrance.url or '',
             'location_type': 2,
@@ -802,8 +808,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_area.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_area.name) or GtfsProfile.getOptionalMultilingualString(stop_area.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_area.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': '',
             'stop_url': '',
             'location_type': 1,  # Station
@@ -838,8 +844,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_place.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_place.name) or GtfsProfile.getOptionalMultilingualString(stop_place.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_place.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': '',
             'stop_url': '',
             'location_type': 1,  # Station
@@ -867,8 +873,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_place.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_place.name) or GtfsProfile.getOptionalMultilingualString(stop_place.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_place.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(stop_place.tariff_zones),
             'stop_url': stop_place.url or '',
             'location_type': 1,  # Station
@@ -899,8 +905,8 @@ class GtfsProfile:
                     'stop_code': GtfsProfile.getOptionalPrivateCode(quay.public_code),
                     'stop_name': GtfsProfile.getOptionalMultilingualString(quay.name) or GtfsProfile.getOptionalMultilingualString(quay.short_name),
                     'stop_desc': GtfsProfile.getOptionalMultilingualString(quay.description),
-                    'stop_lat': round(latitude, 7),
-                    'stop_lon': round(longitude, 7),
+                    'stop_lat': advanced_round(latitude, 7),
+                    'stop_lon': advanced_round(longitude, 7),
                     'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(quay.tariff_zones),
                     'stop_url': quay.url or '',
                     'location_type': 0,  # Platform
@@ -935,8 +941,8 @@ class GtfsProfile:
 
                 shape_point = {
                     'shape_id': GtfsProfile.getOriginalGtfsId(route, 'shape_id'),
-                    'shape_pt_lat': round(latitude, 7),
-                    'shape_pt_lon': round(longitude, 7),
+                    'shape_pt_lat': advanced_round(latitude, 7),
+                    'shape_pt_lon': advanced_round(longitude, 7),
                     'shape_pt_sequence': sequence,
                     'shape_dist_traveled': (d := distance) if distance > 0 else '',
                 }
@@ -963,8 +969,8 @@ class GtfsProfile:
 
             shape_point = {
                 'shape_id': GtfsProfile.getOriginalGtfsId(route, 'shape_id'),
-                'shape_pt_lat': round(latitude, 7),
-                'shape_pt_lon': round(longitude, 7),
+                'shape_pt_lat': advanced_round(latitude, 7),
+                'shape_pt_lon': advanced_round(longitude, 7),
                 'shape_pt_sequence': sequence,
                 'shape_dist_traveled': (d := distance) if distance > 0 else '',
             }
@@ -995,8 +1001,8 @@ class GtfsProfile:
 
                 shape_point = {
                     'shape_id': GtfsProfile.getOriginalGtfsId(service_journey_pattern, 'shape_id'),
-                    'shape_pt_lat': round(latitude, 7),
-                    'shape_pt_lon': round(longitude, 7),
+                    'shape_pt_lat': advanced_round(latitude, 7),
+                    'shape_pt_lon': advanced_round(longitude, 7),
                     'shape_pt_sequence': sequence,
                     'shape_dist_traveled': (d := distance) if distance > 0 else '',
                 }
@@ -1023,8 +1029,8 @@ class GtfsProfile:
 
             shape_point = {
                 'shape_id': GtfsProfile.getOriginalGtfsId(service_journey_pattern, 'shape_id'),
-                'shape_pt_lat': round(latitude, 7),
-                'shape_pt_lon': round(longitude, 7),
+                'shape_pt_lat': advanced_round(latitude, 7),
+                'shape_pt_lon': advanced_round(longitude, 7),
                 'shape_pt_sequence': sequence,
                 'shape_dist_traveled': (d := distance) if distance > 0 else '',
             }
