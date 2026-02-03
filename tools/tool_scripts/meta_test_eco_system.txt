@@ -24,8 +24,8 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt m
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
 
 # Problem with SimplePointVersionStructure: #84
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_ardennesepip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_aubeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
 
 # needs fix for relational constraints
 python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log lombardiatrainitaliaepip
