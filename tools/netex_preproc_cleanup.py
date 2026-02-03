@@ -265,7 +265,7 @@ def include_order_in_id(root: ET.Element,
             elem.set("id", f"{id_val}{suffix}")
 
 def change_order_0(root: ET.Element,
-                   elements_to_process: Iterable[str] = ("PassengerStopAssignment",),
+                   elements_to_process: Iterable[str] = ("PassengerStopAssignment","AlternativeName"),
                    consider_namespaces: bool = False) -> None:
     """
     Traverse the XML tree rooted at `root` and for each element whose tag matches one of
@@ -293,7 +293,7 @@ def change_order_0(root: ET.Element,
 
 def add_id_version(root: ET.Element,
                    include_tags: Iterable[str] = ("AlternativeName","AlternativeText", "OperatorRef","DayTypeRef","LineRef",
-                                                "ScheduledStopPointRef", "ServiceJourneyPatternRef", "PassingTime","StopPointInJourneyPatternRef"),
+                                                "ScheduledStopPointRef", "ServiceJourneyPatternRef", "PassingTime","StopPointInJourneyPatternRef","TimetabledPassingTime"),
                    consider_namespaces: bool = False) -> None:
     """
     Add a unique id attribute (if missing) and version="any" (if missing)11
@@ -358,10 +358,47 @@ def _is_valid_url(url: str) -> bool:
         return False
     return True
 
+def remove_attrs(
+    root: ET.Element,
+    include_attrs: Iterable[str] = ("dataSourceRef",),
+    consider_namespaces: bool = False,
+) -> None:
+    """
+    Remove attributes from all elements in the tree rooted at `root`.
 
+    - include_attrs: iterable of attribute names. If consider_namespaces is False,
+      these are compared against the local name (without namespace). If True,
+      they must match the full attribute key as stored in ElementTree (e.g. '{ns}local' or 'local').
+    - consider_namespaces: when False (default), strip namespace before comparing.
+
+    The function modifies the tree in place and returns None.
+    """
+    # Normalize include_attrs to a set for faster membership tests
+    include_set = set(include_attrs)
+
+    # Iterate root and all descendants
+    for elem in root.iter():
+        if not elem.attrib:
+            continue
+
+        # Build list of keys to remove to avoid changing dict during iteration
+        to_remove = []
+        if consider_namespaces:
+            # Match full attribute keys
+            for key in elem.attrib.keys():
+                if key in include_set:
+                    to_remove.append(key)
+        else:
+            # Match local name only (strip '{ns}' if present)
+            for key in elem.attrib.keys():
+                if _local_name(key) in include_set:
+                    to_remove.append(key)
+
+        for key in to_remove:
+            elem.attrib.pop(key, None)
 
 def remove_refs(root: ET.Element,
-                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef", "ParentSiteRef"),
+                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef", "ParentSiteRef","TypeOfPlaceRef"),
                 consider_namespaces: bool = False) -> None:
     """
     Remove elements whose tag is in include_tags from the tree rooted at root.
@@ -504,30 +541,38 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "REMOVESOMEREFS" in actions_set or not actions_set:
             log_print("Removing some Refs that are not present as elements and not relevant.")
             remove_refs(et.getroot())
+        if "REMOVESOMEATTRS" in actions_set or not actions_set:
+            log_print("Removing some attributs that cause problems (France dataSourceRef)")
+            remove_attrs(et.getroot())
 
-    filecounter = filecounter + 1
-    # Comes from xml.py
-    if output_filename.endswith(".gz"):
-        with igzip_threaded.open(  # type: ignore
-                output_filename,
-                "wb",
-                compresslevel=3,
-                threads=3,
-                block_size=2 * 10 ** 8,
-        ) as out:
-            et.write(out)
-    elif output_filename.endswith(".zip"):
-        with zipfile.ZipFile(output_filename, "a", zipfile.ZIP_DEFLATED) as zf:
-            buffer = BytesIO()
-            et.write(buffer, encoding='utf-8', xml_declaration=True)
-            xml_bytes = buffer.getvalue()
-            if "<ZipInfo" in real_filename:
-                zf.writestr(f"file_{filecounter}.xml", xml_bytes)
-            else:
-                zf.writestr(real_filename, xml_bytes)
-    else:
-        with open(output_filename, "wb") as out:
-            et.write(out)
+        if "NONE" in actions_set or not actions_set:
+            log_print("No action. But processes.")
+
+
+        #Saving file
+        filecounter = filecounter + 1
+        # Comes from xml.py
+        if output_filename.endswith(".gz"):
+            with igzip_threaded.open(  # type: ignore
+                    output_filename,
+                    "wb",
+                    compresslevel=3,
+                    threads=3,
+                    block_size=2 * 10 ** 8,
+            ) as out:
+                et.write(out)
+        elif output_filename.endswith(".zip"):
+            with zipfile.ZipFile(output_filename, "a", zipfile.ZIP_DEFLATED) as zf:
+                buffer = BytesIO()
+                et.write(buffer, encoding='utf-8', xml_declaration=True)
+                xml_bytes = buffer.getvalue()
+                if "<ZipInfo" in real_filename:
+                    zf.writestr(f"file_{filecounter}.xml", xml_bytes)
+                else:
+                    zf.writestr(real_filename, xml_bytes)
+        else:
+            with open(output_filename, "wb") as out:
+                et.write(out)
 
 
 
