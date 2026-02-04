@@ -299,7 +299,7 @@ def extract(archive: zipfile.ZipFile, database: Path) -> None:
                     'feed_info.txt',
                     [
                         {
-                            'feed_publisher_name': str(ds.name.content[0].value) if ds and ds.name else defaults["feed_publisher_name"],
+                            'feed_publisher_name': str(ds.name.content[0]) if ds and ds.name else defaults["feed_publisher_name"],
                             'feed_publisher_url': ds.url if ds and ds.url else defaults["feed_publisher_url"],
                             'feed_lang': 'en',  # TODO
                             'default_lang': 'en',  # TODO
