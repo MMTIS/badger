@@ -24,7 +24,7 @@ from domain.gtfs.model.tables import (
     frequencies_txt,
     pathways_txt,
 )
-from domain.gtfs.services.gtfs_inference import create_feed_info, handle_single_agency, update_empty_enumerations
+from domain.gtfs.services.gtfs_inference import create_feed_info, handle_single_agency, update_empty_enumerations, update_empty_service_id
 from utils.aux_logging import log_all
 
 
@@ -131,3 +131,4 @@ def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
     create_feed_info(con)
     handle_single_agency(con)
     update_empty_enumerations(con)
+    update_empty_service_id(con)

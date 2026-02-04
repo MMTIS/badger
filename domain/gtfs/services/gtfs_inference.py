@@ -45,3 +45,11 @@ def handle_single_agency(con: duckdb.DuckDBPyConnection) -> None:
 def update_empty_enumerations(con: duckdb.DuckDBPyConnection) -> None:
     with con.cursor() as cur:
         cur.execute("""UPDATE stops SET location_type = 0 WHERE location_type IS NULL;""")
+
+
+def update_empty_service_id(con: duckdb.DuckDBPyConnection) -> None:
+    # This fix makes it explicit that an unschedueled trip in the context of GTFS
+    with con.cursor() as cur:
+        cur.execute(
+            """INSERT INTO calendar (service_id, monday, tuesday, wednesday, thursday, friday, saturday, sunday, start_date, end_date) SELECT service_id, 0, 0, 0, 0, 0, 0, 0, '20000101', '20000101' FROM (SELECT service_id FROM trips EXCEPT (SELECT service_id FROM calendar UNION SELECT service_id FROM calendar_dates));"""
+        )

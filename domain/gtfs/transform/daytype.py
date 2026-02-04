@@ -119,7 +119,7 @@ def getDayTypes(con: duckdb.DuckDBPyConnection, codespace: Codespace, version: s
                 id=get_service_id_dt(codespace, service_id),
                 version=version,
                 private_codes=PrivateCodes(private_code=[PrivateCode(type_value="service_id", value=service_id)]),
-                properties=PropertiesOfDayRelStructure(property_of_day=[PropertyOfDay(days_of_week=days_of_week)]),
+                properties=PropertiesOfDayRelStructure(property_of_day=[PropertyOfDay(days_of_week=days_of_week)]) if len(days_of_week) > 0 else None,
             )
             day_types.append(day_type)
             try:
