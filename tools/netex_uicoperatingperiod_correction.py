@@ -32,9 +32,9 @@ def _serialize_etree_to_bytes(tree):
     tree.write(buf, encoding="utf-8", xml_declaration=True)
     return buf.getvalue()
 
-def modify_xml_file(file_path, output_filename):
+def modify_xml_file(file_path, output_filename_str):
     file_path = Path(file_path)
-    output_filename = Path(output_filename)
+    output_filename = Path(output_filename_str)
 
     xml_storage = XmlStorage(file_path)
 
@@ -42,48 +42,36 @@ def modify_xml_file(file_path, output_filename):
     out_is_zip = out_sfx == ".zip"
     out_is_gz = out_sfx == ".gz"
 
-    if out_is_zip:
-        # Open once; use 'w' to overwrite or 'a' to append existing output
-        with zipfile.ZipFile(output_filename, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for f, real_filename in xml_storage.open_netex_file():
-                et = ET.parse(f)
-                modify_xml_content(et.getroot(), file_path.name)
-
-                # Preserve directory structure using forward slashes, no leading slash.
-                # Example: 'AVL_AVL/NX-PI-01_...xml' -> 'AVL_AVL/NX-PI-01_...xml'
-                try:
-                    arcname = Path(real_filename).as_posix().lstrip("/")
-                except Exception:
-                    arcname = str(real_filename).replace("\\", "/").lstrip("/")
-
-                xml_bytes = _serialize_etree_to_bytes(et)
-                zf.writestr(arcname, xml_bytes)
-
-    elif out_is_gz:
-        # Expect single-file mapping for .gz -> .gz
-        with igzip_threaded.open(str(output_filename), "wb", compresslevel=3, threads=3, block_size=2 * 10 ** 8) as out:
-            it = xml_storage.open_netex_file()
-            f, real_filename = next(it, (None, None))
-            if f is None:
-                return
-            et = ET.parse(f)
-            modify_xml_content(et.getroot(), file_path.name)
-            et.write(out, encoding="utf-8", xml_declaration=True)
-            if next(it, None) is not None:
-                raise RuntimeError("Input archive contains multiple files but output is single .gz")
-
-    else:
-        # plain output: expect single file
-        it = xml_storage.open_netex_file()
-        f, real_filename = next(it, (None, None))
-        if f is None:
-            return
+    xml_storage = XmlStorage(file_path)
+    filecounter = 0
+    for f, real_filename in xml_storage.open_netex_file():
         et = ET.parse(f)
         modify_xml_content(et.getroot(), file_path.name)
-        with open(output_filename, "wb") as out:
-            et.write(out, encoding="utf-8", xml_declaration=True)
-        if next(it, None) is not None:
-            raise RuntimeError("Input archive contains multiple files but output is single plain file")
+        # Saving file
+        filecounter = filecounter + 1
+        # Comes from xml.py
+        if output_filename_str.endswith(".gz"):
+            with igzip_threaded.open(  # type: ignore
+                    output_filename,
+                    "wb",
+                    compresslevel=3,
+                    threads=3,
+                    block_size=2 * 10 ** 8,
+            ) as out:
+                et.write(out)
+        elif output_filename_str.endswith(".zip"):
+            with zipfile.ZipFile(output_filename, "a", zipfile.ZIP_DEFLATED) as zf:
+                buffer = BytesIO()
+                et.write(buffer, encoding='utf-8', xml_declaration=True)
+                xml_bytes = buffer.getvalue()
+                if "<ZipInfo" in real_filename:
+                    zf.writestr(f"file_{filecounter}.xml", xml_bytes)
+                else:
+                    zf.writestr(real_filename, xml_bytes)
+        else:
+            with open(output_filename, "wb") as out:
+                et.write(out)
+
 
 def ensure_same_extension(input_path: str, output_path: str) -> None:
     if Path(input_path).suffix != Path(output_path).suffix:
