@@ -51,7 +51,7 @@ from domain.netex.model import (
     OperatingPeriodRef,
     RouteLinksInFrameRelStructure,
     RouteView,
-    ParticipantRef,
+    ParticipantRef, TextType,
 )
 from domain.netex.services.ids import getId
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
@@ -118,7 +118,7 @@ class NordicProfile:
 
     def projectNetworkFromLines(self, lines: List[Line]) -> Network:
         group_of_lines: GroupOfLines = GroupOfLines(
-            id=getId(GroupOfLines, self.codespace, "1"), version=lines[0].version, name=MultilingualString(value="GroupOfLines")
+            id=getId(GroupOfLines, self.codespace, "1"), version=lines[0].version, name=MultilingualString(content=[TextType(value="GroupOfLines")])
         )
         ref = getRef(group_of_lines)
         for line in lines:

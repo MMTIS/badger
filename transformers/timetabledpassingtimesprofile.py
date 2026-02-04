@@ -18,7 +18,7 @@ from domain.netex.model import (
     RouteView,
     JourneyPattern,
     TimingPointInJourneyPattern,
-    TimeDemandType,
+    TimeDemandType, TextType,
 )
 import sys
 import hashlib
@@ -246,7 +246,7 @@ class TimetablePassingTimesProfile:
                             route_ref_or_route_view=RouteView(
                                 flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
                             ),
-                            name=MultilingualString(content=[spijp_hash]),
+                            name=MultilingualString(content=[TextType(value=spijp_hash)]),
                             derived_from_object_ref=sj.id,
                             derived_from_version_ref_attribute=sj.version,
                             points_in_sequence=spijps,
@@ -346,7 +346,7 @@ class TimetablePassingTimesProfile:
                                 route_ref_or_route_view=RouteView(
                                     flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
                                 ),
-                                name=MultilingualString(content=[spijp_hash]),
+                                name=MultilingualString(content=[TextType(value=spijp_hash)]),
                                 derived_from_object_ref=sj.id,
                                 derived_from_version_ref_attribute=sj.version,
                                 points_in_sequence=spijps,

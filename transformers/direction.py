@@ -1,7 +1,8 @@
 from typing import Dict, Any, Generator, cast, Tuple, Optional
 
 from mdbx.mdbx import TXN
-from domain.netex.model import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef, DirectionType
+from domain.netex.model import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef, DirectionType, \
+    TextType
 from domain.netex.services.ids import getId
 from domain.netex.services.refs import getRef
 from domain.netex.services.model_typing import Tid
@@ -20,15 +21,13 @@ def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generat
             direction: Direction | None = directions.get(key, None)
             new_direction=None
             if direction is None:
-                if directions.get(key) is None:
-                    direction = Direction(
-                        id=getId(generator_defaults['codespace'], Direction, key),
-                        version='any',
-                        name=MultilingualString(content=[key]),
-                        direction_type=sjp.direction_type,
-                    )
-                    directions[key] = direction
-                    yield direction
+                direction = Direction(
+                    id=getId(generator_defaults['codespace'], Direction, key),
+                    version='any',
+                    name=MultilingualString(content=[TextType(value=key)]),
+                    direction_type=sjp.direction_type,
+                )
+                directions[key] = direction
                 direction_refs[key] = cast(DirectionRef, getRef(direction))
             sjp.direction_ref_or_direction_view = direction_refs[key]
             yield sjp

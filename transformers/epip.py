@@ -126,7 +126,7 @@ from domain.netex.model import (
     DayTypeRef,
     EntityStructure,
     Locale,
-    NameOfClassOperatingPeriodRefStructureType,
+    NameOfClassOperatingPeriodRefStructureType, TextType,
 )
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
@@ -1093,7 +1093,7 @@ def export_epip_network_offer(
         version="ntx:1.1",
         publication_timestamp=XmlDateTime.now(),
         participant_ref=ParticipantRef(value=defaults["particpant_ref"]),
-        description=MultilingualString(content=[defaults["xml_description"]]),
+        description=MultilingualString(content=[TextType(value=defaults["xml_description"])]),
         data_objects=DataObjectsRelStructure(
             choice=[
                 CompositeFrame(
