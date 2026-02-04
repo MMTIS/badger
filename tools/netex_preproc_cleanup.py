@@ -399,7 +399,7 @@ def remove_attrs(
             elem.attrib.pop(key, None)
 
 def remove_refs(root: ET.Element,
-                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef", "ParentSiteRef","TypeOfPlaceRef"),
+                include_tags: Iterable[str] = ("SupplyContactRef","TopographicPlaceRef", "ParentSiteRef","TypeOfPlaceRef","BrandingRef"),
                 consider_namespaces: bool = False) -> None:
     """
     Remove elements whose tag is in include_tags from the tree rooted at root.
@@ -483,6 +483,93 @@ def make_url_useful(root: ET.Element, consider_namespaces: bool = False) -> None
             # final fallback
             elem.text = FALLBACK_URL
 
+def remove_sncf_problems(root: ET.Element, consider_namespaces: bool = False  ) -> None:
+    """
+            Fix SNCF-specific issues in-place.
+
+            - Remove elements DestinationDisplayRef and OperatorRef when they have attribute ref == "".
+            - Remove elements TypeOfLineRef and routes unconditionally.
+            - Remove attributes responsibilitySetRef when value == "".
+
+            If consider_namespaces is False, match by local name. If True, match full QName.
+            """
+    # target names
+    dest_name = "DestinationDisplayRef"
+    op_name = "OperatorRef"
+    type_of_line_name = "TypeOfLineRef"
+    routes_name = "routes"
+    ref_attr_local = "ref"
+    resp_attr_local = "responsibilitySetRef"
+
+    # 1) Remove child elements based on parent iteration (safe removal)
+    for parent in root.iter():
+        children = list(parent)
+        for child in children:
+            child_tag = child.tag if consider_namespaces else _local_name(child.tag)
+
+            # Remove unconditional elements
+            if child_tag == (type_of_line_name if consider_namespaces else type_of_line_name) \
+                    or child_tag == (routes_name if consider_namespaces else routes_name):
+                parent.remove(child)
+                continue
+
+            # Remove DestinationDisplayRef or OperatorRef only if ref == ""
+            if child_tag == (dest_name if consider_namespaces else dest_name) \
+                    or child_tag == (op_name if consider_namespaces else op_name):
+                # Find ref attribute value (consider namespace variants)
+                ref_val = None
+                # prefer exact 'ref' key, otherwise search attributes by local name
+                if "ref" in child.attrib:
+                    ref_val = child.attrib.get("ref")
+                else:
+                    for akey, aval in child.attrib.items():
+                        if _local_name(akey) == ref_attr_local:
+                            ref_val = aval
+                            break
+                if ref_val == "":
+                    parent.remove(child)
+                    continue
+
+    # 2) Remove responsibilitySetRef attributes when value == ""
+    for elem in root.iter():
+        if not elem.attrib:
+            continue
+        to_remove = []
+        for key, val in elem.attrib.items():
+            if val != "":
+                continue
+            key_local = _local_name(key)
+            if key_local == resp_attr_local:
+                # if consider_namespaces==True and you want to restrict to exact QName
+                # you could check `if consider_namespaces and key != resp_attr_local: skip`
+                to_remove.append(key)
+        for key in to_remove:
+            elem.attrib.pop(key, None)
+
+    # Remove attributes responsibilitySetRef with value == ""
+    # Walk all elements and remove matching attributes
+    for elem in root.iter():
+        if not elem.attrib:
+            continue
+        to_remove = []
+        if consider_namespaces:
+            # Remove attributes whose full key equals the exact name (unlikely) or whose local name matches
+            for key, val in elem.attrib.items():
+                if key == "responsibilitySetRef" and val == "":
+                    to_remove.append(key)
+                elif _local_name(key) == "responsibilitySetRef" and val == "":
+                    to_remove.append(key)
+        else:
+            for key, val in elem.attrib.items():
+                if _local_name(key) == "responsibilitySetRef" and val == "":
+                    to_remove.append(key)
+        for key in to_remove:
+            elem.attrib.pop(key, None)
+
+
+
+
+
 def process_file(file_path, output_filename, actions: Iterable[str] | None = None):
     # normalize actions to a set for fast membership checks
     if actions is None:
@@ -514,11 +601,6 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("Adds id and version to a a set of Tags")
             add_id_version(et.getroot())
 
-        # simplify versions if possible: especially if there are only any and one other
-        if "REMOVEAMBIGUOUSANY" in actions_set or not actions_set:
-            log_print(" simplify versions if possible: especially if there are only any and one other")
-            simplify_version(et.getroot())
-
         if "FIXORDER0" in actions_set or not actions_set:
             log_print("some files contain order='0'. We replace it with order='1'")
             change_order_0(et.getroot())
@@ -549,6 +631,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "UICOPERATINGPERIODCORRECTION" in actions_set or not actions_set:
             log_print("Correction UIC Operating period.")
             #TODO currently separate file as it does a bit more....netex_uicoperatingperiod_correction.py
+
+        if "REMOVESNCFPROBLEMS" in actions_set or not actions_set:
+            log_print("Fix some additional SNCF problems. Remove empty DestinationDisplayRefs, OperatorRefs and attribute responsibilitySets")
+            remove_sncf_problems(et.getroot())
 
         if "NONE" in actions_set or not actions_set:
             log_print("No action. But processes.")
