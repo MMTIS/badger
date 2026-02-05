@@ -477,8 +477,7 @@ def main(
     if result == 1:
         exit(1)
 
-
-if __name__ == "__main__":
+def cli(argv=None):
     import argparse
     import traceback
 
@@ -501,7 +500,7 @@ if __name__ == "__main__":
         help="The log level (use logging constants)",
     )
     args = parser.parse_args()
-    mylogger = prepare_logger(logging.INFO, args.log_file)
+    prepare_logger(logging.INFO, args.log_file)
     try:
         main(
             args.script_file,
@@ -514,3 +513,6 @@ if __name__ == "__main__":
         )
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+
+if __name__ == "__main__":
+    cli()
