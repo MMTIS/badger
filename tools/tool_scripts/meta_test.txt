@@ -1,31 +1,16 @@
-# Current set of scripts to run in sequence
-#v1.1
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt nlsmall.log nlsmall
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
-
-#übler Fehler mit PointsInJourneyPattern: order drin in id, aber falsch
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
-
-#Problem with ParentSiteRef in validation. nameOfClass can't be Site
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_bolzano.log sta_bolzano
-
-#Problem with day_type_ref in gtfsprofile.py
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_trentino.log sta_trentino
-
-
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt swissinterchange.log swissinterchange
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lux.log lux
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_ter.log fr_sncf_ter
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_gtfs.log fr_sncf_gtfs
-python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt swissprod.log swiss-prod-epip-1
-
-'''
-Tested
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_ciri.log 5t_ciri
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt filter1.log filter1
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt trenitalia.log trenitalia
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrainitalia.log lombardiatrainitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiavarese.log lombardiavarese
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiafunbus.log lombardiafunbus
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_bolzano.log sta_bolzano
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_trentino.log sta_trentino
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lux.log lux
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_ter.log fr_sncf_ter
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_gtfs.log fr_sncf_gtfs
 
 
-'''

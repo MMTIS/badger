@@ -1,41 +1,28 @@
 # WORKING
 # =======
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange_r
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
 
-#nl epip
+
+DirectionRef problem
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
+
+#needs to be redefined
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
 
-# basic gtfs loading
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
-
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+# not yet defined
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
 
 
-# filter
-python -m tools.script_runner ./tools/tool_scripts/script_regression.v1.1.txt mylog.log filter1
 
 # NOT WORKING
 # ===========
-# Daytype problem in GTFS validation, perhaps from JourneyMeeting and InterchangeRule
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
 
-# Problem with SimplePointVersionStructure: #84
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
-
-# needs fix for relational constraints
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log lombardiatrainitaliaepip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
-
-# problem unknown (or perhaps also needs relational constraint fix)
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
-
-# needs relational constraints and dayofset fixes
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_sncf_ter
 
 # long runners
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lux

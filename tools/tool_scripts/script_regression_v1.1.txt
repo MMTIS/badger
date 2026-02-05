@@ -110,13 +110,13 @@
         {"script": "fix.add_stop", "args": "%%dir%%/03-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/input.zip] %%dir%%/06-gtfs.mdbx "},
         {"script": "fix.add_stop", "args": "%%dir%%/06-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.mdbx %%dir%%/07-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
          ]
@@ -136,6 +136,8 @@
         {"script": "fix.add_stop", "args": "%%dir%%/03-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/05-%%block%%-netex.xml.gz %%dir%%/06-%%block%%-netex.xml.gz [SIMPLIFYVERSION]"},
+        {"script": "tools.xml_validator", "args": "%%dir%%/06-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/02.zip] %%dir%%/06-gtfs.mdbx "},
         {"script": "fix.add_stop", "args": "%%dir%%/06-gtfs.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.mdbx %%dir%%/07-gtfs.mdbx"},

@@ -226,7 +226,7 @@ def replace_versionref_with_version(root: ET.Element,
 
 
 def include_order_in_id(root: ET.Element,
-                        elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment","AlternativeName","StopPointInJourneyPattern"),
+                        elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment","AlternativeName"),
                         consider_namespaces: bool = False) -> None:
     """
     Walk the element tree rooted at `root` and for each element whose tag matches one of
@@ -242,7 +242,6 @@ def include_order_in_id(root: ET.Element,
       these should match the element.tag value (including namespace braces).
     - consider_namespaces: whether to treat the provided names as namespace-aware (True)
       or to match only the local name part of element.tag (False).
-    TODO StopPointInJourneyPattern was added for SNCF. May be that this breaks for people who did theidof StopPointInJourneyPattern correctly as we might break it
     """
     # Normalize set for faster membership tests
     targets = set(elements_to_process)
