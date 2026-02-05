@@ -29,6 +29,7 @@ def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generat
                 )
                 directions[key] = direction
                 direction_refs[key] = cast(DirectionRef, getRef(direction))
+                yield direction
             sjp.direction_ref_or_direction_view = direction_refs[key]
             yield sjp
 
