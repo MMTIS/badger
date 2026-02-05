@@ -47,7 +47,7 @@ class StorageObject(QObject):
                         self.nameChanged.emit(self._name)
 
                     elif isinstance(name.content[0], TextType):
-                        self._name = name.content[0].value
+                        self._name = name.content[0]
                         self.nameChanged.emit(self._name)
 
             elif isinstance(name, str):
