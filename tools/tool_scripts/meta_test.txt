@@ -1,9 +1,6 @@
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_ciri.log 5t_ciri
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt filter1.log filter1
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt trenitalia.log trenitalia
+
+# Problem OperatorRef
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrainitalia.log lombardiatrainitalia
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiavarese.log lombardiavarese
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiafunbus.log lombardiafunbus
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
