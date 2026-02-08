@@ -56,6 +56,7 @@ from domain.netex.model import (
     VersionOfObjectRefStructure,
     LevelRef,
     Level, AllPublicTransportModesEnumeration,
+    FlexibleLineView,
 )
 
 import operator as operator_f
@@ -675,7 +676,8 @@ class GtfsProfile:
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None:
             if isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, LineRefStructure):
                 return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
-
+            elif isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineView) and isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref, LineRefStructure) :
+                return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref
         elif service_journey_pattern is not None:
             if service_journey.journey_pattern_ref.ref == service_journey_pattern.id:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteView):
