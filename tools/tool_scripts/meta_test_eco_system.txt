@@ -9,21 +9,20 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fi
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt trenitalia.log trenitalia
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiavarese.log lombardiavarese
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiafunbus.log lombardiafunbus
-
-
-DirectionRef problem
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
 
-#needs to be redefined
+#needs to be redefined so that it validates.
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
 
-# not yet defined
+# needs to be defined in script_regression_v1.1.txt
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
 
-
+#  conv.gtfs_db_to_db C:/Users/ue71603/Downloads/5t_2/08-gtfs.mdbx C:/Users/ue71603/Downloads/5t_2/10-gtfs.mdbx
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
 
 # NOT WORKING
 # ===========
@@ -37,4 +36,7 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.l
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip-1
 
+
+# Problem: 	https://github.com/MMTIS/QA/issues/18
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
 

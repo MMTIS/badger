@@ -1,9 +1,7 @@
 
 # Problem OperatorRef
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrainitalia.log lombardiatrainitalia
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
+
+
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_bolzano.log sta_bolzano
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_trentino.log sta_trentino
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lux.log lux
