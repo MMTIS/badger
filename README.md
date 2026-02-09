@@ -125,7 +125,8 @@ The following badger scripts are available so far:
 
 | Script | for Module          |
 |--------|---------------------|
-| `badger-script-runner`       | `tools.script_runner` |
+| `badger-script-runner`     | `tools.script_runner` |
+|`badger-gtfs-viewer`        |  `tools.gtfs_map_visualisation` |
 
 #### Sample Usage
 

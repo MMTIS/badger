@@ -255,14 +255,11 @@ def handle_trips_for_route(
                         + str(trip_name)
                     )
 
-
 def array_of_array_to_string(array_of_arrays: list[tuple[float, float]]) -> str:
     return "".join(f"[{x}, {y}]" for x, y in array_of_arrays)
 
-
-if __name__ == "__main__":
+def cli(argv=None):
     import argparse
-
     parser = argparse.ArgumentParser(
         description="Writes an html file for GTFS with leaflet to show stops and trips"
     )
@@ -276,7 +273,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
-    mylogger = prepare_logger(logging.INFO, args.log_file)
+    prepare_logger(logging.INFO, args.log_file)
     try:
         if args.limitation:
             main(args.gtfs_zip_file, args.map_file, args.limitation)
@@ -285,3 +282,6 @@ if __name__ == "__main__":
     except Exception as e:
         log_all(logging.ERROR, f"{e}" + traceback.format_exc())
         raise e
+
+if __name__ == "__main__":
+    cli()

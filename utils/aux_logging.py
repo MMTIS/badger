@@ -4,7 +4,6 @@
 # --logfile=filename
 import logging
 
-from configuration import NOSOFTLOGGING, processing_data, log_dict
 import os
 import sys
 
