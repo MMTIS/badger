@@ -7,5 +7,3 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt st
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lux.log lux
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_ter.log fr_sncf_ter
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_gtfs.log fr_sncf_gtfs
-
-

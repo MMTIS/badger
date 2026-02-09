@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "badger"
 version = "0.1.0"
@@ -28,6 +32,13 @@ dependencies = [
     "xsdata[cli,soap,lxml]>=25.7",
 ]
 requires-python = ">=3.12"
+
+[project.scripts]
+badger-script-runner = "tools.script_runner:cli"
+
+# Only package the conv and tools packages
+[tool.setuptools.packages.find]
+include = ["conv*", "tools*"]
 
 [tool.black]
 extend-exclude = "domain/netex/model/*.py"
