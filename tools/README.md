@@ -1,12 +1,21 @@
 # Tools for badger
-by Matthias Günter
+by Matthias Günter, Stefab de Konink
 
 In this directory there is a set of tools that can be used with the badger conversions:
 * a script runner
+* another script runner
 * a gtfs validator
-* a gtfs visualisation
+* a gtfs visualisation on maps
 * an xml validator (used to validate the NeTEx with the relevant XSD)
 
+We also have two types of "fixing" tools for the script runner:
+* some work on the NeTEx files
+* some work on the mdbx database
+* one fixes some problematic characters in GTFS stops.txt
+
+The tools are evolving.
+
+The tools are fixing different problems that occur.
 Future tools will contain:
 * a relation explorer in NeTEx
 * a SIRI ET/PT export of a given operating day
@@ -14,14 +23,14 @@ Future tools will contain:
 * some statistics for NeTEx
 
 
-We might also add tools, that correct common problems in certain data sets.
 
 ## The XML (NeTEx) validator
 in the `tools` folder there is the a tool for validating xml files.
 ```
-uv run python -m tools.xml_validator path_to_xml_file.xml.zip 
+uv run python -m tools.xml_validator path_to_xml_file.xml.zip --log_file <path> --xsdschema <path> 
 ```
-`path_to_xml_file.xml.zip` can be an xml, a zip or a gz file.
+`path_to_xml_file.xml.zip` can be an xml, a zip or a gz file. If no xsdschema is provided the one from the project is used.
+
 
 ## The GTFS validator
 In the `tools` folder there is the a tool for validating GTFS files.
@@ -67,6 +76,7 @@ Note:
 * We provide some script files in the `tools/tools_script` folder-
 * `no_of_step` is the sequence number in the block to start. Be aware that it is the n-th script in the block and not the number/id in `step` in the script.
 * `name_of_block` the identier of the block. `all` means all blocks (are processed sequentially.)
+* We will in short rename the .txt files to json.
 
 ### Basic idea
 The script runner allows to run scripts.

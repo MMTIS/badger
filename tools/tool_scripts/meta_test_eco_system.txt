@@ -1,56 +1,42 @@
 # WORKING
 # =======
-
-#nl epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl3
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl2
-
-
-# basic gtfs generation
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
-
-# basic gtfs loading
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_aubegtfs
-
-# combined
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange_r
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_ciri.log 5t_ciri
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt filter1.log filter1
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt trenitalia.log trenitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiavarese.log lombardiavarese
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiafunbus.log lombardiafunbus
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
 
+#needs to be redefined so that it validates.
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
 
-# filter
-python -m tools.script_runner ./tools/tool_scripts/script_regression.v1.1.txt mylog.log filter1
+# needs to be defined in script_regression_v1.1.txt
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
+
+#  conv.gtfs_db_to_db C:/Users/ue71603/Downloads/5t_2/08-gtfs.mdbx C:/Users/ue71603/Downloads/5t_2/10-gtfs.mdbx
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
 
 # NOT WORKING
 # ===========
-# Daytype problem in GTFS validation, perhaps from JourneyMeeting and InterchangeRule
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
 
-# Problem with SimplePointVersionStructure: #84
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_ardennesepip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_aubeepip
-
-# needs fix for relational constraints
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log lombardiatrainitaliaepip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
-
-# problem unknown (or perhaps also needs relational constraint fix)
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
-
-# needs relational constraints and dayofset fixes
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_sncf_ter
 
 # long runners
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lux
-#python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swiss4epip
 
 #mandatory test
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
-#python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip-1
 
+
+# Problem: 	https://github.com/MMTIS/QA/issues/18
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
 

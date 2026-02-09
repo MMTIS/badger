@@ -10,8 +10,8 @@ from domain.netex.model import (
 from storage.mdbx.core.implementation import MdbxStorage
 
 with MdbxStorage(Path("/tmp/unittest.mdbx"), readonly=False) as storage:
-    storage.insert_objects_on_queue(Authority, [Authority(id="1", version="1", name=MultilingualString(content=["test"]))], False)
-    storage.insert_objects_on_queue(Operator, [Operator(id="1", version="1", name=MultilingualString(content=["test"]))], False)
+    storage.insert_objects_on_queue(Authority, [Authority(id="1", version="1", name=MultilingualString(content=[TextType(value="test")]))], False)
+    storage.insert_objects_on_queue(Operator, [Operator(id="1", version="1", name=MultilingualString(content=[TextType(value="test")]))], False)
 
 with MdbxStorage(Path("/tmp/unittest.mdbx"), readonly=True) as storage:
     with storage.env.ro_transaction() as ro_txn:

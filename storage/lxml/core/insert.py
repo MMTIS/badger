@@ -12,8 +12,6 @@ from domain.netex import model as netex
 from domain.netex.model import VersionFrameDefaultsStructure
 from domain.netex.services.model_typing import Tid
 from domain.utils import get_object_name
-from storage.interface import Storage
-from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.time import class_contains_xml_time, recursive_replace
 
 from lxml import etree
@@ -28,6 +26,7 @@ def get_element_name_with_ns(clazz: type[Tid]) -> str:
 
     return "{" + (meta.namespace if meta is not None else "") + "}" + name
 
+
 def get_interesting_classes(
     my_filter: set[type] | None = None,
 ) -> tuple[list[str], list[str], list[Any]]:
@@ -39,7 +38,9 @@ def get_interesting_classes(
 
     # Specifically we are interested in classes that are derived from "EntityInVersion", to find them, we exclude embedded child objects called "VersionedChild"
     entitiesinversion: list[tuple[str, type[Any]]] = [
-        x for x in interesting_members if netex.VersionedChildStructure in x[1].__mro__ or netex.EntityInVersionStructure in x[1].__mro__ or netex.EntityStructure in x[1].__mro__
+        x
+        for x in interesting_members
+        if netex.VersionedChildStructure in x[1].__mro__ or netex.EntityInVersionStructure in x[1].__mro__ or netex.EntityStructure in x[1].__mro__
     ]
 
     # Obviously we want to have the VersionedChild too
@@ -59,10 +60,15 @@ def get_interesting_classes(
         interesting_clazzes = [x[1] for x in entitiesinversion if x[1] in my_filter]
     else:
         clean_element_names = [x[0] for x in entitiesinversion if not x[0].endswith("Frame")]
-        interesting_element_names = [get_element_name_with_ns(x[1]) for x in entitiesinversion if not x[0].endswith("Frame") and not x[0].endswith("Structure") and not x[0].endswith("Dummy")]
+        interesting_element_names = [
+            get_element_name_with_ns(x[1])
+            for x in entitiesinversion
+            if not x[0].endswith("Frame") and not x[0].endswith("Structure") and not x[0].endswith("Dummy")
+        ]
         interesting_clazzes = [x[1] for x in entitiesinversion if not x[0].endswith("Frame") and not x[0].endswith("Structure") and not x[0].endswith("Dummy")]
 
     return clean_element_names, interesting_element_names, interesting_clazzes
+
 
 def get_local_name(element: type[Tid]) -> str:
     meta = getattr(element, "Meta", None)
@@ -72,12 +78,9 @@ def get_local_name(element: type[Tid]) -> str:
     return element.__name__
 
 
-
 def insert_database(
-    storage: MdbxStorage,
-    classes: tuple[list[str], list[str], list[Any]],
-    f: IO[Any] | None = None,
-    type_of_frame_filter: list[str] | None = None) -> None:
+    storage: MdbxStorage, classes: tuple[list[str], list[str], list[Any]], f: IO[Any] | None = None, type_of_frame_filter: list[str] | None = None
+) -> None:
 
     myserializer: MyXmlSerializer = MyXmlSerializer([])
     xml_context = XmlContext()
@@ -86,31 +89,39 @@ def insert_database(
 
     # TODO: resolve this part in a more generic way
     clsmembers = inspect.getmembers(netex, inspect.isclass)
-    all_frames = [
-        get_local_name(x[1])
-        for x in clsmembers
-        if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.VersionFrameVersionStructure in x[1].__mro__
-    ]
+    all_frames = set(
+        [
+            get_local_name(x[1])
+            for x in clsmembers
+            if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.VersionFrameVersionStructure in x[1].__mro__
+        ]
+    )
 
     obj_clazz: type | None = None
-    obj_list: list[Tid] = [] # We use this for buffering
+    obj_list: list[Tid] = []  # We use this for buffering
 
-    all_with_id = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "id")]
-    all_with_version = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "version")]
+    all_with_id = set([get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "id")])
+    all_with_version = set([get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "version")])
 
     # See: https://github.com/NeTEx-CEN/NeTEx/issues/788
     # all_datasource_refs = [x[0] for x in clsmembers if hasattr(x[1], 'Meta') and hasattr(x[1].Meta, 'namespace') and hasattr(x[1], 'data_source_ref_attribute')]
-    all_datasource_refs = [
-        get_local_name(x[1])
-        for x in clsmembers
-        if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.DataManagedObjectStructure in x[1].__mro__
-    ]
-    all_responsibility_set_refs = [
-        get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.EntityInVersionStructure in x[1].__mro__
-    ]
-    all_srs_name = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1], "srs_name")]
+    all_datasource_refs = set(
+        [
+            get_local_name(x[1])
+            for x in clsmembers
+            if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.DataManagedObjectStructure in x[1].__mro__
+        ]
+    )
+    all_responsibility_set_refs = set(
+        [
+            get_local_name(x[1])
+            for x in clsmembers
+            if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace") and netex.EntityInVersionStructure in x[1].__mro__
+        ]
+    )
+    all_srs_name = set([get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1], "srs_name")])
 
-    all_classes_with_xml_time = [get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and class_contains_xml_time(x[1])]
+    all_classes_with_xml_time = set([get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "Meta") and class_contains_xml_time(x[1])])
 
     frame_defaults_stack: list[netex.VersionFrameDefaultsStructure | None] = []
     if f is None:
@@ -284,7 +295,7 @@ def insert_database(
                         recursive_replace(object, current_zoneinfo)
 
                 if hasattr(clazz, "order"):
-                    if order is None:
+                    if order is None or order=="0": # order is non-negative. We have found data where it is 0, so we set it to 1 too
                         warnings.warn(f"{localname} {id} does not have a required order, setting it to 1.")
                         order = 1
                         object.order = order

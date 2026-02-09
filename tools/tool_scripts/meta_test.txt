@@ -1,19 +1,9 @@
-# Current set of scripts to run in sequence
 
-#nl epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4epip
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl3
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl2
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+# Problem OperatorRef
 
-# basic gtfs generation
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
 
-# basic gtfs loading
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
-
-# combined
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_bolzano.log sta_bolzano
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_trentino.log sta_trentino
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lux.log lux
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_ter.log fr_sncf_ter
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_gtfs.log fr_sncf_gtfs

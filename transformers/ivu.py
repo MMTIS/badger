@@ -16,7 +16,7 @@ from domain.netex.model import (
     VehicleType,
     MultilingualString,
     StopPlace,
-    Quay,
+    Quay, TextType,
 )
 import re
 from storage.mdbx.core.implementation import MdbxStorage
@@ -94,7 +94,7 @@ def avv_vehicle_type_short_name(db_read: MdbxStorage, txn: TXN) -> Generator[Veh
     vt: VehicleType
     for vt in db_read.iter_only_objects(txn, VehicleType):
         if vt.name:
-            vt.short_name = MultilingualString(content=[make_abbreviation(str(vt.name.content[0]), 5)])
+            vt.short_name = MultilingualString(content=[TextType(value=make_abbreviation(str(vt.name.content[0]), 5))])
             yield vt
 
 

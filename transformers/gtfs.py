@@ -4,6 +4,7 @@ import sys
 import warnings
 from datetime import timedelta, datetime, time
 from typing import Generator, TypeVar, Any, cast, Iterable, Optional
+import itertools
 import copy
 
 from mdbx.mdbx import TXN
@@ -37,6 +38,7 @@ from domain.netex.model import (
     RouteRef,
     RouteView,
     ServiceJourneyPattern,
+    ServiceCalendar,
     UicOperatingPeriodRef,
     OperatingPeriodRef,
 )
@@ -444,8 +446,83 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
     yield from query_sj(db_read, txn)
 
     def query_daytype(db_read: MdbxStorage, txn: TXN, calendar_combinations):
-        # TODO: This does not take embedded DayTypeAssignments
-        dtas = getIndexByGroup(db_read.iter_only_objects(txn, DayTypeAssignment), 'day_type_ref.ref')
+        service_calendars: list[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
+
+        all_day_type_assignments = [
+            x
+            for x in itertools.chain.from_iterable(
+                [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
+            )
+            if isinstance(x, DayTypeAssignment)
+        ] + list(
+            db_read.iter_only_objects(txn, DayTypeAssignment)
+        )  # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
+
+        dtas = getIndexByGroup(all_day_type_assignments, 'day_type_ref.ref')
+
+        all_day_types = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [service_calendar.day_types.day_type_ref_or_day_type_dummy for service_calendar in service_calendars if service_calendar.day_types]
+                )
+                if isinstance(x, DayType)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, DayType)
+            )  # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
+        )
+
+        all_uic_operating_periods = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_periods
+                    ]
+                )
+                if isinstance(x, UicOperatingPeriod)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, UicOperatingPeriod)
+            )  # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
+        )
+
+        all_operating_periods = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_periods
+                    ]
+                )
+                if isinstance(x, OperatingPeriod)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, OperatingPeriod)
+            )  # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
+        )
+
+        all_operating_days = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_days.operating_day_ref_or_operating_day
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_days
+                    ]
+                )
+                if isinstance(x, OperatingDay)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, OperatingDay)
+            )  # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
+        )
 
         for option in calendar_combinations:
             if isinstance(option, ValidityConditionsRelStructure):
@@ -465,6 +542,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                     day_type, day_type_assignments, operating_period = gtfs_day_type(day_type, day_type_assignments, operating_days, [uic_operating_period], [])
                     if operating_period is not None:
                         operating_period = [operating_period]
+                        all_operating_periods.update(getIndex(operating_period))
 
                     yield day_type, day_type_assignments, operating_period
                 else:
@@ -473,7 +551,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
 
             elif isinstance(option, DayTypeRefsRelStructure):
                 if len(option.day_type_ref) == 1:
-                    day_type = db_read.load_object_by_reference(txn, option.day_type_ref[0])
+                    day_type = all_day_types[option.day_type_ref[0].ref]
                     day_type_assignments = dtas[day_type.id]
                     uic_operating_periods = []
                     operating_periods = []
@@ -485,17 +563,20 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                         if isinstance(ref, UicOperatingPeriodRef) or (
                             isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                         ):
-                            uic_operating_periods.append(db_read.load_object_by_reference(txn, ref))
+                            uic_operating_periods.append(all_uic_operating_periods[ref.ref])
                         elif isinstance(ref, OperatingPeriodRef):
-                            r = db_read.load_object_by_reference(txn, ref)
-                            if isinstance(r, OperatingPeriod):
-                                operating_periods.append(r)
-                            elif isinstance(r, UicOperatingPeriod):
-                                uic_operating_periods.append(r)
+                            op = all_operating_periods.get(ref.ref, None)
+                            if op:
+                                operating_periods.append(op)
                             else:
-                                log_all(logging.ERROR, f"{ref} cannot be found.")
+                                uop = all_uic_operating_periods.get(ref.ref, None)
+                                if uop:
+                                    uic_operating_periods.append(uop)
+                                else:
+                                    log_all(logging.ERROR, f"{ref} cannot be found.")
+
                         elif isinstance(ref, OperatingDayRef):
-                            operating_days.append(db_read.load_object_by_reference(txn, ref))
+                            operating_days.append(all_operating_days[ref.ref])
 
                     if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                         day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -503,6 +584,7 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                         )
                         if operating_period is not None:
                             operating_period = [operating_period]
+                            all_operating_periods.update(getIndex(operating_period))
 
                         yield day_type, day_type_assignments, operating_period
                     else:
@@ -533,20 +615,20 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                             if isinstance(ref, UicOperatingPeriodRef) or (
                                 isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                             ):
-                                uic_operating_periods.append(db_read.load_object_by_reference(txn, ref))
+                                uic_operating_periods.append(all_uic_operating_periods[ref.ref])
                             elif isinstance(ref, OperatingPeriodRef):
-                                r = db_read.load_object_by_reference(txn, ref)
-                                if len(r) > 0:
-                                    operating_periods.append(r[0])
+                                op = all_operating_periods.get(ref.ref, None)
+                                if op:
+                                    operating_periods.append(op)
                                 else:
-                                    # TODO: we must be able to query child classes directly.
-                                    r = db_read.load_object_by_reference(txn, ref)
-                                    if len(r) > 0:
-                                        uic_operating_periods.append(r[0])
+                                    uop = all_uic_operating_periods.get(ref.ref, None)
+                                    if uop:
+                                        uic_operating_periods.append(uop)
                                     else:
                                         log_all(logging.ERROR, f"{ref} cannot be found.")
+
                             elif isinstance(ref, OperatingDayRef):
-                                operating_days.append(db_read.load_object_by_reference(txn, ref))
+                                operating_days.append(all_operating_days[ref.ref])
 
                         if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                             day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -554,17 +636,19 @@ def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourn
                             )
                             if operating_period is not None:
                                 operating_period = [operating_period]
+                                all_operating_periods.update(getIndex(operating_period))
 
                             yield aggregated_day_type, day_type_assignments, operating_period
                         else:
                             yield aggregated_day_type, day_type_assignments, operating_periods
 
     log_all(logging.INFO, "Processing Calendars")
-    for day_type, day_type_assignments, operating_periods in query_daytype(db_read, txn, calendar_combinations):
-        yield day_type
-        yield from day_type_assignments
-        if operating_periods is not None and len(operating_periods) > 0:
-            yield from operating_periods
+    for day_type_1, day_type_assignments_1, operating_periods_1 in query_daytype(db_read, txn, calendar_combinations):
+        yield day_type_1
+        yield from day_type_assignments_1
+        if operating_periods_1 is not None and len(operating_periods_1) > 0:
+            yield from operating_periods_1
+
 
 def gtfs_calendar2(
     service_id: str, day_type: DayType, operating_period: OperatingPeriod
@@ -615,9 +699,13 @@ def gtfs_calendar_and_dates2(
                 )
             )
         elif isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef):
-            operating_period: Optional[OperatingPeriod] = db_read.load_object_by_reference(txn, day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref)
+            operating_period: Optional[OperatingPeriod] = db_read.load_object_by_reference(
+                txn, day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
+            )
             if operating_period:
                 yield from gtfs_calendar2(service_id, day_type, operating_period)
+            else:
+                print(f"Missing {day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref}")
 
 
 """

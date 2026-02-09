@@ -112,7 +112,6 @@ def load_and_run(file_name: str, args_string: str) -> Any:
         elif arg == "False":
             result = False
         args1.append(result)
-    print(f'the arguments {args1}')
     result = main_function(*args1)
     return result
 

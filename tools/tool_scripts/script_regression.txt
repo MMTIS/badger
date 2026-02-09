@@ -3,7 +3,7 @@
     {
     "block": "swissmikro",
     "download_url":"https://github.com/user-attachments/files/18201746/swiss_mikro.zip",
-    "working":"tbd",
+    "working":"2026-01-25",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
@@ -15,65 +15,6 @@
         {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
         ]
     },
-           {
-    "block": "nl4",
-    "url":"https://data.ndovloket.nl/netex/wsf/ https://data.ndovloket.nl/netex/enum/ https://data.ndovloket.nl/netex/epiap/",
-    "download_url":["https://data.ndovloket.nl/netex/epiap/NeTEx_DOVA_epiap_2026-01-06.xml.gz","https://data.ndovloket.nl/netex/enum/NeTEx_DOVA_networks_2025-12-30.xml.gz","https://data.ndovloket.nl/netex/enum/NeTEx_BISON_codespaces_2025-12-23.xml.gz","https://data.ndovloket.nl/netex/enum/NeTEx_BISON_enumerations.xml.gz","https://data.ndovloket.nl/netex/enum/NeTEx_DOVA_tariffzones_2025-12-31.xml.gz","https://data.ndovloket.nl/netex/enum/NeTEx_DOVA_authorities_2025-12-31.xml.gz","https://data.ndovloket.nl/netex/wsf/NeTEx_WSF_WSF_20251210_20251210.xml.gz"],
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-epip.xml"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/05-epip.xml domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml] %%dir%%/06.mdbx"},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
-         ]
-  },
-
-           {
-    "block": "nl1",
-    "url":"https://data.ndovloket.nl/netex/teso/",
-    "download_url1":"https://github.com/user-attachments/files/18202156/NeTEx_TESO_TESO_20241112_20241112.xml.gz",
-     "download_url":"https://data.ndovloket.nl/netex/teso/NeTEx_TESO_TESO_20251210_20251210.xml.gz",
-
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "#tools.xml_validator", "args": "%%inputfilepath%% domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-epip.xml.gz"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/05-epip.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.mdbx"},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
-         ]
-  },
-
-           {
-    "block": "swissinterchange",
-    "download_url":"https://github.com/user-attachments/files/24689648/swiss_interchange.zip",
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-epip.xml.gz"},
-        {"script": "tools.xml_validator", "args": "%%dir%%/ domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.mdbx"},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
-         ]
-  },
-
            {
     "block": "swissinterchange_r",
     "download_url":"https://github.com/user-attachments/files/18885408/swiss_interchange_resp_set_only.zip",
@@ -125,87 +66,16 @@
         {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
          ]
   },
+  {
+     "block":"nlsmall",
+     "url":"https://data.ndovloket.nl/netex/teso/",
+     "description":"nl2 test with list",
+     "download_urls":[
+         "https://github.com/user-attachments/files/24983072/nlsmall.zip"
 
-           {
-    "block": "swissinterchange_r",
-    "download_url":"https://github.com/user-attachments/files/18885408/swiss_interchange_resp_set_only.zip",
-    "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-epip.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.mdbx"},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+         ],
+     "scripts": [
+         {"script": "process_url_list", "args": "netex2epipgtfs"}
          ]
-  },
-    {
-        "block":"nl3",
-        "description":"nl 3 test with list",
-        "download_urls":[
-            "https://github.com/user-attachments/files/18202170/NeTEx_WSF_WSF_20241112_20241112.xml.gz"
-            ],
-        "scripts": [
-            {"script": "process_url_list", "args": "netex2epip"}
-            ]
-       },
-    {
-        "block":"nl2",
-        "description":"nl2 test with list",
-        "download_urls":[
-            "https://github.com/user-attachments/files/18202160/NeTEx_WPD_WPD_20241112_20241112.xml.gz"
-            ],
-        "scripts": [
-            {"script": "process_url_list", "args": "netex2epipgtfs"}
-            ]
-       },
-
-    {
-        "block":"swissmikrolist",
-        "description":"swissmikro with list",
-        "download_urls":[
-            "https://github.com/user-attachments/files/18201746/swiss_mikro.zip"
-            ],
-        "scripts": [
-            {"script": "process_url_list", "args": "gtfs2epip"}
-            ]
-       }
-       ,
-
-    {
-        "block":"fernbusse",
-        "description":"blablacar and flixbus",
-        "download_urls":[
-            "https://github.com/user-attachments/files/18202184/blablacar.zip",
-            "https://gtfs.gis.flix.tech/gtfs_generic_eu.zip"
-            ],
-        "scripts": [
-            {"script": "process_url_list", "args": "gtfs2epip"}
-            ]
-       },
-
-
-    {
-       "block": "swiss4",
-       "download_url":"https://github.com/user-attachments/files/18593829/swiss4.zip",
-        "description":"Reduced Swiss data set for tests, still a bit large",
-        "scripts": [
-        {"script": "clean_tmp", "args": "%%dir%%"},
-        {"script": "set_defaults", "args": "authority='SKI+'; time_zone='Europe/Berlin'; feed_publisher_name='SBB SKI+'; feed_publisher_url='https://opentransportdata.swiss'"},
-        {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
-        {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
-        {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/%%block%%-netex.xml.gz"},
-        {"script": "tools.xml_validator.py", "args": "%%dir%%/%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/%%block%%-netex.xml.gz]  %%dir%%/08.mdbx"},
-        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08.mdbx %%dir%%/09.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/09.mdbx %%dir%%/%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/17-%%block%%-map.html 1"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"}
-
-        ]
-    }
+     }
 ]

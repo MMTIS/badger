@@ -1,9 +1,9 @@
 import logging
+from pathlib import Path
+from typing import Generator
 
-from netex import ServiceJourney
-from netexio.database import Database
-from netexio.pickleserializer import MyPickleSerializer
-from netexio.signaledcursor import SignaledCursor
+from domain.netex.model import ServiceJourney
+from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import prepare_logger, log_all
 
 # TODO: there could be a situation where 'sometimes' the offset is set, we would not be able to handle that variant
@@ -153,30 +153,36 @@ def fix_passing_times(service_journey: ServiceJourney):
     return changed
 
 
-def main(source_database_file: str):
+def main(source_database_file: str) -> None:
     # This function tries to resolve invalid time order within ServiceJourneys for both Passing Times and Calls.
-    with Database(source_database_file, MyPickleSerializer(compression=True), readonly=False) as source_db:
-        service_journey: ServiceJourney
-        for service_journey in SignaledCursor(ServiceJourney, source_db, readonly=False):
-            changed = False
-            changed |= fix_calls(service_journey)
-            changed |= fix_passing_times(service_journey)
+    with MdbxStorage(Path(source_database_file), readonly=False) as source_db:
+        with source_db.env.rw_transaction() as txn_write:
 
-            if changed:
-                source_db.insert_one_object(service_journey, False, False)
+            def all_sj() -> Generator[ServiceJourney, None, None]:
+                service_journey: ServiceJourney
+                for service_journey in source_db.iter_only_objects(txn_write, ServiceJourney):
+                    changed = False
+                    changed |= fix_calls(service_journey)
+                    changed |= fix_passing_times(service_journey)
+
+                    if changed:
+                        yield service_journey
+
+            source_db.insert_any_object_on_queue(txn_write, all_sj())
+            txn_write.commit()
 
 
 if __name__ == "__main__":
     import argparse
     import traceback
 
-    parser = argparse.ArgumentParser(description="Check an LMDB for missing references")
-    parser.add_argument("source", type=str, help="lmdb file to use as input.")
+    parser = argparse.ArgumentParser(description="Check an MDBX for not correctly set DayOffsets. It will transform 25:00 to 01:00 with DayOffset=1.")
+    parser.add_argument("source", type=str, help="mdbx file to use as input.")
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
     try:
-        main(args.source)
+        main(Path(args.source))
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e
