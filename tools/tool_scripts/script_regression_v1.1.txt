@@ -58,7 +58,8 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02.zip"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/01.zip"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/01.zip %%dir%%/02.zip [ADDIDVERSION REMOVELUXPROBLEMS]"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/02.zip] %%dir%%/03-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},

@@ -118,7 +118,7 @@ Some commands are directly implemented in the script runner
 * `clean_tmp`: With the given directory all temporary processing files are deleted (usually duckdb and lmdb)
 * `download_input_file`: The file specified by `download_url` in the block is stored in the directory indicated.
 * `set_defaults`: Superseeds defaults set in the configuraiton file. See the configuration file for allowed elements.
-* `process_url_list`: see separate section
+* `process_url_list`: see separate section on this option.
 
 Example of `set_defaults`:
 ```
@@ -141,7 +141,7 @@ Example of the process_url_list commands:
             ]
        }]
  ```
-Normally defined processings:
+Predefined list processings (in tools/tool_scripts/list_scripts.txt):
 * `netex2epip`: Form an EPIP from a NeTEx.
 * `netex2epipgtfs`: Form EPIP and GTFS from a NeTEx.
 * `gtfs2epip`: Forming a GTFS from an EPIP.
@@ -154,6 +154,40 @@ Note:
 ### Note
 * if using downloads from URL and not starting with that step, then `%%inputfilepath%%` does not have a valid value and will result in an error.
 * `this_step` and `end_step` are not tested yet.
+
+## Pre-Post-processors
+The preprocessors are currently not uniform and probably not stable. Most those processors function only in a limited way. They don't guarantee consistent results,
+when the input file is not suitable for application.
+* tools.netex_uicoperatingperiod_correction <input-file> <output-file>: makes sure that the nameOfClassRef of an OperatingPeriodRef is UiCOperatingPeriodRef, when it should be.
+* tools.gtfs_sanitize_stops <input-file> <output-file>: In some cases the UTF-8 is not adhered to. This removes the illegal characters from stops.txt. The source data should be corrected.
+* fix.add_stop.py <mdbx-database>: French data often does not correctly use PointinServiceJourneyPatternRef in PassingTime. it is not there and the assumption is, that is processed somehow. This functions adds the information.
+* tools.netex_preproc_cleanup <input-file> <output-file> [list of actions]: Applies some actions to an input file. The list of actions follow below. 
+
+At a given point we will (a) try to automate detection of necessary processing and (b) include it in a direct data processing pipeline, with some sort of plugins.
+
+Currently, the actions can occur in different steps of the pipeline.
+
+Note: <input-file> and <output-file> must have the same ending zip, xml or xml.gz.  Otherwise the transforms fail.
+
+### Actions of processing steps.
+Attention: An empty action list [] tries to apply every action. This is *not* advised. Carefully atune each
+processing script to the input data. In some cases the data source should improve the data. The current situation
+are fixes.
+
+* VERSIONREF: The attribute versionRef is moved to version. With the exception of "TypeOfFrameRef".
+* REMOVEUNNECESSARYIDTAGS: removes id and version from Centroid and Location and reponsibilitySets
+* FIXLINESTRINGID: Gml needs id to start not with a number, so we add a prefix.
+* ADDIDVERSION: It is sometimes easier to add artifical id and version attributes to a list of elements: "AlternativeName","AlternativeText", "OperatorRef","DayTypeRef","LineRef", "ScheduledStopPointRef", "ServiceJourneyPatternRef", "PassingTime","StopPointInJourneyPatternRef","TimetabledPassingTime"),
+* FIXORDER0: The order attribute can't be 0. We set it to 1.
+* INCLUDEORDERINID: Previous to NeTEx 2.0 the order attribute was part of the key. So sometimes elements are only unique when order is used. So we append the order to the id. As this does not fix refs. We do it only for elements that are not referenced usually: " in actions_set or not actions_set: "NoticeAssignment", "PassengerStopAssignment","AlternativeName"
+* SIMPLIFYVERSION: As validators can deal with the fact that the version="all" can match other versions between id/ref. We make it explicit. any is replaces with the most used version. This only works, if version handling is not used in full.
+* FIXEMAILNONE: We had data sets, where the eMail was "None". This is not valid in GTFS. so we change it.
+* ADDHTTPSURL: The GTFS validator wants https: in the url of agency.txt. So it is added.
+* REMOVESOMEREFS: In some cases Ref elements are used to store codes (e.g. BrandingRef). This is not working with full validation. So we remove them: "SupplyContactRef","TopographicPlaceRef", "ParentSiteRef","TypeOfPlaceRef","BrandingRef"
+* REMOVESOMEATTRS: removes datasourceref attribute. To be done, when it is not defined.
+* REMOVESNCFPROBLEMS: Remove elements DestinationDisplayRef and OperatorRef when they have attribute ref == "". Remove elements TypeOfLineRef and routes unconditionally. Remove attributes responsibilitySetRef when value == "".
+* REMOVELUXPROBLEMS: nameOfClassRef in FromJourney and ToJourney is wrong and is replaced.
+* NONE: No action
 
 ## The ftp_uploader (untested)
 In the `tools` folder there is the a tool for ftp upload.
