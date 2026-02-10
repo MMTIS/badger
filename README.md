@@ -112,12 +112,11 @@ This generates executable scripts for Linux/Mac and Windows in subdirectories of
 
 After installation, the following environment variables shall be set accordingly:
 
-| Environment Variable | Value                                                    |
-|----------------------|----------------------------------------------------------|
-| `BADGER_HOME`          | Root path, where your checked out the badger repository. |
-| `PYTHONPATH`           | Make sure it contains the value of `BADGER_HOME`           |
-| `PATH`                 | Make sure it contains the value of `BADGER_HOME`           |
-| `BADGER_DATA`          | Data directory for Badger.                               |
+| Environment Variable | Value                                                                                                                                                                        |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `PYTHONPATH`           | Add the badger root path, where you checked out the badger repository.                                                                                                       |
+| `PATH`                 | Add the path to the installed scripts to the `PATH` variable. On Linux, Mac, this may be like `~/badger/.venv/bin:$PATH`, on Windows like `C:\path\to\batcher\.venv\Scripts` |
+| `BADGER_DATA`          | You may set the data directory for Badger.                                                                                                                                   |
 
 On Linux or Mac, this can be achieved by adding something like this to your `.zshrc` or `.bashrc` file:
 ```
