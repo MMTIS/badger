@@ -1,7 +1,7 @@
 # CONFIGURATION:
 import logging
 from typing import Any
-import os
+from os import path, getenv
 # Logging
 log_dict: dict[str, list[Any]] = (
     {}
@@ -28,10 +28,10 @@ defaults["codespace"] = "OPENOV"
 defaults["version"] = 1
 
 input_dir = "d:/input"  # the standard directory for files to load (depreciated)
-processing_data = "d:/aux_testing_processing"   #the root folder for processing
-work_dir = os.path.dirname(os.path.abspath(__file__))
-list_scripts = os.path.join(work_dir,"tools/tool_scripts/list_scripts.txt")  # place where the list processing scripts are stored, based from program folder
-gtfs_validator = os.path.join(work_dir,"tools/gtfs-validator-cli.jar")  # location of the gtfs validator.jar, based from program folder.
+processing_data = getenv("BADGER_DATA_DIR","d:/aux_testing_processing")   #the root folder for processing
+work_dir = path.dirname(path.abspath(__file__))
+list_scripts = path.join(work_dir,"tools/tool_scripts/list_scripts.txt")  # place where the list processing scripts are stored, based from program folder
+gtfs_validator = path.join(work_dir,"tools/gtfs-validator-cli.jar")  # location of the gtfs validator.jar, based from program folder.
 
 # ftp connection information for the ftp upload tool
 ftpconns = {

@@ -110,14 +110,24 @@ uv pip install -e .
 ```
 This generates executable scripts for Linux/Mac and Windows in subdirectories of `.venv`.
 
-After installation, the scripts can be made available by adding the script location to the PATH, depending on your operating system.
+After installation, the following environment variables shall be set accordingly:
 
-On Linux or Mac, add something like this to your `.zshrc` or `.bashrc` file:
+| Environment Variable | Value                                                    |
+|----------------------|----------------------------------------------------------|
+| `BADGER_HOME`          | Root path, where your checked out the badger repository. |
+| `PYTHONPATH`           | Make sure it contains the value of `BADGER_HOME`           |
+| `PATH`                 | Make sure it contains the value of `BADGER_HOME`           |
+| `BADGER_DATA`          | Data directory for Badger.                               |
+
+On Linux or Mac, this can be achieved by adding something like this to your `.zshrc` or `.bashrc` file:
 ```
 BADGER_HOME=~/path/to/badger
+export PYTHONPATH="$BADGER_HOME:$PYTHONPATH"
 export PATH="$BADGER_HOME/.venv/bin:$PATH"
+export BADGER_DATA_DIR="~/data/badger"
 ```
-On Windows, add `C:\path\to\batcher\.venv\Scripts` to the `PATH` environment variable of the system settings.
+
+On Windows, you may set according variables in the system settings. In particular, add `C:\path\to\batcher\.venv\Scripts` to the `PATH` environment variable.
 
 #### List of Badger CLI Scripts
 
