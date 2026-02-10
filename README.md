@@ -145,5 +145,5 @@ uv run python -m tools.script_runner ~/repos/MMTIS/badger/tools/tool_scripts/scr
 ```
 Can be replaced by:
 ```
-badger-script-runner ~/repos/MMTIS/badger/tools/tool_scripts/script_regression_basic.txt badger.log swissmikro
+badger-script-runner ~/repos/MMTIS/badger/tools/tool_scripts/script_regression.txt badger.log swissmikro
 ```
