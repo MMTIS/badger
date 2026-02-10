@@ -132,10 +132,11 @@ On Windows, you may set according variables in the system settings. In particula
 
 The following badger scripts are available so far:
 
-| Script | for Module          |
-|--------|---------------------|
-| `badger-script-runner`     | `tools.script_runner` |
-|`badger-gtfs-viewer`        |  `tools.gtfs_map_visualisation` |
+| Script                 | for Module                     |
+|------------------------|--------------------------------|
+| `badger-script-runner` | `tools.script_runner`          |
+| `badger-gtfs-viewer`   | `tools.gtfs_map_visualisation` |
+| `badger-gui`           | `gui.main`                     |
 
 #### Sample Usage
 
