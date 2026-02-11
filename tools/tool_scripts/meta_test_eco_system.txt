@@ -12,7 +12,8 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lo
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
-
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
 #needs to be redefined so that it validates.
 python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
 
@@ -24,16 +25,13 @@ python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.l
 #  conv.gtfs_db_to_db C:/Users/ue71603/Downloads/5t_2/08-gtfs.mdbx C:/Users/ue71603/Downloads/5t_2/10-gtfs.mdbx
 python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
 
-# NOT WORKING
-# ===========
 
-
-# long runners
+# problems with QuayRef that are not copied
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lux
 
+
+
 #mandatory test
-#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
-#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip-1
 
 

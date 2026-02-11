@@ -483,7 +483,7 @@ def make_url_useful(root: ET.Element, consider_namespaces: bool = False) -> None
             elem.text = FALLBACK_URL
 
 
-def remove_lux_problems(root: ET.Element, consider_namespaces: bool = False) -> None:
+def remove_lux_problems(root: ET.Element, consider_namespaces: bool = True) -> None:
     """
     Modify the XML tree in-place. For every element whose local name is
     'FromJourney' or 'ToJourney', replace its attribute 'nameOfRefClass'
@@ -497,7 +497,7 @@ def remove_lux_problems(root: ET.Element, consider_namespaces: bool = False) -> 
 
     Note: This changes attributes in-place and does not return anything.
     """
-    target_names = {"FromJourney", "ToJourney"}
+    target_names = {"FromJourneyRef", "ToJourneyRef"}
 
     if consider_namespaces:
         # Match by local name regardless of namespace URI.
