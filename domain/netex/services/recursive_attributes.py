@@ -180,19 +180,25 @@ def embedding_obj_iter(
 ) -> Generator[tuple[Optional[bytes], Tid, list[int]], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
+    if not interesting_classes:
+        interesting_classes = netex.set_all
+
     for obj, path in recursive_attributes(deserialized, []):
         if obj.__class__.__name__ in serializer.name_object: # TODO: The object should not even enter here
             if hasattr(obj, "id") and obj.id is not None:
-                if (ignore is None or obj.__class__ not in ignore) and (interesting_classes is None or obj.__class__ in interesting_classes):
+                if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
                     yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj, path
 
 
 def only_embedding(
-    serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]] = None, ignore: Optional[set[type[Tid]]] = None
+    serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]], ignore: Optional[set[type[Tid]]] = None
 ) -> Generator[bytes, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
+    if not interesting_classes:
+        interesting_classes = netex.set_all
+
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
-            if (ignore is None or obj.__class__ not in ignore) and (interesting_classes is None or obj.__class__ in interesting_classes):
-                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True)
+            if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj

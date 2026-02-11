@@ -2,14 +2,22 @@ from mdbx import MDBXCursorOp, MDBXDBFlags
 
 from domain.netex.indexes.inverse_class import collect_classes_index
 from domain.netex.services.model_typing import Tid
-from domain.netex.model import EntityStructure
+from domain.netex.model import EntityStructure, Network, NameOfClass
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
 from domain.utils import get_object_name
-from storage.mdbx.core.implementation import MdbxStorage, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_ID_IDX, \
-    DB_UNRESOLVED_FLAGS, DB_REFERENCE_OUTWARD_FLAGS, DB_ID_IDX_FLAGS
+from storage.mdbx.core.implementation import (
+    MdbxStorage,
+    DB_UNRESOLVED,
+    DB_REFERENCE_OUTWARD,
+    DB_ID_IDX,
+    DB_UNRESOLVED_FLAGS,
+    DB_REFERENCE_OUTWARD_FLAGS,
+    DB_ID_IDX_FLAGS,
+)
 from storage.mdbx.serialization.byteserializer import ByteSerializer
 from mdbx.mdbx import TXN
 from typing import Optional, Generator
+
 
 def resolve_embeddings_iterable(
     storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[Tid]] = None, ignore: Optional[set[Tid]] = None
@@ -48,6 +56,12 @@ def resolve_embeddings_iterable(
 
 
 def resolve_embeddings(storage: MdbxStorage):
+    """
+    We have a list of unresolved elements, from this elements we know their "origin" meaning the objects in which this reference appears.
+    In our worst case example multiple missing references are part of the origin object we are searching in.
+    We want to avoid at all costs that we will be rewriting objects prior to all references of that object have been acknowledged.
+    """
+
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
 
@@ -75,7 +89,10 @@ def resolve_embeddings(storage: MdbxStorage):
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
                     obj: Tid = storage.serializer.unmarshall(value, clazz)
-                    for candidate in only_embedding(storage.serializer, obj, missing_classes):
+                    write = False
+                    for candidate, obj in only_embedding(storage.serializer, obj, None):
+                        # for candidate in only_embedding(storage.serializer, obj, missing_classes):
+                        # TODO: deze operatie faalt op het moment dat a) de nameOfRefClass foutief is, b) version foutief is c) het verwacht ook dat we alle classen zoeken, terwijl we eigenlijk zouden willen limiteren op de missende classen
                         if candidate in unresolved_pairs:
                             full_key = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(idx, 'little')).to_bytes(8, 'little')
                             for resolved_index in unresolved_pairs[candidate]:
@@ -83,6 +100,10 @@ def resolve_embeddings(storage: MdbxStorage):
                                 db_reference_outward.put(txn, resolved_index, full_key)
                                 db_unresolved.delete(txn, resolved_index, candidate)
                             del unresolved_pairs[candidate]
+                            write = True
+                    if write:
+                        db.put(txn, idx, storage.serializer.marshall(obj, obj.__class__))
+
         txn.commit()
 
 
@@ -98,76 +119,106 @@ def resolve(storage: MdbxStorage) -> None:
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
-        for idx, value in unresolved_cursor.iter():
-            parts: list[str] | None = None
-            prefix: str | None = None
-            resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
-            class_change = False
-            version_change = False
-            if not resolved_idx:
-                cursor = txn.cursor(db=db_id_idx)
+        for it in unresolved_cursor.iter_dupsort_rows():
+            references_to_fix: list[tuple] = []
 
-                parts = storage.serializer.split_key(value)
-
-                # Alternative 1, id + version exists, class does not match
-                parts.pop()
-                prefix = separator.join(parts)
-                for check_key, check_idx in cursor.iter(prefix):
-                    if check_key.startswith(prefix):
-                        class_change = check_idx
-                        resolved_idx = check_idx
-                    break
-
+            for idx, value in it:
+                parts: list[str] | None = None
+                prefix: str | None = None
+                resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
+                class_change = False
+                version_change = False
                 if not resolved_idx:
-                    # Alternative 2, id exists
-                    # TODO: we might be able to also do a variant where we do check the class
-                    parts.pop()
+                    cursor = txn.cursor(db=db_id_idx)
 
-                    prefix = separator.join(parts)
+                    parts = storage.serializer.split_key(value)
+                    class_part = separator + parts[-1]
+
+                    # Alternative 1, id + version exists, class does not match
+                    parts.pop()
+                    prefix = separator.join(parts) + separator
                     for check_key, check_idx in cursor.iter(prefix):
                         if check_key.startswith(prefix):
-                            version_change = check_idx
+                            class_change = check_idx
                             resolved_idx = check_idx
                         break
 
-            if resolved_idx:
-                if version_change or class_change:
-                    # In this situation the original reference was incomplete
+                    if not resolved_idx:
+                        # Alternative 2, id exists
+                        parts.pop()
+
+                        prefix = separator.join(parts) + separator
+                        for check_key, check_idx in cursor.iter(prefix):
+                            if check_key.startswith(prefix) and check_key.endswith(class_part):
+                                class_change = False
+                                version_change = check_idx
+                                resolved_idx = check_idx
+                                break
+
+                            elif check_key.startswith(prefix):
+                                class_change = check_idx
+                                version_change = check_idx
+                                resolved_idx = check_idx
+                                # Continue to find a better match
+
+                            else:
+                                break
+
+                if resolved_idx:
+                    if version_change or class_change:
+                        references_to_fix.append((resolved_idx, value, version_change, class_change))
+
+                    # f = storage.load_object_by_full_key(txn, idx)
+                    # t = storage.load_object_by_full_key(txn, resolved_idx)
+
+                    # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
+
+                    db_reference_forward.put(txn, idx, resolved_idx)
+                    unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
+
+                # else:
+                #    print("unresolved", value, idx)
+
+            # In this situation the original reference was incomplete
+            if len(references_to_fix) > 0:
+                referencing_class_idx, referencing_key = storage.serializer.full_key_to_idx(idx)
+                referencing_class = storage.idx_class[referencing_class_idx]
+                referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
+
+                for resolved_idx, value, version_change, class_change in references_to_fix:
                     referenced_class_idx, referenced_key = storage.serializer.full_key_to_idx(resolved_idx)
-                    referencing_class_idx, referencing_key = storage.serializer.full_key_to_idx(idx)
-                    referencing_class = storage.idx_class[referencing_class_idx]
-                    referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
 
                     for reference in only_reference_objects(referencing_obj):
-                        if reference.name_of_ref_class not in storage.serializer.name_object:
+                        if isinstance(reference.name_of_ref_class, str):
+                            # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
+                            # print(reference.name_of_ref_class, reference)
+                            if reference.name_of_ref_class not in storage.serializer.name_object:
+                                continue
+                            name_of_ref_class = reference.name_of_ref_class
+
+                        elif reference.name_of_ref_class.value not in storage.serializer.name_object:
                             # TODO: Add a warning.
                             continue
 
+                        else:
+                            name_of_ref_class = reference.name_of_ref_class.value
+
                         cmp_value = storage.serializer.encode_key(
-                            reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[reference.name_of_ref_class], True
+                            reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[name_of_ref_class], True
                         )
                         if value == cmp_value:
                             if class_change:
                                 referenced_class = storage.idx_class[referenced_class_idx]
-                                reference.name_of_ref_class = get_object_name(referenced_class)
+                                reference.name_of_ref_class = NameOfClass(
+                                    get_object_name(referenced_class)
+                                )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
                                 referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key)
                                 reference.version = referenced_obj.version
 
-                    # TODO: buffer this write to ~10000 objects of the same type?
-                    db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
-                    db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
-
-                # f = storage.load_object_by_full_key(txn, idx)
-                # t = storage.load_object_by_full_key(txn, resolved_idx)
-
-                # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
-
-                db_reference_forward.put(txn, idx, resolved_idx)
-                unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
-
-            # else:
-            #    print("unresolved", value, idx)
+                # TODO: buffer this write to ~10000 objects of the same type?
+                db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+                db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
         txn.commit()

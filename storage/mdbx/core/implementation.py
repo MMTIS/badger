@@ -465,6 +465,7 @@ class MdbxStorage:
             # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
             return obj
 
+    # TODO: It would be nice if we could do a caching layer here
     def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[EntityStructure]:
         with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
             # TODO: With our current schema, we always will have a name_of_ref_class filled in.
