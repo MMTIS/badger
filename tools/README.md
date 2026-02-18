@@ -83,12 +83,12 @@ The following example shows the example of a script file:
     "scripts": [
         {"step":1,"script": "clean_tmp", "args": "%%dir%%"},
         {"step":2,"script": "download_input_file", "args": "%%dir%%"},
-        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.lmdb"},
-        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.lmdb %%dir%%/04.lmdb"},
-        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.lmdb %%dir%%/05-epip.xml.gz"},
-        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.lmdb True"},
-        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.lmdb %%dir%%/07.lmdb"},
-        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.lmdb %%dir%%/08-%%block%%-gtfs.zip"},
+        {"step":3,"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
+        {"step":4,"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
+        {"step":5,"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-epip.xml.gz"},
+        {"step":6,"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.mdbx True"},
+        {"step":7,"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
+        {"step":8,"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"step":9,"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
         {"step":10,"script": "#tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
          ]
@@ -105,7 +105,7 @@ All conversions and tools can be used as `script` with the arguments used as def
 
 ### Internal commands of the script runner
 Some commands are directly implemented in the script runner
-* `clean_tmp`: With the given directory all temporary processing files are deleted (usually duckdb and lmdb)
+* `clean_tmp`: With the given directory all temporary processing files are deleted (usually duckdb and mdbx)
 * `download_input_file`: The file specified by `download_url` in the block is stored in the directory indicated.
 * `set_defaults`: Superseeds defaults set in the configuraiton file. See the configuration file for allowed elements.
 * `process_url_list`: see separate section
