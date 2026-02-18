@@ -15,7 +15,7 @@ from utils.utils import to_seconds
 from netex import (
     Line,
     MultilingualString,
-    AllVehicleModesOfTransportEnumeration,
+    AllPublicTransportModesEnumeration,
     InfoLinksRelStructure,
     ScheduledStopPoint,
     StopPlace,
@@ -149,25 +149,25 @@ class GtfsProfile:
         return None
 
     @staticmethod
-    def projectVehicleModeToRouteType(vehicle_mode: AllVehicleModesOfTransportEnumeration) -> int:
-        if vehicle_mode == AllVehicleModesOfTransportEnumeration.TRAM:
+    def projectVehicleModeToRouteType(vehicle_mode: AllPublicTransportModesEnumeration) -> int:
+        if vehicle_mode == AllPublicTransportModesEnumeration.TRAM:
             return 0
-        elif vehicle_mode == AllVehicleModesOfTransportEnumeration.METRO:
+        elif vehicle_mode == AllPublicTransportModesEnumeration.METRO:
             return 1
-        elif vehicle_mode == AllVehicleModesOfTransportEnumeration.RAIL:
+        elif vehicle_mode == AllPublicTransportModesEnumeration.RAIL:
             return 2
-        elif vehicle_mode == AllVehicleModesOfTransportEnumeration.BUS:
+        elif vehicle_mode == AllPublicTransportModesEnumeration.BUS:
             return 3
-        elif vehicle_mode in (AllVehicleModesOfTransportEnumeration.WATER, AllVehicleModesOfTransportEnumeration.FERRY):
+        elif vehicle_mode in (AllPublicTransportModesEnumeration.WATER, AllPublicTransportModesEnumeration.FERRY):
             return 4
 
         # We don't have a Cable Tram in NeTEx route_type = 5?
 
-        elif vehicle_mode == AllVehicleModesOfTransportEnumeration.CABLEWAY:
+        elif vehicle_mode == AllPublicTransportModesEnumeration.CABLEWAY:
             return 6
-        elif vehicle_mode == AllVehicleModesOfTransportEnumeration.FUNICULAR:
+        elif vehicle_mode == AllPublicTransportModesEnumeration.FUNICULAR:
             return 7
-        elif vehicle_mode == AllVehicleModesOfTransportEnumeration.TROLLEY_BUS:
+        elif vehicle_mode == AllPublicTransportModesEnumeration.TROLLEY_BUS:
             return 11
 
         # We don't have a Monorail in NeTEx route_type = 11?

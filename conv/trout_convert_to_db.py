@@ -7,7 +7,7 @@ from itertools import chain
 from xsdata.models.datatype import XmlTime, XmlDateTime, XmlDuration
 
 from netex import Operator, MultilingualString, DataSource, DestinationDisplay, PresentationStructure, Line, \
-    PrivateCode, PrivateCodes, OperatorRef, AllVehicleModesOfTransportEnumeration, StopArea, \
+    PrivateCode, PrivateCodes, OperatorRef, AllPublicTransportModesEnumeration, StopArea, \
     SimplePointVersionStructure, LocationStructure2, TopographicPlaceView, ScheduledStopPoint, PrivateCodeStructure, \
     StopAreaRefsRelStructure, StopAreaRefStructure, PointRefsRelStructure, ScheduledStopPointRef, ServiceJourneyPattern, \
     RouteView, LineRef, ValidBetween, ValidityConditionsRelStructure, ValidityCondition, ValidDuring, \
@@ -54,22 +54,22 @@ def get_operators(tt: TYearTimetable) -> Generator[Operator, None, None]:
     for operator in tt.operators:
         yield Operator(id=tt.stringPool[operator.id], version=str(tt.exportTimestamp), name=MultilingualString(value=tt.stringPool[operator.name]))
 
-def get_transport_mode(mode) -> AllVehicleModesOfTransportEnumeration:
+def get_transport_mode(mode) -> AllPublicTransportModesEnumeration:
     match mode:
         case 0:
-            return AllVehicleModesOfTransportEnumeration.UNKNOWN
+            return AllPublicTransportModesEnumeration.UNKNOWN
         case 1:
-            return AllVehicleModesOfTransportEnumeration.TRAM
+            return AllPublicTransportModesEnumeration.TRAM
         case 2:
-            return AllVehicleModesOfTransportEnumeration.METRO
+            return AllPublicTransportModesEnumeration.METRO
         case 3:
-            return AllVehicleModesOfTransportEnumeration.RAIL
+            return AllPublicTransportModesEnumeration.RAIL
         case 4:
-            return AllVehicleModesOfTransportEnumeration.BUS
+            return AllPublicTransportModesEnumeration.BUS
         case 5:
-            return AllVehicleModesOfTransportEnumeration.WATER
+            return AllPublicTransportModesEnumeration.WATER
 
-    return AllVehicleModesOfTransportEnumeration.UNKNOWN
+    return AllPublicTransportModesEnumeration.UNKNOWN
 
 def get_lines(tt: TYearTimetable) -> Generator[Line, None, None]:
     for line in tt.lines:

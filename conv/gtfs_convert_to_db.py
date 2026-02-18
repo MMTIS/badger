@@ -32,7 +32,7 @@ from netex import (
     LanguageUseEnumeration,
     Line,
     PresentationStructure,
-    AllVehicleModesOfTransportEnumeration,
+    AllPublicTransportModesEnumeration,
     PrivateCode,
     OperationalContext,
     ResourceFrame,
@@ -306,23 +306,23 @@ class GtfsNeTexProfile(CallsProfile):
         return results
 
     @staticmethod
-    def gtfsRouteTypeToNeTEx(route_type: int | None) -> AllVehicleModesOfTransportEnumeration | None:
+    def gtfsRouteTypeToNeTEx(route_type: int | None) -> AllPublicTransportModesEnumeration | None:
         if route_type == 0:
-            return AllVehicleModesOfTransportEnumeration.TRAM
+            return AllPublicTransportModesEnumeration.TRAM
         elif route_type == 1:
-            return AllVehicleModesOfTransportEnumeration.METRO
+            return AllPublicTransportModesEnumeration.METRO
         elif route_type == 2:
-            return AllVehicleModesOfTransportEnumeration.RAIL
+            return AllPublicTransportModesEnumeration.RAIL
         elif route_type == 3:
-            return AllVehicleModesOfTransportEnumeration.BUS
+            return AllPublicTransportModesEnumeration.BUS
         elif route_type == 4:
-            return AllVehicleModesOfTransportEnumeration.WATER
+            return AllPublicTransportModesEnumeration.WATER
         elif route_type == 5 or route_type == 7:
-            return AllVehicleModesOfTransportEnumeration.FUNICULAR
+            return AllPublicTransportModesEnumeration.FUNICULAR
         elif route_type == 6:
-            return AllVehicleModesOfTransportEnumeration.CABLEWAY
+            return AllPublicTransportModesEnumeration.CABLEWAY
         elif route_type == 11:
-            return AllVehicleModesOfTransportEnumeration.TROLLEY_BUS
+            return AllPublicTransportModesEnumeration.TROLLEY_BUS
 
         return None
 
