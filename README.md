@@ -13,7 +13,6 @@ Install `uv` as package management tool.
 For example via `pip install uv`.
 
 ```sh
-uv venv
 uv sync
 sh scripts/setup.sh
 ```
