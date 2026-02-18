@@ -136,8 +136,13 @@ class GtfsProfile:
             else:
                 multilingual_string = None
 
-        if multilingual_string is not None:
-            return multilingual_string.value
+        if multilingual_string is not None and multilingual_string.content:
+            # content is a list of TextType objects or strings
+            first_content = multilingual_string.content[0]
+            if hasattr(first_content, "value"):
+                return first_content.value
+            else:
+                return str(first_content)
 
         return None
 
