@@ -1,4 +1,11 @@
 import logging
+from dataclasses import dataclass
+from itertools import groupby
+from typing import OrderedDict
+from zipfile import ZipFile
+
+from folium import PolyLine
+from pandas import DataFrame
 
 from utils.aux_logging import prepare_logger, log_all, log_once
 import random
@@ -9,254 +16,145 @@ import folium
 import pandas as pd
 from folium.plugins import MarkerCluster
 import traceback
+import sys
+import unittest
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+
+@dataclass
+class Trip:
+    trip_id: str
+    trip_headsign: str
+    route_id: str
+    stop_coordinates: list[tuple[float, float]]
+    stop_names: list[str]
+    stop_ids: list[str]
+
+class GtfsTripsAggregator:
+
+    def __init__(self, df_trips: pd.DataFrame, df_stops: pd.DataFrame, df_stop_times: pd.DataFrame, limitation=0):
+        self.limitation = limitation
+        self.df_trips = df_trips
+        self.df_stops = df_stops
+        self.df_stop_times = df_stop_times
+
+    def aggregate_trips(self) -> list[Trip]:
+        trips = []
+
+        # get trip lengths
+        trip_lengths = self.df_stop_times.groupby("trip_id")["stop_id"].count()
+        df_trip_len = pd.DataFrame(trip_lengths.values, index=trip_lengths.index,columns=["length"])
+        # TODO trips filtern, so dass nur der jeweils längste Trip pro Route übrig bleibt
+
+        for trip_id, trip_row in self.df_trips.iterrows():
+            stop_coordinates = []
+            stop_lons = []
+            stop_lats = []
+            stop_names = []
+            stop_ids = []
+            trip_stop_times = self.df_stop_times[self.df_stop_times["trip_id"] == trip_id]
+            trip_stop_times = pd.merge(trip_stop_times, self.df_stops, on="stop_id")
+            for idx, stop_row in trip_stop_times.iterrows():
+                stop_coordinates.append((stop_row["stop_lat"], stop_row["stop_lon"]))
+                stop_lons.append(stop_row["stop_lon"])
+                stop_lats.append(stop_row["stop_lat"])
+                stop_names.append(stop_row["stop_name"])
+                stop_ids.append(stop_row["stop_id"])
+
+            trip = Trip(
+                trip_id=str(trip_id),
+                trip_headsign=trip_row['trip_headsign'],
+                route_id=trip_row['route_id'],
+                stop_coordinates=stop_coordinates,
+                stop_names=stop_names,
+                stop_ids=stop_ids)
+
+            trips.append(trip)
+
+        return trips
 
 
-# Generate a random dark color
-def generate_random_dark_color() -> str:
-    r = random.randint(0, 200)  # Random red component (0-128)
-    g = random.randint(0, 200)  # Random green component (0-128)
-    b = random.randint(0, 200)  # Random blue component (0-128)
-    return "#%02x%02x%02x" % (r, g, b)
+class TripsMapGenerator:
+    def __init__(self, limitation):
+        self.limitation = limitation
 
+    # Generate a random dark color
+    def generate_random_dark_color(self) -> str:
+        r = random.randint(0, 200)  # Random red component (0-128)
+        g = random.randint(0, 200)  # Random green component (0-128)
+        b = random.randint(0, 200)  # Random blue component (0-128)
+        return "#%02x%02x%02x" % (r, g, b)
 
-def main(gtfs_zip_file: str, map_file: str, limitation: int) -> None:
-    limitation = int(limitation)
-    # Read GTFS files using pandas
-    # Read the GTFS files directly from the ZIP archive using pandas
-    start_time = time.time()
-    with zipfile.ZipFile(gtfs_zip_file, "r") as zip_ref:
-        df_routes = pd.read_csv(
-            zip_ref.open("routes.txt"), usecols=["route_id", "route_short_name"]
+    def generate_map(self, trips: list[Trip]) -> folium.Map:
+
+        # Create a map using Leaflet
+        map_center = self.calculate_map_center(trips)
+        trips_map = folium.Map(location=map_center, zoom_start=16)
+
+        lines_group = folium.FeatureGroup(
+            name="Trips", overlay=True, control=True, show=True
+        ).add_to(trips_map)
+
+        for trip in trips:
+            marker_cluster = self._create_stop_markers(trip)
+            marker_cluster.add_to(trips_map)
+            poly_line = self._create_poly_line(trip)
+            poly_line.add_to(lines_group)
+        return trips_map
+
+    def calculate_map_center(self, trips: list[Trip]) -> (float, float):
+        # df_stops['stop_lat'].mean(), df_stops['stop_lon'].mean()]
+        # TODO finish center calculation
+        lats = []
+        lons = []
+        for trip in trips:
+            for coord in trip.stop_coordinates:
+                lats.append(coord[0])
+            minimums = min(trip.stop_coordinates)
+        map_center = [
+            47.368650,
+            8.539183,
+        ]
+        return map_center
+
+    def _create_poly_line(self, trip: Trip) -> PolyLine:
+        return folium.PolyLine(
+            locations=trip.stop_coordinates,
+            tooltip=trip.trip_headsign,
+            smooth_factor=10,
+            color=self.generate_random_dark_color(),
         )
-        df_stops = pd.read_csv(
-            zip_ref.open("stops.txt"),
-            usecols=["stop_id", "stop_name", "stop_lat", "stop_lon"],
-        )
-        df_trips = pd.read_csv(
-            zip_ref.open("trips.txt"), usecols=["route_id", "trip_id", "trip_headsign"]
-        )
-        df_stop_times = pd.read_csv(
-            zip_ref.open("stop_times.txt"),
-            usecols=["trip_id", "stop_id", "stop_sequence"],
-        )
-    end_time = time.time()
-    print("files read in " + str(round(end_time - start_time, 2)))
 
-    # Create a map using Leaflet
-    map_center = [
-        47.368650,
-        8.539183,
-    ]  # df_stops['stop_lat'].mean(), df_stops['stop_lon'].mean()]
-    m = folium.Map(location=map_center, zoom_start=16)
+    def _create_stop_markers(self, trip: Trip) -> MarkerCluster:
+        marker_cluster = MarkerCluster(
+            name="Stops", overlay=True, control=True, show=True, icon_create_function=None
+        )  # type: ignore
+        for i in range(len(trip.stop_ids)):
+            stop_label = trip.stop_ids[i] + ":" + trip.stop_names[i]
+            folium.Marker(location=trip.stop_coordinates[i],
+                          popup=stop_label,
+                          name=stop_label).add_to(marker_cluster)
+        return marker_cluster
+
+
+def main(path_to_zip: str, map_file: str, limitation: int) -> None:
     start_time = time.time()
-    print("basemap created in " + str(round(start_time - end_time, 2)))
 
-    # Add markers for each stop - create a dictionary for fast stop lookups
-    stops_dict = df_stops.set_index("stop_id")[["stop_lat", "stop_lon"]].T.to_dict(
-        "list"
-    )
-    stop_dict_list = list(stops_dict.keys())
-    stop_dict_list_len_range = range(len(stop_dict_list))
-    stop_name_dict = df_stops.set_index("stop_id")[["stop_name"]].T.to_dict("list")
-    stop_id_duplicates = []
+    with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
+        df_trips = pd.read_csv(zip_ref.open("trips.txt"), usecols=["route_id", "trip_id", "trip_headsign"],
+                               index_col="trip_id")
+        df_stops = pd.read_csv(zip_ref.open("stops.txt"), usecols=["stop_id", "stop_name", "stop_lat", "stop_lon"],
+                               index_col="stop_id")
+        df_stop_times = pd.read_csv(zip_ref.open("stop_times.txt"), usecols=["trip_id", "stop_id", "stop_sequence"])
 
-    marker_cluster = MarkerCluster(
-        name="Stops", overlay=True, control=True, show=True, icon_create_function=None
-    )  # type: ignore
-    marker_cluster.add_to(m)
+    trips = (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, limitation)
+             .aggregate_trips())
 
-    for i in stop_dict_list_len_range:
-        if limitation and (i % limitation != 0):
-            continue
-
-        stop_id = stop_dict_list[i]
-        (lat, lon) = stops_dict[stop_id]
-
-        if stop_id in stop_id_duplicates:
-            continue
-
-        j = i + 1
-        for j in stop_dict_list_len_range:
-            # this loop ensures that we do not have duplicate markers (no "single parents")
-            stop_id_inner = stop_dict_list[j]
-            (lat_inner, lon_inner) = stops_dict[stop_id_inner]
-
-            if (lat == lat_inner) and (lon == lon_inner):
-                if stop_id == stop_id_inner:
-                    continue
-                elif stop_id != stop_id_inner:
-                    if str(stop_id_inner).startswith("Parent"):
-                        stop_id_duplicates.append(stop_id_inner)
-                        break
-
-        folium.Marker(
-            location=[lat, lon],
-            popup=str(stop_id) + ":" + str(stop_name_dict[stop_id]),  # stop_name
-            name=str(stop_id) + ":" + str(stop_name_dict[stop_id]),  # as above
-        ).add_to(marker_cluster)
-
-    marker_cluster.add_to(m)
-
-    end_time = time.time()
-    print("markers added for each stop in " + str(round(end_time - start_time, 2)))
-
-    # Create dictionaries for trips creation as well
-    route_dict = df_routes.set_index("route_id")[["route_short_name"]].T.to_dict()
-
-    trips_dict = (
-        df_trips.groupby("route_id")["trip_id"]
-        .agg(list)
-        .reset_index()
-        .set_index("route_id")["trip_id"]
-        .to_dict()
-    )
-
-    trips_names_dict = (
-        df_trips.groupby("route_id")["trip_headsign"]
-        .agg(list)
-        .reset_index()
-        .set_index("route_id")["trip_headsign"]
-        .to_dict()
-    )
-
-    stop_times_dict = (
-        df_stop_times.groupby("trip_id")["stop_id"]
-        .agg(list)
-        .reset_index()
-        .set_index("trip_id")["stop_id"]
-        .to_dict()
-    )
-
-    # Add trips to map
-    stop_coords_list: list[list[tuple[float, float]]] = []
-    stop_coords_list_str: list[str] = []
-    route_names: list[str] = []
-
-    r = 0
-    timer = 0
-    for route_id in route_dict.keys():
-        if r % 1000 == 0 and not limitation:
-            print(str(r) + " of " + str(len(route_dict)))
-            timer = int(time.time())
-
-        route_name_dict = route_dict[route_id]
-
-        if limitation and (r % limitation == 0):
-            handle_trips_for_route(
-                trips_dict,
-                trips_names_dict,
-                route_id,
-                stop_times_dict,
-                stops_dict,
-                stop_coords_list,
-                stop_coords_list_str,
-                route_names,
-                route_name_dict,
-            )
-        elif not limitation:
-            handle_trips_for_route(
-                trips_dict,
-                trips_names_dict,
-                route_id,
-                stop_times_dict,
-                stops_dict,
-                stop_coords_list,
-                stop_coords_list_str,
-                route_names,
-                route_name_dict,
-            )
-
-        r = r + 1
-        if r % 1000 == 0 and not limitation:
-            print("r in " + str(time.time() - timer))
-
-    start_time = time.time()
-    print("routes prepared in " + str(round(start_time - end_time, 2)))
-
-    trips_group = folium.FeatureGroup(
-        name="Trips", overlay=True, control=True, show=False
-    ).add_to(m)
-
-    for i in range(len(stop_coords_list)):
-        if i != 0:
-            p = folium.PolyLine(
-                locations=stop_coords_list[i],
-                tooltip=route_names[i],
-                smooth_factor=10,
-                color=generate_random_dark_color(),
-            )  # type: ignore
-            p.add_to(trips_group)
-
-
-    folium.LayerControl().add_to(m)
-    start_time = time.time()
-    print("polylines created in: " + str(round(start_time - end_time, 2)))
-
+    m = TripsMapGenerator(limitation).generate_map(trips)
     # Save the map to an HTML file
     m.save(map_file)
-    print("map created in: " + str(round(time.time() - end_time, 2)))
-
-
-def handle_trips_for_route(
-    trips_dict: dict[str, list[str]],
-    trips_names_dict: dict[str, list[str]],
-    route_id: str,
-    stop_times_dict: dict[str, list[str]],
-    stops_dict: dict[str, tuple[float, float]],
-    stop_coords_list: list[list[tuple[float, float]]],
-    stop_coords_list_str: list[str],
-    route_names: list[str],
-    route_name_dict: dict[str, str],
-) -> None:
-    if trips_dict.get(route_id) is None:
-        log_once(logging.ERROR, "mapping", f"No trips for route {route_id}")
-        return
-    trips = trips_dict.get(route_id)
-    if trips is not None:
-        for trip_id in trips:
-            stop_coords: list[tuple[float, float]] = []
-            trip_name = trips_names_dict[route_id][trips_dict[route_id].index(trip_id)]
-
-            for stop_id in stop_times_dict[trip_id]:
-                if stops_dict.get(stop_id) is None:
-                    log_once(
-                        logging.ERROR,
-                        "no coordinates",
-                        f"no coordinates available: {trip_id} - {stop_id}",
-                    )
-                else:
-                    stop_coord: tuple[float, float] = stops_dict[stop_id]
-
-                    if stop_coord:
-                        stop_coords.append(stop_coord)
-
-            # remove full duplicate lines or sub-lines we stringify the arrays for efficiency
-            stop_coords_str = array_of_array_to_string(stop_coords)
-            stop_coords_list_range = range(len(stop_coords_list))
-            no_sub = False
-
-            for i in stop_coords_list_range:
-                stop_coords_list_i_str = stop_coords_list_str[i]
-
-                if (stop_coords_str in stop_coords_list_i_str) or (
-                    stop_coords_list_i_str in stop_coords_str
-                ):
-                    no_sub = True
-                    break
-            if not no_sub:
-                stop_coords_list.append(stop_coords)
-                stop_coords_list_str.append(array_of_array_to_string(stop_coords))
-                if isinstance(trip_name, (int, float)):
-                    route_names.append(route_name_dict["route_short_name"])
-                else:
-                    route_names.append(
-                        str(route_name_dict["route_short_name"])
-                        + " to "
-                        + str(trip_name)
-                    )
-
-def array_of_array_to_string(array_of_arrays: list[tuple[float, float]]) -> str:
-    return "".join(f"[{x}, {y}]" for x, y in array_of_arrays)
+    print("map created in: " + str(round(start_time - time.time(), 2)))
 
 def cli(argv=None):
     import argparse
@@ -283,5 +181,48 @@ def cli(argv=None):
         log_all(logging.ERROR, f"{e}" + traceback.format_exc())
         raise e
 
+class GtfsTripsAggregatorTest(unittest.TestCase):
+    logger = logging.getLogger(__name__)
+
+    def test_single_trip_WHEN_aggregate_EXPECT_trip(self):
+        trips_data = {
+            "trip_id": ["trip1"],
+            "route_id": ["route1"],
+            "trip_headsign": ["headsign1"]
+        }
+        stops_data = {
+            "stop_id": ["stop1", "stop2"],
+            "stop_name": ["stop-name1", "stop-name2"],
+            "stop_lat": [1, 2],
+            "stop_lon": [1, 2]
+        }
+        stop_times_data = {
+            "trip_id": ["trip1", "trip1"],
+            "stop_id": ["stop1", "stop2"],
+            "stop_sequence": [1, 2]
+        }
+
+        trips = self._aggregate(trips_data, stops_data, stop_times_data)
+
+        self.assertEqual(len(trips), 1)
+        self.assertEqual(trips[0].trip_headsign,"headsign1")
+        self.assertEqual(trips[0].trip_id, "trip1")
+        self.assertEqual(trips[0].route_id, "route1")
+        self.assertEqual(len(trips[0].stop_ids), 2)
+        self.assertEqual(len(trips[0].stop_names), 2)
+
+    def _aggregate(self, trips_data, stops_data, stop_times_data) -> list[Trip]:
+        df_trips = pd.DataFrame(trips_data).set_index("trip_id")
+        df_stops = pd.DataFrame(stops_data).set_index("stop_id")
+        df_stop_times = pd.DataFrame(stop_times_data)
+        return (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, 0)
+                 .aggregate_trips())
+
+
 if __name__ == "__main__":
-    cli()
+    if len(sys.argv) == 1:
+        # No arguments -> run tests in this module
+        # Using argv=[sys.argv[0]] avoids unittest trying to parse any args
+        unittest.main(argv=[sys.argv[0]])
+    else:
+        cli()
