@@ -1,13 +1,10 @@
 import logging
 from dataclasses import dataclass
-from itertools import groupby
-from typing import OrderedDict
-from zipfile import ZipFile
 
 from folium import PolyLine
 from pandas import DataFrame
 
-from utils.aux_logging import prepare_logger, log_all, log_once
+from utils.aux_logging import prepare_logger, log_all
 import random
 import time
 import zipfile
@@ -42,18 +39,18 @@ class GtfsTripsAggregator:
     def aggregate_trips(self) -> list[Trip]:
         trips = []
 
-        # get trip lengths
-        trip_lengths = self.df_stop_times.groupby("trip_id")["stop_id"].count()
-        df_trip_len = pd.DataFrame(trip_lengths.values, index=trip_lengths.index,columns=["length"])
+        filtered = self.filter_keeping_longest_trips_per_route()
+        filtered = self.filter_keeping_one_trip_per_route(filtered)
+
         # TODO trips filtern, so dass nur der jeweils längste Trip pro Route übrig bleibt
 
-        for trip_id, trip_row in self.df_trips.iterrows():
+        for trip_id, trip_row in filtered.iterrows():
             stop_coordinates = []
             stop_lons = []
             stop_lats = []
             stop_names = []
             stop_ids = []
-            trip_stop_times = self.df_stop_times[self.df_stop_times["trip_id"] == trip_id]
+            trip_stop_times = self.df_stop_times[self.df_stop_times["trip_id"] == trip_row["trip_id"]]
             trip_stop_times = pd.merge(trip_stop_times, self.df_stops, on="stop_id")
             for idx, stop_row in trip_stop_times.iterrows():
                 stop_coordinates.append((stop_row["stop_lat"], stop_row["stop_lon"]))
@@ -63,7 +60,7 @@ class GtfsTripsAggregator:
                 stop_ids.append(stop_row["stop_id"])
 
             trip = Trip(
-                trip_id=str(trip_id),
+                trip_id=str(trip_row["trip_id"]),
                 trip_headsign=trip_row['trip_headsign'],
                 route_id=trip_row['route_id'],
                 stop_coordinates=stop_coordinates,
@@ -74,23 +71,52 @@ class GtfsTripsAggregator:
 
         return trips
 
+    def filter_keeping_longest_trips_per_route(self) -> DataFrame:
+        """
+        Filters rows keeping only the longest trips of routes.
+        """
+        # get trip lengths
+        trip_lengths = self.df_stop_times.groupby("trip_id")["stop_id"].count()
+        df_trip_lengths = pd.DataFrame(trip_lengths.values, index=trip_lengths.index, columns=["length"])
+        # create complete trips DataFrame with length column
+        df_trips_with_length = pd.merge(self.df_trips, df_trip_lengths, on="trip_id")
+        df_trips_with_length["trip_id"] = df_trips_with_length.index
+        # get max length of each route
+        max_length_of_routes = df_trips_with_length.groupby("route_id")["length"].max()
+        max_length_of_routes = pd.DataFrame(max_length_of_routes.values, index=max_length_of_routes.index, columns=["max_length"])
+        # create complete trips DataFrame with length and max_length columns
+        all = pd.merge(df_trips_with_length, max_length_of_routes, on="route_id")
+        # filter
+        return all[all['length'].eq(all['max_length'])]
+
+    def filter_keeping_one_trip_per_route(self, df_trips: DataFrame) -> DataFrame:
+        """
+        Filters rows keeping only one trip per route.
+        """
+        idx = df_trips.groupby('route_id')['trip_id'].idxmin()
+        return df_trips.loc[idx].reset_index(drop=True)
 
 class TripsMapGenerator:
     def __init__(self, limitation):
         self.limitation = limitation
 
-    # Generate a random dark color
     def generate_random_dark_color(self) -> str:
+        """
+        Generates a color value of a random dark color.
+        """
         r = random.randint(0, 200)  # Random red component (0-128)
         g = random.randint(0, 200)  # Random green component (0-128)
         b = random.randint(0, 200)  # Random blue component (0-128)
         return "#%02x%02x%02x" % (r, g, b)
 
     def generate_map(self, trips: list[Trip]) -> folium.Map:
+        """
+        Generates a folium map with all provided trips.
+        """
+        trips_map = folium.Map(zoom_start=16, tiles="OpenStreetMap")
 
-        # Create a map using Leaflet
-        map_center = self.calculate_map_center(trips)
-        trips_map = folium.Map(location=map_center, zoom_start=16)
+        bounds = self.calculate_bounds(trips)
+        trips_map.fit_bounds(bounds, padding=(20, 20), max_zoom=16)
 
         lines_group = folium.FeatureGroup(
             name="Trips", overlay=True, control=True, show=True
@@ -103,20 +129,17 @@ class TripsMapGenerator:
             poly_line.add_to(lines_group)
         return trips_map
 
-    def calculate_map_center(self, trips: list[Trip]) -> (float, float):
-        # df_stops['stop_lat'].mean(), df_stops['stop_lon'].mean()]
-        # TODO finish center calculation
-        lats = []
-        lons = []
+    def calculate_bounds(self, trips: list[Trip]) -> tuple[tuple[float, float], tuple[float, float]]:
+        """
+        Calculates the bounds for the map (south-west and north-east corners), so that each marker is inside the map.
+        """
+        maximums = (0, 0)
+        minimums = (180, 180)
         for trip in trips:
             for coord in trip.stop_coordinates:
-                lats.append(coord[0])
-            minimums = min(trip.stop_coordinates)
-        map_center = [
-            47.368650,
-            8.539183,
-        ]
-        return map_center
+                maximums = max(maximums, coord)
+                minimums = min(minimums, coord)
+        return maximums, minimums
 
     def _create_poly_line(self, trip: Trip) -> PolyLine:
         return folium.PolyLine(
@@ -210,6 +233,27 @@ class GtfsTripsAggregatorTest(unittest.TestCase):
         self.assertEqual(trips[0].route_id, "route1")
         self.assertEqual(len(trips[0].stop_ids), 2)
         self.assertEqual(len(trips[0].stop_names), 2)
+
+    def test_multiple_trips_WHEN_aggregate_EXPECT_one_trip(self):
+        trips_data = {
+            "trip_id": ["trip1","trip2"],
+            "route_id": ["route","route"],
+            "trip_headsign": ["headsign","headsign"]
+        }
+        stops_data = {
+            "stop_id": ["stop1", "stop2","stop3"],
+            "stop_name": ["stop-name1", "stop-name2","stop-name3"],
+            "stop_lat": [1, 2, 3],
+            "stop_lon": [1, 2, 3]
+        }
+        stop_times_data = {
+            "trip_id": ["trip1", "trip1","trip2","trip2","trip2"],
+            "stop_id": ["stop1", "stop2","stop1","stop2","stop3"],
+            "stop_sequence": [1, 2, 1, 2, 3]
+        }
+        trips = self._aggregate(trips_data, stops_data, stop_times_data)
+        self.assertEqual(len(trips), 1)
+
 
     def _aggregate(self, trips_data, stops_data, stop_times_data) -> list[Trip]:
         df_trips = pd.DataFrame(trips_data).set_index("trip_id")
