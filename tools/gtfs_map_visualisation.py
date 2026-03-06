@@ -30,8 +30,9 @@ class Trip:
 
 class GtfsTripsAggregator:
 
-    def __init__(self, df_trips: pd.DataFrame, df_stops: pd.DataFrame, df_stop_times: pd.DataFrame, limitation=0):
-        self.limitation = limitation
+    def __init__(self, df_trips: pd.DataFrame, df_stops: pd.DataFrame, df_stop_times: pd.DataFrame, max_routes : int = 10, route_id : str = None) -> None:
+        self.max_routes = max_routes
+        self.route_id = route_id
         self.df_trips = df_trips
         self.df_stops = df_stops
         self.df_stop_times = df_stop_times
@@ -39,12 +40,9 @@ class GtfsTripsAggregator:
     def aggregate_trips(self) -> list[Trip]:
         trips = []
 
-        filtered = self.filter_keeping_longest_trips_per_route()
-        filtered = self.filter_keeping_one_trip_per_route(filtered)
+        filtered_trips = self.filter(self.df_trips, self.df_stop_times, route_id=self.route_id, max_routes=self.max_routes)
 
-        # TODO trips filtern, so dass nur der jeweils längste Trip pro Route übrig bleibt
-
-        for trip_id, trip_row in filtered.iterrows():
+        for trip_id, trip_row in filtered_trips.iterrows():
             stop_coordinates = []
             stop_lons = []
             stop_lats = []
@@ -71,15 +69,40 @@ class GtfsTripsAggregator:
 
         return trips
 
-    def filter_keeping_longest_trips_per_route(self) -> DataFrame:
+    def filter(self, df_trips: DataFrame, df_stop_times: DataFrame, route_id: str = None, max_routes: int = 10) -> DataFrame:
+        """
+        Filters trips to show on the map.
+        """
+        if route_id is not None:
+            filtered = self.filter_by_route(df_trips, route_id)
+        else:
+            filtered = self.filter_by_number_of_routes(df_trips, max_routes)
+        filtered = self.filter_keeping_longest_trips_per_route(filtered, df_stop_times)
+        filtered = self.filter_keeping_one_trip_per_route(filtered)
+        return filtered
+
+    def filter_by_route(self, df_trips: pd.DataFrame, route_id: str) -> pd.DataFrame:
+        """
+        Filters rows keeping only records with the given route_id.
+        """
+        return df_trips[df_trips["route_id"] == route_id]
+
+    def filter_by_number_of_routes(self, df_trips: DataFrame, max_routes: int) -> DataFrame:
+        """
+        Filters rows keeping only the given number of routes.
+        """
+        # TODO implement max_routes filter
+        return df_trips
+
+    def filter_keeping_longest_trips_per_route(self, df_trips: DataFrame, df_stop_times: DataFrame) -> DataFrame:
         """
         Filters rows keeping only the longest trips of routes.
         """
         # get trip lengths
-        trip_lengths = self.df_stop_times.groupby("trip_id")["stop_id"].count()
+        trip_lengths = df_stop_times.groupby("trip_id")["stop_id"].count()
         df_trip_lengths = pd.DataFrame(trip_lengths.values, index=trip_lengths.index, columns=["length"])
         # create complete trips DataFrame with length column
-        df_trips_with_length = pd.merge(self.df_trips, df_trip_lengths, on="trip_id")
+        df_trips_with_length = pd.merge(df_trips, df_trip_lengths, on="trip_id")
         df_trips_with_length["trip_id"] = df_trips_with_length.index
         # get max length of each route
         max_length_of_routes = df_trips_with_length.groupby("route_id")["length"].max()
@@ -97,8 +120,8 @@ class GtfsTripsAggregator:
         return df_trips.loc[idx].reset_index(drop=True)
 
 class TripsMapGenerator:
-    def __init__(self, limitation):
-        self.limitation = limitation
+    def __init__(self):
+        pass
 
     def generate_random_dark_color(self) -> str:
         """
@@ -161,7 +184,10 @@ class TripsMapGenerator:
         return marker_cluster
 
 
-def main(path_to_zip: str, map_file: str, limitation: int) -> None:
+def main(path_to_zip: str, map_file: str, max_routes: int = 10, route_id: int = None) -> None:
+    """
+    main function
+    """
     start_time = time.time()
 
     with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
@@ -171,15 +197,19 @@ def main(path_to_zip: str, map_file: str, limitation: int) -> None:
                                index_col="stop_id")
         df_stop_times = pd.read_csv(zip_ref.open("stop_times.txt"), usecols=["trip_id", "stop_id", "stop_sequence"])
 
-    trips = (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, limitation)
+    trips = (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, max_routes = max_routes, route_id = route_id)
              .aggregate_trips())
 
-    m = TripsMapGenerator(limitation).generate_map(trips)
+    m = TripsMapGenerator().generate_map(trips)
     # Save the map to an HTML file
     m.save(map_file)
     print("map created in: " + str(round(start_time - time.time(), 2)))
 
+
 def cli(argv=None):
+    """
+    Command line interface for gtfs_map_visualisation.
+    """
     import argparse
     parser = argparse.ArgumentParser(
         description="Writes an html file for GTFS with leaflet to show stops and trips"
@@ -187,19 +217,23 @@ def cli(argv=None):
     parser.add_argument("gtfs_zip_file", type=str, help="GTFS zip file")
     parser.add_argument("map_file", type=str, help="output file (.html)")
     parser.add_argument(
-        "--limitation",
+        "--max_routes",
         type=int,
         required=False,
-        help="output every <argument> route (all trips of route)",
+        help="Maximum number of routes to show on the map.",
+    )
+    parser.add_argument(
+        "--route_id",
+        type=int,
+        required=False,
+        help="route_id of route to show on the map.",
     )
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
     prepare_logger(logging.INFO, args.log_file)
     try:
-        if args.limitation:
-            main(args.gtfs_zip_file, args.map_file, args.limitation)
-        else:
-            main(args.gtfs_zip_file, args.map_file, 1)
+        main(args.gtfs_zip_file, args.map_file, max_routes = args.max_routes, route_id = args.route_id)
+
     except Exception as e:
         log_all(logging.ERROR, f"{e}" + traceback.format_exc())
         raise e
@@ -207,59 +241,83 @@ def cli(argv=None):
 class GtfsTripsAggregatorTest(unittest.TestCase):
     logger = logging.getLogger(__name__)
 
-    def test_single_trip_WHEN_aggregate_EXPECT_trip(self):
-        trips_data = {
-            "trip_id": ["trip1"],
-            "route_id": ["route1"],
-            "trip_headsign": ["headsign1"]
-        }
-        stops_data = {
-            "stop_id": ["stop1", "stop2"],
-            "stop_name": ["stop-name1", "stop-name2"],
-            "stop_lat": [1, 2],
-            "stop_lon": [1, 2]
-        }
-        stop_times_data = {
-            "trip_id": ["trip1", "trip1"],
-            "stop_id": ["stop1", "stop2"],
-            "stop_sequence": [1, 2]
-        }
+    # Example 1 - one route with one trip
+    single_trip_trips = {
+        "trip_id": ["trip"],
+        "route_id": ["route"],
+        "trip_headsign": ["headsign"]
+    }
+    single_trip_stops = {
+        "stop_id": ["stop1", "stop2"],
+        "stop_name": ["stop-name1", "stop-name2"],
+        "stop_lat": [1, 2],
+        "stop_lon": [1, 2]
+    }
+    single_trip_stop_times = {
+        "trip_id": ["trip", "trip"],
+        "stop_id": ["stop1", "stop2"],
+        "stop_sequence": [1, 2]
+    }
 
-        trips = self._aggregate(trips_data, stops_data, stop_times_data)
+    # Example 2 - route with two trips
+    single_route_trips = {
+        "trip_id": ["trip1", "trip2"],
+        "route_id": ["route", "route"],
+        "trip_headsign": ["headsign", "headsign"]
+    }
+    single_route_stops = {
+        "stop_id": ["stop1", "stop2", "stop3"],
+        "stop_name": ["stop-name1", "stop-name2", "stop-name3"],
+        "stop_lat": [1, 2, 3],
+        "stop_lon": [1, 2, 3]
+    }
+    single_route_stop_times = {
+        "trip_id": ["trip1", "trip1", "trip2", "trip2", "trip2"],
+        "stop_id": ["stop1", "stop2", "stop1", "stop2", "stop3"],
+        "stop_sequence": [1, 2, 1, 2, 3]
+    }
 
+    # Example 3 - two routes
+    many_routes_trips = {
+        "trip_id": ["trip1", "trip2", "trip3"],
+        "route_id": ["route1", "route1","route2"],
+        "trip_headsign": ["headsign1", "headsign1","headsign2"]
+    }
+    many_routes_stops = {
+        "stop_id": ["stop1", "stop2", "stop3", "stop4","stop5","stop6"],
+        "stop_name": ["stop-name1", "stop-name2", "stop-name3","stop-name4", "stop-name5", "stop-name6"],
+        "stop_lat": [1, 2, 3, 4 , 5 ,6],
+        "stop_lon": [1, 2, 3, 4, 5, 6]
+    }
+    many_routes_stop_times = {
+        "trip_id": ["trip1", "trip1", "trip2", "trip2", "trip2", "trip3","trip3","trip3"],
+        "stop_id": ["stop1", "stop2", "stop1", "stop2", "stop3", "stop4","stop5","stop6"],
+        "stop_sequence": [1, 2, 1, 2, 3, 1, 2, 3]
+    }
+
+    def test_single_trip_WHEN_aggregate_EXPECT_one_trip(self):
+        trips = self._aggregate(self.single_trip_trips, self.single_trip_stops, self.single_trip_stop_times)
         self.assertEqual(len(trips), 1)
-        self.assertEqual(trips[0].trip_headsign,"headsign1")
-        self.assertEqual(trips[0].trip_id, "trip1")
-        self.assertEqual(trips[0].route_id, "route1")
+        self.assertEqual(trips[0].trip_headsign,"headsign")
+        self.assertEqual(trips[0].trip_id, "trip")
+        self.assertEqual(trips[0].route_id, "route")
         self.assertEqual(len(trips[0].stop_ids), 2)
         self.assertEqual(len(trips[0].stop_names), 2)
 
     def test_multiple_trips_WHEN_aggregate_EXPECT_one_trip(self):
-        trips_data = {
-            "trip_id": ["trip1","trip2"],
-            "route_id": ["route","route"],
-            "trip_headsign": ["headsign","headsign"]
-        }
-        stops_data = {
-            "stop_id": ["stop1", "stop2","stop3"],
-            "stop_name": ["stop-name1", "stop-name2","stop-name3"],
-            "stop_lat": [1, 2, 3],
-            "stop_lon": [1, 2, 3]
-        }
-        stop_times_data = {
-            "trip_id": ["trip1", "trip1","trip2","trip2","trip2"],
-            "stop_id": ["stop1", "stop2","stop1","stop2","stop3"],
-            "stop_sequence": [1, 2, 1, 2, 3]
-        }
-        trips = self._aggregate(trips_data, stops_data, stop_times_data)
+        trips = self._aggregate(self.single_route_trips, self.single_route_stops, self.single_route_stop_times)
         self.assertEqual(len(trips), 1)
 
+    def test_multiple_routes_WHEN_filter_by_route_with_one_trip_EXPECT_one_trip(self):
+        trips = self._aggregate(self.many_routes_trips, self.many_routes_stops,
+                                self.many_routes_stop_times, route_id="route2")
+        self.assertEqual(len(trips), 1)
 
-    def _aggregate(self, trips_data, stops_data, stop_times_data) -> list[Trip]:
-        df_trips = pd.DataFrame(trips_data).set_index("trip_id")
-        df_stops = pd.DataFrame(stops_data).set_index("stop_id")
-        df_stop_times = pd.DataFrame(stop_times_data)
-        return (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, 0)
+    def _aggregate(self, trips, stops, stop_times, route_id: str = None) -> list[Trip]:
+        df_trips = pd.DataFrame(trips).set_index("trip_id")
+        df_stops = pd.DataFrame(stops).set_index("stop_id")
+        df_stop_times = pd.DataFrame(stop_times)
+        return (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, route_id=route_id)
                  .aggregate_trips())
 
 
