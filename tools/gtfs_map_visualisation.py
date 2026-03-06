@@ -17,7 +17,11 @@ import sys
 import unittest
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+# logging.basicConfig(filename='example.log', encoding='utf-8', level=logging.DEBUG)
+
+GTFS_TRIPS_FILE_NAME = "trips.txt"
+GTFS_STOPS_FILE_NAME = "stops.txt"
+GTFS_STOP_TIMES_FILE_NAME = "stop_times.txt"
 
 @dataclass
 class Trip:
@@ -41,7 +45,7 @@ class GtfsTripsAggregator:
         trips = []
 
         filtered_trips = self.filter(self.df_trips, self.df_stop_times, route_id=self.route_id, max_routes=self.max_routes)
-
+        logger.debug("After all filters - remaining {} trips.".format(filtered_trips.index.size))
         for trip_id, trip_row in filtered_trips.iterrows():
             stop_coordinates = []
             stop_lons = []
@@ -75,10 +79,14 @@ class GtfsTripsAggregator:
         """
         if route_id is not None:
             filtered = self.filter_by_route(df_trips, route_id)
+            logging.debug("Filtered by route_id=%s - remaining %d trips.",route_id, filtered.index.size)
         else:
             filtered = self.filter_by_number_of_routes(df_trips, max_routes)
+            logging.debug("Filtered by max_routes=%d - remaining %d trips.", max_routes, filtered.index.size)
         filtered = self.filter_keeping_longest_trips_per_route(filtered, df_stop_times)
+        logging.debug("Filtered keeping longest trips per route - remaining %d trips.", filtered.index.size)
         filtered = self.filter_keeping_one_trip_per_route(filtered)
+        logging.debug("Filtered keeping one trip per route - remaining %d trips.", filtered.index.size)
         return filtered
 
     def filter_by_route(self, df: pd.DataFrame, route_id: str) -> pd.DataFrame:
@@ -139,6 +147,7 @@ class TripsMapGenerator:
         trips_map = folium.Map(zoom_start=16, tiles="OpenStreetMap")
 
         bounds = self.calculate_bounds(trips)
+        logging.debug("Map bounds: %s", bounds)
         trips_map.fit_bounds(bounds, padding=(20, 20), max_zoom=16)
 
         lines_group = folium.FeatureGroup(
@@ -184,27 +193,44 @@ class TripsMapGenerator:
         return marker_cluster
 
 
-def main(path_to_zip: str, map_file: str, max_routes: int = 10, route_id: str = None) -> None:
+def main(path_to_zip: str, max_routes: int = 10, route_id: str = None, debug: bool = False, map_file: str = "gtfs-map.html") -> None:
     """
     main function
     """
+    configure_logging(debug=debug)
     start_time = time.time()
 
     with zipfile.ZipFile(path_to_zip, "r") as zip_ref:
-        df_trips = pd.read_csv(zip_ref.open("trips.txt"), usecols=["route_id", "trip_id", "trip_headsign"],
+        logging.debug("Reading from %s",path_to_zip)
+        df_trips = pd.read_csv(zip_ref.open(GTFS_TRIPS_FILE_NAME), usecols=["route_id", "trip_id", "trip_headsign"],
                                index_col="trip_id")
-        df_stops = pd.read_csv(zip_ref.open("stops.txt"), usecols=["stop_id", "stop_name", "stop_lat", "stop_lon"],
+        logging.debug("Got %d records from %s.", len(df_trips.index), GTFS_TRIPS_FILE_NAME)
+
+        df_stops = pd.read_csv(zip_ref.open(GTFS_STOPS_FILE_NAME), usecols=["stop_id", "stop_name", "stop_lat", "stop_lon"],
                                index_col="stop_id")
-        df_stop_times = pd.read_csv(zip_ref.open("stop_times.txt"), usecols=["trip_id", "stop_id", "stop_sequence"])
+        logging.debug("Got %d records from %s.", len(df_stops.index), GTFS_STOPS_FILE_NAME)
+
+        df_stop_times = pd.read_csv(zip_ref.open(GTFS_STOP_TIMES_FILE_NAME), usecols=["trip_id", "stop_id", "stop_sequence"])
+        logging.debug("Got %d records from %s.", len(df_stop_times.index), GTFS_STOP_TIMES_FILE_NAME)
 
     trips = (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, max_routes = max_routes, route_id = route_id)
              .aggregate_trips())
 
+    logging.debug("Aggregated %d trip(s).", len(trips))
+
     m = TripsMapGenerator().generate_map(trips)
     # Save the map to an HTML file
+    logging.debug("Saving map file to %s.", map_file)
     m.save(map_file)
-    print("map created in: " + str(round(start_time - time.time(), 2)))
+    logging.info("Map created in %.2f seconds.", round(time.time() - start_time, 2))
 
+def configure_logging(debug: bool = True) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if debug else logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        force=True,  # ensure reconfiguration even if something set a handler already
+    )
 
 def cli(argv=None):
     """
@@ -215,10 +241,16 @@ def cli(argv=None):
         description="Writes an html file for GTFS with leaflet to show stops and trips"
     )
     parser.add_argument("gtfs_zip_file", type=str, help="GTFS zip file")
-    parser.add_argument("map_file", type=str, help="output file (.html)")
+    parser.add_argument(
+        "--map_file",
+        type=str,
+        required=False,
+        default="gtfs-map.html",
+        help="Output file (.html)")
     parser.add_argument(
         "--max_routes",
         type=int,
+        default=10,
         required=False,
         help="Maximum number of routes to show on the map.",
     )
@@ -229,17 +261,25 @@ def cli(argv=None):
         help="route_id of route to show on the map.",
     )
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
+    parser.add_argument(
+        "--debug",
+        type=bool,
+        help="Enable debug mode",
+        required=False)
     args = parser.parse_args()
     prepare_logger(logging.INFO, args.log_file)
     try:
-        main(args.gtfs_zip_file, args.map_file, max_routes = args.max_routes, route_id = args.route_id)
+        main(args.gtfs_zip_file,
+             max_routes = args.max_routes,
+             debug = args.debug,
+             map_file = args.map_file,
+             route_id = args.route_id)
 
     except Exception as e:
         log_all(logging.ERROR, f"{e}" + traceback.format_exc())
         raise e
 
 class GtfsTripsAggregatorTest(unittest.TestCase):
-    logger = logging.getLogger(__name__)
 
     # Example 1 - one route with one trip
     single_trip_trips = {
@@ -323,7 +363,7 @@ class GtfsTripsAggregatorTest(unittest.TestCase):
                                     self.many_routes_stop_times, max_routes=1)
         self.assertTrue(len(trips) > 0)
 
-    def _aggregate(self, trips, stops, stop_times, route_id: str = None, max_routes: int = None) -> list[Trip]:
+    def _aggregate(self, trips, stops, stop_times, route_id: str = None, max_routes: int = 10) -> list[Trip]:
         df_trips = pd.DataFrame(trips).set_index("trip_id")
         df_stops = pd.DataFrame(stops).set_index("stop_id")
         df_stop_times = pd.DataFrame(stop_times)
@@ -335,6 +375,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         # No arguments -> run tests in this module
         # Using argv=[sys.argv[0]] avoids unittest trying to parse any args
+        configure_logging(debug=True)
         unittest.main(argv=[sys.argv[0]])
     else:
         cli()
