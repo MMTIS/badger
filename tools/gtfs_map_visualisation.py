@@ -167,7 +167,7 @@ class TripsMapGenerator:
     def _create_poly_line(self, trip: Trip) -> PolyLine:
         return folium.PolyLine(
             locations=trip.stop_coordinates,
-            tooltip=trip.trip_headsign,
+            tooltip="route_id=<b>{}</b>".format(trip.trip_id)+"<br/>"+"head_sign={}".format(trip.trip_headsign),
             smooth_factor=10,
             color=self.generate_random_dark_color(),
         )
@@ -177,14 +177,14 @@ class TripsMapGenerator:
             name="Stops", overlay=True, control=True, show=True, icon_create_function=None
         )  # type: ignore
         for i in range(len(trip.stop_ids)):
-            stop_label = trip.stop_ids[i] + ":" + trip.stop_names[i]
+            stop_label = "stop_id=<b>{}</b>\nstop_name={}".format(trip.stop_ids[i], trip.stop_names[i])
             folium.Marker(location=trip.stop_coordinates[i],
                           popup=stop_label,
                           name=stop_label).add_to(marker_cluster)
         return marker_cluster
 
 
-def main(path_to_zip: str, map_file: str, max_routes: int = 10, route_id: int = None) -> None:
+def main(path_to_zip: str, map_file: str, max_routes: int = 10, route_id: str = None) -> None:
     """
     main function
     """
@@ -224,7 +224,7 @@ def cli(argv=None):
     )
     parser.add_argument(
         "--route_id",
-        type=int,
+        type=str,
         required=False,
         help="route_id of route to show on the map.",
     )
