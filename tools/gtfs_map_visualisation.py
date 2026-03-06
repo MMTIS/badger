@@ -81,20 +81,20 @@ class GtfsTripsAggregator:
         filtered = self.filter_keeping_one_trip_per_route(filtered)
         return filtered
 
-    def filter_by_route(self, df_trips: pd.DataFrame, route_id: str) -> pd.DataFrame:
+    def filter_by_route(self, df: pd.DataFrame, route_id: str) -> pd.DataFrame:
         """
         Filters rows keeping only records with the given route_id.
         """
-        return df_trips[df_trips["route_id"] == route_id]
+        return df[df["route_id"] == route_id]
 
-    def filter_by_number_of_routes(self, df_trips: DataFrame, max_routes: int) -> DataFrame:
+    def filter_by_number_of_routes(self, df: DataFrame, max_routes: int) -> DataFrame:
         """
         Filters rows keeping only the given number of routes.
         """
-        # TODO implement max_routes filter
-        return df_trips
+        selected_routes = df['route_id'].drop_duplicates().head(max_routes)
+        return df[df['route_id'].isin(selected_routes)].copy()
 
-    def filter_keeping_longest_trips_per_route(self, df_trips: DataFrame, df_stop_times: DataFrame) -> DataFrame:
+    def filter_keeping_longest_trips_per_route(self, df: DataFrame, df_stop_times: DataFrame) -> DataFrame:
         """
         Filters rows keeping only the longest trips of routes.
         """
@@ -102,7 +102,7 @@ class GtfsTripsAggregator:
         trip_lengths = df_stop_times.groupby("trip_id")["stop_id"].count()
         df_trip_lengths = pd.DataFrame(trip_lengths.values, index=trip_lengths.index, columns=["length"])
         # create complete trips DataFrame with length column
-        df_trips_with_length = pd.merge(df_trips, df_trip_lengths, on="trip_id")
+        df_trips_with_length = pd.merge(df, df_trip_lengths, on="trip_id")
         df_trips_with_length["trip_id"] = df_trips_with_length.index
         # get max length of each route
         max_length_of_routes = df_trips_with_length.groupby("route_id")["length"].max()
@@ -112,12 +112,12 @@ class GtfsTripsAggregator:
         # filter
         return all[all['length'].eq(all['max_length'])]
 
-    def filter_keeping_one_trip_per_route(self, df_trips: DataFrame) -> DataFrame:
+    def filter_keeping_one_trip_per_route(self, df: DataFrame) -> DataFrame:
         """
         Filters rows keeping only one trip per route.
         """
-        idx = df_trips.groupby('route_id')['trip_id'].idxmin()
-        return df_trips.loc[idx].reset_index(drop=True)
+        idx = df.groupby('route_id')['trip_id'].idxmin()
+        return df.loc[idx].reset_index(drop=True)
 
 class TripsMapGenerator:
     def __init__(self):
@@ -313,11 +313,21 @@ class GtfsTripsAggregatorTest(unittest.TestCase):
                                 self.many_routes_stop_times, route_id="route2")
         self.assertEqual(len(trips), 1)
 
-    def _aggregate(self, trips, stops, stop_times, route_id: str = None) -> list[Trip]:
+    def test_multiple_routes_WHEN_max_routes_1_EXPECT_one_trip(self):
+        trips = self._aggregate(self.many_routes_trips, self.many_routes_stops,
+                                self.many_routes_stop_times, max_routes=0)
+        self.assertEqual(len(trips), 0)
+
+    def test_multiple_routes_WHEN_max_routes_1_EXPECT_trip(self):
+        trips = self._aggregate(self.many_routes_trips, self.many_routes_stops,
+                                    self.many_routes_stop_times, max_routes=1)
+        self.assertTrue(len(trips) > 0)
+
+    def _aggregate(self, trips, stops, stop_times, route_id: str = None, max_routes: int = None) -> list[Trip]:
         df_trips = pd.DataFrame(trips).set_index("trip_id")
         df_stops = pd.DataFrame(stops).set_index("stop_id")
         df_stop_times = pd.DataFrame(stop_times)
-        return (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, route_id=route_id)
+        return (GtfsTripsAggregator(df_trips, df_stops, df_stop_times, route_id=route_id, max_routes=max_routes)
                  .aggregate_trips())
 
 

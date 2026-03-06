@@ -30,6 +30,7 @@ dependencies = [
     "types-paramiko",
     "tqdm",
     "xsdata[cli,soap,lxml]>=25.7",
+    "pandas-stubs~=2.3.3",
 ]
 requires-python = ">=3.12"
 
