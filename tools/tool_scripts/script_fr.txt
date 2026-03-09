@@ -1,0 +1,44 @@
+ [
+{
+    "block": "fr_paris_idfm",
+    "download_url":"https://proxy.transport.data.gouv.fr/resource/idfm-prim-iboo-netex",
+    "description": "Horaires au format NeTEx de https://transport.data.gouv.fr/resources/80922",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/neTEx.mdbx"},
+        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"}
+    ]
+  },
+  {
+    "block": "fr_region_sud",
+    "download_url":"https://chouette.enroute.mobi/api/v1/datas/IV_prod_zou_proximite/netex.zip",
+    "description": "Horaires au format NeTEx de https://transport.data.gouv.fr/resources/81933",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/neTEx.mdbx"},
+        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"}
+    ]
+  },
+  {
+    "block": "fr_orleans",
+    "download_url":"https://chouette.enroute.mobi/api/v1/datas/keolis_orleans/netex.zip",
+    "description": "Horaires au format NeTEx de https://transport.data.gouv.fr/resources/80922",
+    "scripts": [
+        {"script": "clean_tmp", "args": "%%dir%%"},
+        {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/neTEx.mdbx"},
+        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
+        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
+        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"}
+    ]
+  }
+]
