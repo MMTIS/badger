@@ -20,11 +20,13 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%inputfilepath%% %%dir%%/input.zip [VERSIONREF ADDIDVERSION SIMPLIFYVERSION REMOVESOMEREFS FIXORDER0 REMOVESOMEATTRS]"},
         {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/neTEx.mdbx"},
+        {"script": "fix.add_stop", "args": "%%dir%%/neTEx.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
-        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"}
+        {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/%%block%%-gtfs.zip"},
+        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
     ]
   },
   {
@@ -39,8 +41,8 @@
         {"script": "fix.add_stop", "args": "%%dir%%/neTEx.mdbx "},
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/%%block%%-gtfs.zip"},
-        {"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"},
-        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"}
+        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
     ]
   }
 ]
