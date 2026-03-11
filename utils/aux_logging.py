@@ -3,8 +3,7 @@
 # --log=INFO
 # --logfile=filename
 import logging
-
-from configuration import NOSOFTLOGGING, processing_data, log_dict
+from configuration import NOSOFTLOGGING, processing_data
 import os
 import sys
 
@@ -20,7 +19,6 @@ import sys
 
 # Attention: log_print only writes to the screen and not to the log_file
 def log_print(s: str) -> None:
-    global NOSOFTLOGGING
     if not NOSOFTLOGGING:
         print(s)
 
@@ -28,7 +26,7 @@ def log_print(s: str) -> None:
 def prepare_logger(log_level: int, log_file_name: str) -> logging.Logger:
     # create logger
     global log_dict
-    global processing_data
+
     mylogger = logging.getLogger("script_runner")
     if mylogger.hasHandlers():
         # already initalised
