@@ -99,7 +99,9 @@ class GtfsTripsAggregator:
         """
         Filters rows keeping only the given number of routes.
         """
-        selected_routes = df['route_id'].drop_duplicates().head(max_routes)
+        routes = df['route_id']
+        unique_routes = routes.drop_duplicates()
+        selected_routes = unique_routes.head(int(max_routes))
         return df[df['route_id'].isin(selected_routes)].copy()
 
     def filter_keeping_longest_trips_per_route(self, df: DataFrame, df_stop_times: DataFrame) -> DataFrame:
