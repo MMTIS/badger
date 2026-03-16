@@ -12,7 +12,7 @@
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/04-netex-import.mdbx %%dir%%/05-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/05-netex-database.mdbx %%dir%%/epip_output.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/ domain/netex/schema/xsd/NeTEx_publication.xsd"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/08-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/08-%%block%%-map.html max_routes=1"}
         ]
     },
            {
@@ -28,7 +28,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/10-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -46,7 +46,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/10-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -63,7 +63,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06.mdbx %%dir%%/07.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/10-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/10-%%block%%-map.html max_routes=1"}
          ]
   },
   {

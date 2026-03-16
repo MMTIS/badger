@@ -10,7 +10,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip --map_file=%%dir%%/%%block%%-map.html"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip map_file=%%dir%%/%%block%%-map.html"}
     ]
   },
   {
@@ -26,7 +26,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/%%block%%-gtfs.zip"},
         {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip --map_file=%%dir%%/%%block%%-map.html"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip map_file=%%dir%%/%%block%%-map.html"}
     ]
   },
   {
@@ -42,7 +42,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/neTEx.mdbx %%dir%%/gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/gtfs.mdbx %%dir%%/%%block%%-gtfs.zip"},
         {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/%%block%%-gtfs.zip %%dir%%/gtfs.duckdb"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip --map_file=%%dir%%/%%block%%-map.html"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/%%block%%-gtfs.zip map_file=%%dir%%/%%block%%-map.html"}
     ]
   }
 ]
