@@ -13,8 +13,7 @@ from domain.netex.services.refs import getFakeRef
 def get_route_id(codespace: Codespace, route_id: str) -> str:
     if ':Line:' in route_id:
         return route_id
-    else:
-        return getId(codespace, Line, route_id)
+    return getId(codespace, Line, route_id)
 
 
 def getLines(con: duckdb.DuckDBPyConnection, codespace: Codespace, version: str) -> Generator[Line, None, None]:

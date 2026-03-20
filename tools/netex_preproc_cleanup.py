@@ -482,6 +482,42 @@ def make_url_useful(root: ET.Element, consider_namespaces: bool = False) -> None
             # final fallback
             elem.text = FALLBACK_URL
 
+
+def remove_lux_problems(root: ET.Element, consider_namespaces: bool = False) -> None:
+    """
+    Modify the XML tree in-place. For every element whose local name is
+    'FromJourney' or 'ToJourney', replace its attribute 'nameOfRefClass'
+    with the value 'ServiceJourney'.
+
+    Args:
+      root: the ElementTree Element to process (typically the document root).
+      consider_namespaces: if True, elements named '{namespace}FromJourney'
+        or '{namespace}ToJourney' will also be matched. If False, only matches
+        based on local (non-namespaced) tag names.
+
+    Note: This changes attributes in-place and does not return anything.
+    """
+    target_names = {"FromJourney", "ToJourney"}
+
+    if consider_namespaces:
+        # Match by local name regardless of namespace URI.
+        for elem in root.iter():
+            if _local_name(elem.tag) in target_names:
+                # Set/replace the attribute
+                elem.set("nameOfRefClass", "ServiceJourney")
+    else:
+        # Match only when the tag equals the plain name (no namespace).
+        for elem in root.iter():
+            # If elem.tag contains a namespace it will be like '{ns}Local'
+            if not elem.tag.startswith("{"):
+                if elem.tag in target_names:
+                    elem.set("nameOfRefClass", "ServiceJourney")
+            else:
+                # skip namespaced tags when not considering namespaces
+                continue
+
+
+
 def remove_sncf_problems(root: ET.Element, consider_namespaces: bool = False  ) -> None:
     """
             Fix SNCF-specific issues in-place.
@@ -635,6 +671,9 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("Fix some additional SNCF problems. Remove empty DestinationDisplayRefs, OperatorRefs and attribute responsibilitySets")
             remove_sncf_problems(et.getroot())
 
+        if "REMOVELUXPROBLEMS" in actions_set or not actions_set:
+            log_print("Fix some additional LUX problems.  It replaces the nameOfClassRef in FromJourney and ToJourney with 'ServiceJourney'")
+            remove_lux_problems(et.getroot())
         if "NONE" in actions_set or not actions_set:
             log_print("No action. But processes.")
 

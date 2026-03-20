@@ -97,3 +97,43 @@ For writing towards XML we create generators that would be called exactly when t
 
 ### Tools
 Badger comes with some tools. Those are described [here](./tools/README.md)
+
+### Installable Badger CLI Scripts
+
+Badger provides the ability to install badger CLI scripts on your computer. This simplifies the usage of Badger from the command line, as you are not restricted to the project directory anymore.
+
+#### Installation
+
+Badger scripts are installed with the following command:
+```
+uv pip install -e .
+```
+This generates executable scripts for Linux/Mac and Windows in subdirectories of `.venv`.
+
+After installation, the scripts can be made available by adding the script location to the PATH, depending on your operating system.
+
+On Linux or Mac, add something like this to your `.zshrc` or `.bashrc` file:
+```
+BADGER_HOME=~/path/to/badger
+export PATH="$BADGER_HOME/.venv/bin:$PATH"
+```
+On Windows, add `C:\path\to\batcher\.venv\Scripts` to the `PATH` environment variable of the system settings.
+
+#### List of Badger CLI Scripts
+
+The following badger scripts are available so far:
+
+| Script | for Module          |
+|--------|---------------------|
+| `badger-script-runner`       | `tools.script_runner` |
+
+#### Sample Usage
+
+The following command:
+```
+uv run python -m tools.script_runner ~/repos/MMTIS/badger/tools/tool_scripts/script_regression_basic.txt badger.log swissmikro
+```
+Can be replaced by:
+```
+badger-script-runner ~/repos/MMTIS/badger/tools/tool_scripts/script_regression_basic.txt badger.log swissmikro
+```
