@@ -7,7 +7,7 @@ domain/netex/model/**
 **/*.duckdb/
 **/*.mdbx/
 *.pyc
-*.txt
+**/.DS_Store
 
 *.jar
 uv.lock

@@ -57,15 +57,12 @@ In the `tools` folder there is the a tool for GTFS visualisation.
 The idea is to see the geographical extension of transport networks.
 For this reasons "some" stops and "some" routes are shown on a map.
 ```
-uv run python -m tools.gtfs_map_visualisation path_to_gtfs_file.zip  path_to_folium_map.html one_of_n_routes
+uv run python -m tools.gtfs_map_visualisation path_to_gtfs_file.zip [--max_routes=MAX_ROUTES] [--route_id=ROUTE_ID] [--map_file=MAP_FILE ]
 ```
-`one_of_n_routes` is a number.
-If set to 1 every route is shown, if set to 10, then only one in 10 routes and one in ten stops is shown.
-This is nonsensical for processing, but it shows the geographical extension.
-Set to 1 one has a reasonable view on the "lines" within the GTFS file.
-
-On startup in the report only the stops are shown.
-To see the trips check the box in the top right corner.
+Optional arguments:
+- `max_routes`:  Provide the maximum number of routes to show on the map (defaults to 10).
+- `route_id`: Show only the route with `route_id ROUTE_ID`.
+- `map_file`: Path to output file, default to `gtfs-map.html`.
 
 ## The script runner
 In the `tools` folder there is the a tool for running scripts to process everything.

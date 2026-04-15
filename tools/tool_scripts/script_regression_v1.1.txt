@@ -29,7 +29,7 @@
     {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
     {"script": "tools.gtfs_sanitize_stops", "args": "%%dir%%/08-%%block%%-gtfs.zip"},
     {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-    {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+    {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
     ]
 },
 {
@@ -68,7 +68,7 @@
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -94,7 +94,7 @@
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=100"}
          ]
   },
 
@@ -119,7 +119,7 @@
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -147,7 +147,7 @@
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -164,7 +164,7 @@
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
         {"script": "tools.gtfs_validator", "args": "%%inputfilepath%% %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/09-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/09-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -219,7 +219,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.gtfs_validator", "args": "%%inputfilepath%% %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% %%dir%%/14-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/14-%%block%%-map.html max_routes=1"}
         ]
   },
 {
@@ -231,7 +231,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.gtfs_validator", "args": "D:\\badger_work\\oebb\\GTFS_OP_2025_obb.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "D:\\badger_work\\oebb\\GTFS_OP_2025_obb.zip %%dir%%/14-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "D:\\badger_work\\oebb\\GTFS_OP_2025_obb.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=1"}
         ]
   },
 
@@ -253,7 +253,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/10-netex-database.mdbx %%dir%%/11-netex-database.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.mdbx %%dir%%/12-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 10"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=10"}
         ]
   },
 
@@ -275,7 +275,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/10-netex-database.mdbx %%dir%%/11-netex-database.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.mdbx %%dir%%/12-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%/14-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -327,7 +327,7 @@
        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -350,7 +350,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
        {
@@ -373,7 +373,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -398,7 +398,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
   {
@@ -419,7 +419,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
     },
 
@@ -442,7 +442,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
   {
@@ -463,7 +463,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
         {"script": "tools.xml_validator", "args": "09-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
@@ -486,7 +486,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
         {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
@@ -512,7 +512,7 @@
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_sanitize_stops", "args": "%%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
 
@@ -535,7 +535,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
         {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
@@ -559,7 +559,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
   {
@@ -581,7 +581,7 @@
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
   {
@@ -600,7 +600,7 @@
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%/13-%%block%%-map.html 1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
          ]
   },
   {
