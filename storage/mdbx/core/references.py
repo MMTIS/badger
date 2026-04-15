@@ -55,6 +55,50 @@ def resolve_embeddings_iterable(
             yield key, obj, candidate
 
 
+def variant_of_candidate_in_list(storage, candidate, obj, unresolved_pairs: dict[bytes, set[bytes]]):
+    parts = storage.serializer.split_key(candidate)
+    class_change = False
+    version_change = False
+    resolved_idx = None
+    result = None
+
+    # TODO: Abstract the separator, so it is uniform through the code
+    separator = bytes([ByteSerializer.SEPARATOR])
+
+    print(candidate)
+
+    if candidate in unresolved_pairs:
+        return candidate, False, False, candidate
+
+    else:
+        class_part = separator + parts[-1]
+        parts.pop()
+        prefix_id_version = separator.join(parts) + separator
+        parts.pop()
+        prefix_id = separator.join(parts) + separator
+
+        for check_key in unresolved_pairs.keys():
+            if check_key.startswith(prefix_id_version):
+                resolved_idx = candidate
+                class_change = NameOfClass(get_object_name(obj.__class__)) # Warning, see other affraid
+                version_change = False
+                result = check_key
+                break
+            elif check_key.startswith(prefix_id) and check_key.endswith(class_part):
+                resolved_idx = candidate
+                class_change = False
+                version_change = obj.version
+                result = check_key
+                break
+            elif check_key.startswith(prefix_id):
+                resolved_idx = candidate
+                class_change = NameOfClass(get_object_name(obj.__class__)) # Warning, see other affraid
+                version_change = obj.version
+                result = check_key
+                # Search if we get something better
+
+    return resolved_idx, version_change, class_change, result
+
 def resolve_embeddings(storage: MdbxStorage):
     """
     We have a list of unresolved elements, from this elements we know their "origin" meaning the objects in which this reference appears.
@@ -64,6 +108,7 @@ def resolve_embeddings(storage: MdbxStorage):
 
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
+    references_to_fix: list[tuple] = []
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
@@ -71,9 +116,14 @@ def resolve_embeddings(storage: MdbxStorage):
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for idx, value in unresolved_cursor.iter():
+            # print(idx, value)
             parts = storage.serializer.split_key(value)
             unresolved_pairs.setdefault(value, set()).add(idx)
             missing_classes.add(storage.idx_class[parts[-1]])
+
+        # TODO: wat hier ontbreekt is dat we hier kijken naar de nameOfRefClass, onder de aanname "dit zou het kunnen zijn"
+        # wat we hier moeten doen is alle kind varianten ook meenemen, waar kan deze reference nog meer naar verwijzen, gegeven dat de class foutief of niet is bepaald.
+        # Dus voor OperatingPeriodRef niet alleen OperingPeriod, maar ook UicOperatingPeriod.
 
         used_classes_in_database = set(storage.db_names(txn).values())
         index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
@@ -84,25 +134,114 @@ def resolve_embeddings(storage: MdbxStorage):
             db = txn.open_map(storage.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             class_count[clazz] = db.get_stat(txn).ms_entries
 
+        almost_resolved_queue = {}
+
+        print(missing_classes)
+
         for clazz, count in sorted(class_count.items(), key=lambda item: item[1]):
             db = txn.open_map(storage.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
                     obj: Tid = storage.serializer.unmarshall(value, clazz)
                     write = False
-                    for candidate, obj in only_embedding(storage.serializer, obj, None):
+                    for candidate, obj in only_embedding(storage.serializer, obj, None): # we zouden hier direct het path binnen het object ook kunnen opslaan
                         # for candidate in only_embedding(storage.serializer, obj, missing_classes):
                         # TODO: deze operatie faalt op het moment dat a) de nameOfRefClass foutief is, b) version foutief is c) het verwacht ook dat we alle classen zoeken, terwijl we eigenlijk zouden willen limiteren op de missende classen
-                        if candidate in unresolved_pairs:
-                            full_key = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(idx, 'little')).to_bytes(8, 'little')
-                            for resolved_index in unresolved_pairs[candidate]:
-                                # Bij deze twee schrijfacties ontstaat build/lib/mdb.c:2156: Assertion 'rc == 0' failed in mdb_page_dirty()
-                                db_reference_outward.put(txn, resolved_index, full_key)
-                                db_unresolved.delete(txn, resolved_index, candidate)
-                            del unresolved_pairs[candidate]
-                            write = True
-                    if write:
-                        db.put(txn, idx, storage.serializer.marshall(obj, obj.__class__))
+
+                        # Misschien willen we hier iets doen door de exacte matchende candidaten rechtstreeks af te handelen,
+                        # Maar te wachten totdat we er zeker van zijn dat er geen betere match bestaat.
+                        resolved_id, version_change, class_change, unresolved = variant_of_candidate_in_list(storage, candidate, obj, unresolved_pairs)
+
+                        if resolved_id:
+                            if not version_change and not class_change:
+                                # Dit is simpel: in principe kunnen we nu direct alles wegschrijven
+                                full_key = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(
+                                    idx, 'little')).to_bytes(8, 'little')
+                                for resolved_index in unresolved_pairs[resolved_id]:
+                                    # Bij deze twee schrijfacties ontstaat build/lib/mdb.c:2156: Assertion 'rc == 0' failed in mdb_page_dirty()
+                                    db_reference_outward.put(txn, resolved_index, full_key)
+                                    db_unresolved.delete(txn, resolved_index, resolved_id)
+                                del unresolved_pairs[unresolved]
+                                if unresolved in almost_resolved_queue:  # TODO: more elegant?
+                                    del almost_resolved_queue[unresolved]
+                                write = True
+
+                            else:
+                                # In deze situatie kunnen er een aantal varianten optreden:
+                                # We gaan later (dus in een ander object) een betere match vinden, waar of de class of de version wel gelijk is.
+                                # Daarom slaan we deze "kandidaat match" wel op, we slaan natuurlijk ook waar we het object hebben gevonden.
+                                # TODO: almost resolved queue
+                                if resolved_id not in almost_resolved_queue:
+                                    parent_full_idx = ((int.from_bytes(storage.class_idx[clazz], 'little') << 32) | int.from_bytes(idx, 'little')).to_bytes(8, 'little')
+                                    almost_resolved_queue[unresolved] = (resolved_id, version_change, class_change, parent_full_idx)
+
+        if len(almost_resolved_queue) > 0:
+            # Er zijn dus net-niet matches, maar dat betekent ook dat de referenties naar deze matches niet juist zijn in de bron
+            # We willen nu voorkomen dat we voor iedere referentie het bron object opnieuw gaan openen.
+            # Waar we voor de unresolve_paired lijst de matches groepeerden naar gelijke uitgaande referenties, willen we juist dat alle referenties binnen een object worden gegroepperd.
+
+            unresolved_pairs_inverted = {}
+            for missing_idx, part_of_objects in unresolved_pairs.items():
+                for obj_idx in part_of_objects:
+                    unresolved_pairs_inverted.setdefault(obj_idx, set()).add(missing_idx)
+
+            for referencing_idx, unresolved in unresolved_pairs_inverted.items():
+                # idx is hier het object waarin de referentie staat
+                referencing_obj = storage.load_object_by_full_key(txn, referencing_idx)
+                write = False
+
+                # we lopen hier alle referenties weer langs
+                # TODO: we zouden hier ook kunnen kiezen om het path te nemen en dan de lookup direct te doen, dat hebben we immers vanuit de vorige only_reference_objects
+                for reference in only_reference_objects(referencing_obj):
+                    if isinstance(reference.name_of_ref_class, str):
+                        # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
+                        # print(reference.name_of_ref_class, reference)
+                        if reference.name_of_ref_class not in storage.serializer.name_object:
+                            # This should already be cleaned upon import. Should never happen
+                            # TODO: assert
+                            continue
+                        name_of_ref_class = reference.name_of_ref_class
+
+                    elif reference.name_of_ref_class.value not in storage.serializer.name_object:
+                        # TODO: Add a warning.
+                        name_of_ref_class = reference.name_of_ref_class.value
+
+                    else:
+                        name_of_ref_class = reference.name_of_ref_class.value
+
+                    cmp_value = storage.serializer.encode_key(
+                        reference.ref, getattr(reference, "version", "any"),
+                        storage.serializer.name_object[name_of_ref_class], True
+                    )
+
+                    if cmp_value in almost_resolved_queue:
+                        resolved_id, version_change, class_change, parent_full_idx = almost_resolved_queue[cmp_value]
+
+                        if class_change:
+                            reference.name_of_ref_class = class_change
+
+                        if version_change:
+                            reference.version = version_change
+
+                        # TODO
+                        db_reference_outward.put(txn, referencing_idx, parent_full_idx)
+                        db_unresolved.delete(txn, referencing_idx, cmp_value) # Deze is correct...
+                        write = True
+
+                if write:
+                    referenced_class_idx, referenced_key = storage.serializer.full_key_to_idx(referencing_idx)
+                    db = txn.open_map(referenced_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+                    db.put(txn, referenced_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+
+            # unmarchal
+                # only_references
+
+
+                    # Hier hebben we nu uitgevonden dat er een relatie bestaat tussen een missende referentie die in een aantal idx'en bestaat
+                    # En nu willen we eigenlijk alle schrijf acties bundelen per bron object, de idx die in de unresolved_pairs lijst staat
+
+                    # if write:
+                    #    db.put(txn, idx, storage.serializer.marshall(obj, obj.__class__))
 
         txn.commit()
 
@@ -110,7 +249,7 @@ def resolve_embeddings(storage: MdbxStorage):
 def resolve(storage: MdbxStorage) -> None:
     if storage.readonly:
         raise
-
+        
     separator = bytes([ByteSerializer.SEPARATOR])
 
     with storage.env.rw_transaction() as txn:
@@ -193,12 +332,12 @@ def resolve(storage: MdbxStorage) -> None:
                             # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
                             # print(reference.name_of_ref_class, reference)
                             if reference.name_of_ref_class not in storage.serializer.name_object:
-                                continue
+                                reference.name_of_ref_class = 'DataManagedObject'
                             name_of_ref_class = reference.name_of_ref_class
 
                         elif reference.name_of_ref_class.value not in storage.serializer.name_object:
                             # TODO: Add a warning.
-                            continue
+                            reference.name_of_ref_class = 'DataManagedObject'
 
                         else:
                             name_of_ref_class = reference.name_of_ref_class.value

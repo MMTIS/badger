@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import Any, Generator, Hashable, Optional
 
 from domain.netex import model as netex
-from domain.netex.model import LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface, EntityStructure
+from domain.netex.model import LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface, EntityStructure, DataManagedObject
 from domain.netex.services.model_typing import Tid, Tref
 from domain.netex.services.utils import get_boring_classes
 from storage.interface import Serializer
@@ -10,8 +10,9 @@ from storage.interface import Serializer
 import inspect
 
 from utils.mro_attributes import list_attributes
+from utils import netex_monkeypatching
 
-# from dataclasses import fields
+from dataclasses import fields, MISSING
 
 
 def _all_subclasses(cls: type[Any]) -> set[type[Any]]:
@@ -34,7 +35,8 @@ netex.set_ref_types = frozenset(  # type: ignore
 
 # netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
 
-netex.set_all = frozenset({name: cls for name, cls in inspect.getmembers(netex, inspect.isclass) if cls.__module__ == netex.__name__})  # type: ignore[attr-defined]
+# TODO: dit gaat fout omdat we nu geen netex meer heten, maar domain.netex.model
+netex.set_all = frozenset({name: cls for name, cls in inspect.getmembers(netex, inspect.isclass) }) # if cls.__module__ == domain.netex.model.__name__})  # type: ignore[attr-defined]
 
 GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
 
@@ -123,23 +125,45 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
             # Don't include external references
             #    continue
 
-            if obj.name_of_ref_class is None:
-                # Hack, because NeTEx does not define the default name of ref class yet
-                if obj.__class__.__name__.endswith("RefStructure"):
-                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
-                elif obj.__class__.__name__.endswith("Ref"):
-                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+            # if obj.name_of_ref_class is None:
+            #    # Hack, because NeTEx does not define the default name of ref class yet
+            #    if obj.__class__.__name__.endswith("RefStructure"):
+            #        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+            #    elif obj.__class__.__name__.endswith("Ref"):
+            #        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
             ref_class = None
             if hasattr(obj.name_of_ref_class, 'value'):
                 if obj.name_of_ref_class.value not in serializer.name_object.keys():
                     # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
-                    continue
+                    # obj.name_of_ref_class = obj.__class__(ref=None).name_of_ref_class
+                    # TODO: Maybe precompute this?
+                    f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
+                    if f.default is not MISSING and f.default is not None:
+                        obj.name_of_ref_class = f.default
+                        ref_class = serializer.name_object[obj.name_of_ref_class.value]
+                    else:
+                        # TODO: We should handle the case were we really have no clue, no default, not set
+                        obj.name_of_ref_class = 'DataManagedObject'
+                        ref_class = DataManagedObject
                 else:
                     ref_class = serializer.name_object[obj.name_of_ref_class.value]
+
             else:
                 if obj.name_of_ref_class not in serializer.name_object.keys():
-                    continue
+                    # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
+                    # obj.name_of_ref_class = obj.__class__(ref=None).name_of_ref_class
+                    # TODO: Maybe precompute this?
+                    f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
+                    if f.default is not MISSING and f.default is not None:
+                        obj.name_of_ref_class = f.default
+                        ref_class = serializer.name_object[obj.name_of_ref_class.value] # because this one has a value
+
+                    else:
+                        # TODO: We should handle the case were we really have no clue, no default, not set
+                        obj.name_of_ref_class = 'DataManagedObject'
+                        ref_class = DataManagedObject
+
                 else:
                     ref_class = serializer.name_object[obj.name_of_ref_class]
 
@@ -166,11 +190,12 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
             # continue
 
             if obj.name_of_ref_class is None:
+                obj.name_of_ref_class = 'DataManagedObject'
                 # Hack, because NeTEx does not define the default name of ref class yet
-                if obj.__class__.__name__.endswith("RefStructure"):
-                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
-                elif obj.__class__.__name__.endswith("Ref"):
-                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+                # if obj.__class__.__name__.endswith("RefStructure"):
+                #     obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                # elif obj.__class__.__name__.endswith("Ref"):
+                #    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
             yield obj
 
@@ -181,7 +206,7 @@ def embedding_obj_iter(
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     if not interesting_classes:
-        interesting_classes = netex.set_all
+        interesting_classes = serializer.class_idx.keys()
 
     for obj, path in recursive_attributes(deserialized, []):
         if obj.__class__.__name__ in serializer.name_object: # TODO: The object should not even enter here
@@ -196,7 +221,7 @@ def only_embedding(
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     if not interesting_classes:
-        interesting_classes = netex.set_all
+        interesting_classes = serializer.class_idx.keys()
 
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
