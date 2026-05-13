@@ -2,7 +2,7 @@
     {
     "block": "blablacar-prod",
     "url":"https://transport.data.gouv.fr/datasets/blablacar-bus-horaires-theoriques-et-temps-reel-du-reseau-europeen",
-    "download_url":"https://github.com/user-attachments/files/18202184/blablacar.zip",
+    "download_url":"https://drive.google.com/uc?export=download&id=1VXd01yQl2Mb67C9bkrx0P8sqNIL532_o",
     "description":"Blablacar data",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
