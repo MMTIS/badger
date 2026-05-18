@@ -10,7 +10,7 @@ from pathlib import Path
 
 from xsdata.models.datatype import XmlDateTime
 
-from domain.netex.model import DayTypeAssignment, Line, Route, ServiceJourney, ServiceJourneyPattern, UicOperatingPeriod
+from domain.netex.model import DayTypeAssignment, Line, Route, ServiceCalendar, ServiceJourney, ServiceJourneyPattern, UicOperatingPeriod
 from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import prepare_logger, log_all
 
@@ -27,6 +27,8 @@ def list_lines(database: Path):
                 lines[line.id].append(line)
 
             duplicate_line_ids = {key for key, values in lines.items() if len(values) > 1}
+
+            print(f"{len(duplicate_line_ids)} of {len(lines)} lines have duplicates")
 
             routes: defaultdict[str, list[Route]] = defaultdict(list)
             for route in db.iter_only_objects(txn, Route):
@@ -52,20 +54,25 @@ def list_lines(database: Path):
                             day_type_ids.add(ref.ref)
 
             uic_period_ids: set[str] = set()
-            day_type_assignments: defaultdict[str, list[DayTypeAssignment]] = defaultdict(list)
-
-            for dta in db.iter_only_objects(txn, DayTypeAssignment):
-                print(dta)
-                if dta.day_type_ref is not None and dta.day_type_ref.ref in day_type_ids:
-                    day_type_assignments[dta.day_type_ref.ref].append(dta)
-                    ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
-                    if hasattr(ref, 'ref'):
-                        uic_period_ids.add(ref.ref)
-
+            day_type_assignments: defaultdict[str, DayTypeAssignment] = {}
             uic_periods: dict[str, UicOperatingPeriod] = {}
-            for period in db.iter_only_objects(txn, UicOperatingPeriod):
-                if period.id in uic_period_ids:
-                    uic_periods[period.id] = period
+
+            for calendar in db.iter_only_objects(txn, ServiceCalendar):
+                if calendar.day_type_assignments is None:
+                    continue
+                for dta in calendar.day_type_assignments.day_type_assignment:
+                    if dta.day_type_ref is not None and dta.day_type_ref.ref in day_type_ids:
+                        day_type_assignments[dta.day_type_ref.ref] = dta
+                        ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
+                        if hasattr(ref, 'ref'):
+                            uic_period_ids.add(ref.ref)
+
+                if calendar.operating_periods is None:
+                    continue
+
+                for entry in calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period:
+                    if isinstance(entry, UicOperatingPeriod) and entry.id in uic_period_ids:
+                        uic_periods[entry.id] = entry
 
             for key, values in sorted(lines.items()):
                 if len(values) > 1:
@@ -74,7 +81,7 @@ def list_lines(database: Path):
                         dates = [(fmt_dt(v.from_date), fmt_dt(v.to_date)) for v in line.validity_conditions_or_valid_between if hasattr(v, 'from_date')]
                         print(f"  version={line.version} dates={dates}")
                     for route in routes.get(key, []):
-                        print(f"  Route: {route.id}")
+                        print(f"  Route: {route.id} lineRef={route.line_ref.ref} v={route.line_ref.version}")
                         for sjp in sjps.get(route.id, []):
                             print(f"    ServiceJourneyPattern: {sjp.id} version={sjp.version}")
                             for journey in journeys.get(sjp.id, []):
@@ -82,14 +89,10 @@ def list_lines(database: Path):
                                     continue
                                 for dt_ref in journey.day_types.day_type_ref:
                                     print(f"      Journey: {journey.id} DayType: {dt_ref.ref}")
-                                    print(day_type_assignments)
-                                    for dta in day_type_assignments.get(dt_ref.ref, []):
-                                        ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
-                                        period = uic_periods.get(ref.ref) if hasattr(ref, 'ref') else None
-                                        if period:
-                                            from_dt = fmt_dt(period.from_operating_day_ref_or_from_date) if isinstance(period.from_operating_day_ref_or_from_date, XmlDateTime) else str(period.from_operating_day_ref_or_from_date)
-                                            to_dt = fmt_dt(period.to_operating_day_ref_or_to_date) if isinstance(period.to_operating_day_ref_or_to_date, XmlDateTime) else str(period.to_operating_day_ref_or_to_date)
-                                            print(f"      Journey: {journey.id} DayType: {dt_ref.ref} period={from_dt} to {to_dt}")
+                                    dta = day_type_assignments.get(dt_ref.ref)
+
+                                    ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
+                                    period = uic_periods.get(ref.ref) if hasattr(ref, 'ref') else None
 
 
 def main(source_database_file: str):
