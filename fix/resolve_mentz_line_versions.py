@@ -1,7 +1,33 @@
 """
 Resolves the Mentz line versions into actual operating days.
 
-https://public.3.basecamp.com/p/fVFt3mGJiK52ewcsr8nFgu6o
+Mentz' EPIP exporter writes variations of a journey not as separate operating
+periods but as a completely new "version" of a line, even though it's not the
+line that changes. It looks like this:
+
+Line A: v1
+  validity: 2026-01-01 -> 2026-01-31
+  Route A1:
+    ServiceJourneyPattern A1:
+      Journey A1
+        dayTypes: Period1
+
+Line A: v2
+  validity: 2026-02-01 -> 2026-02-31
+  Route A2:
+    ServiceJourneyPattern A2:
+      Journey A2
+        dayTypes: Period1
+
+This means you must create new operating periods for each version of the line
+and assign the correct day types to each version of the journey.
+
+This is very unfortunate and extremely convoluted to untangle.
+
+Further reading:
+ https://public.3.basecamp.com/p/fVFt3mGJiK52ewcsr8nFgu6o
+ https://github.com/noi-techpark/opendatahub-mentor-otp/issues/291
+
 """
 
 import logging
