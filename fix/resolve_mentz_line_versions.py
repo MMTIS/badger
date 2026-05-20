@@ -32,7 +32,7 @@ Further reading:
 
 import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from collections.abc import Generator
 from datetime import date
 from pathlib import Path
 
@@ -45,6 +45,8 @@ from domain.netex.model import (
     DayTypeRef,
     DayTypeRefsRelStructure,
     Line,
+    OperatingPeriod,
+    OperatingPeriodRef,
     Route,
     ServiceCalendar,
     ServiceJourney,
@@ -61,85 +63,66 @@ def fmt_dt(dt: XmlDateTime | None) -> str:
     return dt.to_datetime().isoformat() if dt else "None"
 
 
-def _xml_date(d: date) -> XmlDateTime:
-    return XmlDateTime(d.year, d.month, d.day, 0, 0, 0)
-
-
-@dataclass
-class LineValidity:
-    from_dt: XmlDateTime
-    to_dt: XmlDateTime
-
-    @property
-    def from_date(self) -> date:
-        return self.from_dt.to_datetime().date()
-
-    @property
-    def to_date(self) -> date:
-        return self.to_dt.to_datetime().date()
-
-
-@dataclass
-class NewPeriod:
-    from_xml: XmlDateTime
-    to_xml: XmlDateTime
-    bits: str
-    from_date: date
-    to_date: date
-
-    @property
-    def n_days(self) -> int:
-        return (self.to_date - self.from_date).days + 1
-
-
-def _build_version_validity(
+def _iter_version_validity(
     lines: defaultdict[str, list[Line]],
     frame_end: XmlDateTime,
-) -> dict[tuple[str, str | None], LineValidity]:
-    result: dict[tuple[str, str | None], LineValidity] = {}
+) -> Generator[tuple[tuple[str, str | None], ValidBetween], None, None]:
+    raw: dict[tuple[str, str | None], tuple[XmlDateTime, XmlDateTime | None]] = {}
     for line_id, line_versions in lines.items():
         if len(line_versions) <= 1:
             continue
         for line in line_versions:
             for vb in line.validity_conditions_or_valid_between:
                 if hasattr(vb, 'from_date') and vb.from_date is not None:
-                    result[(line_id, line.version)] = LineValidity(
-                        from_dt=vb.from_date,
-                        to_dt=vb.to_date if vb.to_date is not None else frame_end,
-                    )
+                    raw[(line_id, line.version)] = (vb.from_date, vb.to_date)
                     break
-    return result
+
+    for line_id, line_versions in lines.items():
+        if len(line_versions) <= 1:
+            continue
+        sorted_vers = sorted(
+            [(line.version, raw[(line_id, line.version)])
+             for line in line_versions if (line_id, line.version) in raw],
+            key=lambda item: item[1][0],
+        )
+        for i, (ver, (from_dt, to_dt)) in enumerate(sorted_vers):
+            if to_dt is None:
+                to_dt = sorted_vers[i + 1][1][0] if i + 1 < len(sorted_vers) else frame_end
+            yield (line_id, ver), ValidBetween(from_date=from_dt, to_date=to_dt)
 
 
 def _compute_period(
     existing_period: UicOperatingPeriod | None,
-    validity: LineValidity,
-) -> NewPeriod:
+    validity: ValidBetween,
+) -> UicOperatingPeriod | OperatingPeriod:
+    line_from_date = validity.from_date.to_datetime().date()
+    line_to_date = validity.to_date.to_datetime().date()
+
     if existing_period is not None and isinstance(existing_period.from_operating_day_ref_or_from_date, XmlDateTime):
         period_from_date = existing_period.from_operating_day_ref_or_from_date.to_datetime().date()
         period_to_ref = existing_period.to_operating_day_ref_or_to_date
-        period_to_date = period_to_ref.to_datetime().date() if isinstance(period_to_ref, XmlDateTime) else validity.to_date
+        period_to_date = period_to_ref.to_datetime().date() if isinstance(period_to_ref, XmlDateTime) else line_to_date
 
-        new_from_date = max(validity.from_date, period_from_date)
-        new_to_date = min(validity.to_date, period_to_date)
+        new_from_date = max(line_from_date, period_from_date)
+        new_to_date = min(line_to_date, period_to_date)
 
         if new_from_date <= new_to_date:
             offset = (new_from_date - period_from_date).days
             n_days = (new_to_date - new_from_date).days + 1
             existing_bits = existing_period.valid_day_bits or ''
             bits = existing_bits[offset:offset + n_days].ljust(n_days, '0')
-            from_xml = validity.from_dt if new_from_date == validity.from_date else existing_period.from_operating_day_ref_or_from_date
-            to_xml = validity.to_dt if new_to_date == validity.to_date else period_to_ref
-            return NewPeriod(from_xml=from_xml, to_xml=to_xml, bits=bits, from_date=new_from_date, to_date=new_to_date)
+            from_xml = validity.from_date if new_from_date == line_from_date else existing_period.from_operating_day_ref_or_from_date
+            to_xml = validity.to_date if new_to_date == line_to_date else period_to_ref
+            return UicOperatingPeriod(
+                from_operating_day_ref_or_from_date=from_xml,
+                to_operating_day_ref_or_to_date=to_xml,
+                valid_day_bits=bits,
+            )
 
-    # No existing period or no overlap — cover the full line validity with all days active.
-    n_days = max(1, (validity.to_date - validity.from_date).days + 1)
-    return NewPeriod(
-        from_xml=validity.from_dt,
-        to_xml=validity.to_dt,
-        bits='1' * n_days,
-        from_date=validity.from_date,
-        to_date=validity.to_date,
+    # No existing period or no overlap — all days in the line's validity window are active.
+    return OperatingPeriod(
+        from_operating_day_ref_or_from_date=validity.from_date,
+        to_operating_day_ref_or_to_date=validity.to_date,
     )
 
 
@@ -147,31 +130,36 @@ def _make_calendar_objects(
     line_id: str,
     existing_dt_id: str,
     safe_version: str,
-    period: NewPeriod,
-) -> tuple[DayType, UicOperatingPeriod, DayTypeAssignment]:
+    period: UicOperatingPeriod | OperatingPeriod,
+) -> tuple[DayType, UicOperatingPeriod | OperatingPeriod, DayTypeAssignment]:
     new_day_type_id = f"{line_id}:{existing_dt_id}:{safe_version}"
-    new_uic_period_id = f"{line_id}:{existing_dt_id}:UicOperatingPeriod:{safe_version}"
+    new_period_id = f"{line_id}:{existing_dt_id}:{type(period).__name__}:{safe_version}"
     new_dta_id = f"{line_id}:{existing_dt_id}:DayTypeAssignment:{safe_version}"
 
-    print(f"  Creating {new_day_type_id} [{period.from_date} .. {period.to_date}] ({period.n_days} days)")
+    period_from = period.from_operating_day_ref_or_from_date
+    period_to = period.to_operating_day_ref_or_to_date
+    from_date = period_from.to_datetime().date() if isinstance(period_from, XmlDateTime) else None
+    to_date = period_to.to_datetime().date() if isinstance(period_to, XmlDateTime) else None
+    n_days = (to_date - from_date).days + 1 if from_date and to_date else '?'
+    print(f"  Creating {new_day_type_id} [{from_date} .. {to_date}] ({n_days} days)")
+
+    period.id = new_period_id
+    period.version = '1'
+
+    period_ref = (
+        UicOperatingPeriodRef(ref=new_period_id, version='1')
+        if isinstance(period, UicOperatingPeriod)
+        else OperatingPeriodRef(ref=new_period_id, version='1')
+    )
 
     return (
         DayType(id=new_day_type_id, version='1'),
-        UicOperatingPeriod(
-            id=new_uic_period_id,
-            version='1',
-            from_operating_day_ref_or_from_date=period.from_xml,
-            to_operating_day_ref_or_to_date=period.to_xml,
-            valid_day_bits=period.bits,
-        ),
+        period,
         DayTypeAssignment(
             id=new_dta_id,
             version='1',
             day_type_ref=DayTypeRef(ref=new_day_type_id, version='1'),
-            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=UicOperatingPeriodRef(
-                ref=new_uic_period_id,
-                version='1',
-            ),
+            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=period_ref,
         ),
     )
 
@@ -181,7 +169,7 @@ def _process_journey(
     line_id: str,
     line_version: str | None,
     safe_version: str,
-    validity: LineValidity,
+    validity: ValidBetween,
     day_type_assignments: dict[str, DayTypeAssignment],
     uic_periods: dict[str, UicOperatingPeriod],
     new_objects: list,
@@ -217,11 +205,11 @@ def _resolve_journeys(
     routes: defaultdict[str, list[Route]],
     sjps: defaultdict[str, list[ServiceJourneyPattern]],
     journeys: defaultdict[str, list[ServiceJourney]],
-    version_validity: dict[tuple[str, str | None], LineValidity],
+    version_validity: dict[tuple[str, str | None], ValidBetween],
     day_type_assignments: dict[str, DayTypeAssignment],
     uic_periods: dict[str, UicOperatingPeriod],
-) -> tuple[list[DayType | UicOperatingPeriod | DayTypeAssignment], list[ServiceJourney]]:
-    new_objects: list[DayType | UicOperatingPeriod | DayTypeAssignment] = []
+) -> tuple[list[DayType | UicOperatingPeriod | OperatingPeriod | DayTypeAssignment], list[ServiceJourney]]:
+    new_objects: list[DayType | UicOperatingPeriod | OperatingPeriod | DayTypeAssignment] = []
     updated_journeys: list[ServiceJourney] = []
     created: dict[tuple[str, str | None, str], str] = {}
 
@@ -309,7 +297,7 @@ def fix_lines(database: Path) -> None:
         frame_end: XmlDateTime = XmlDateTime(2026, 12, 14, 23, 59, 59)
         print(f"The feed's end date is {frame_end}")
 
-        version_validity = _build_version_validity(lines, frame_end)
+        version_validity = dict(_iter_version_validity(lines, frame_end))
 
         new_objects, updated_journeys = _resolve_journeys(
             lines, routes, sjps, journeys, version_validity, day_type_assignments, uic_periods,
