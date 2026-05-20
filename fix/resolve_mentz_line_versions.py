@@ -33,7 +33,6 @@ Further reading:
 import logging
 from collections import defaultdict
 from collections.abc import Generator
-from datetime import date
 from pathlib import Path
 
 from xsdata.models.datatype import XmlDateTime
@@ -91,12 +90,21 @@ def _iter_version_validity(
             yield (line_id, ver), ValidBetween(from_date=from_dt, to_date=to_dt)
 
 
-def _compute_period(
+def _make_calendar_objects(
+    line_id: str,
+    existing_dt_id: str,
+    safe_version: str,
     existing_period: UicOperatingPeriod | None,
     validity: ValidBetween,
-) -> UicOperatingPeriod | OperatingPeriod:
+) -> tuple[DayType, UicOperatingPeriod | OperatingPeriod, DayTypeAssignment]:
+    new_day_type_id = f"{line_id}:{existing_dt_id}:{safe_version}"
+    new_dta_id = f"{line_id}:{existing_dt_id}:DayTypeAssignment:{safe_version}"
+
     line_from_date = validity.from_date.to_datetime().date()
     line_to_date = validity.to_date.to_datetime().date()
+
+    period: UicOperatingPeriod | OperatingPeriod
+    period_ref: UicOperatingPeriodRef | OperatingPeriodRef
 
     if existing_period is not None and isinstance(existing_period.from_operating_day_ref_or_from_date, XmlDateTime):
         period_from_date = existing_period.from_operating_day_ref_or_from_date.to_datetime().date()
@@ -113,54 +121,29 @@ def _compute_period(
             bits = existing_bits[offset:offset + n_days].ljust(n_days, '0')
             from_xml = validity.from_date if new_from_date == line_from_date else existing_period.from_operating_day_ref_or_from_date
             to_xml = validity.to_date if new_to_date == line_to_date else period_to_ref
-            return UicOperatingPeriod(
-                from_operating_day_ref_or_from_date=from_xml,
-                to_operating_day_ref_or_to_date=to_xml,
-                valid_day_bits=bits,
+
+            new_period_id = f"{line_id}:{existing_dt_id}:UicOperatingPeriod:{safe_version}"
+            print(f"  Creating {new_day_type_id} [{new_from_date} .. {new_to_date}] ({n_days} days)")
+            period = UicOperatingPeriod(id=new_period_id, version='1', from_operating_day_ref_or_from_date=from_xml, to_operating_day_ref_or_to_date=to_xml, valid_day_bits=bits)
+            period_ref = UicOperatingPeriodRef(ref=new_period_id, version='1')
+
+            return (
+                DayType(id=new_day_type_id, version='1'),
+                period,
+                DayTypeAssignment(id=new_dta_id, version='1', day_type_ref=DayTypeRef(ref=new_day_type_id, version='1'), uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=period_ref),
             )
 
     # No existing period or no overlap — all days in the line's validity window are active.
-    return OperatingPeriod(
-        from_operating_day_ref_or_from_date=validity.from_date,
-        to_operating_day_ref_or_to_date=validity.to_date,
-    )
-
-
-def _make_calendar_objects(
-    line_id: str,
-    existing_dt_id: str,
-    safe_version: str,
-    period: UicOperatingPeriod | OperatingPeriod,
-) -> tuple[DayType, UicOperatingPeriod | OperatingPeriod, DayTypeAssignment]:
-    new_day_type_id = f"{line_id}:{existing_dt_id}:{safe_version}"
-    new_period_id = f"{line_id}:{existing_dt_id}:{type(period).__name__}:{safe_version}"
-    new_dta_id = f"{line_id}:{existing_dt_id}:DayTypeAssignment:{safe_version}"
-
-    period_from = period.from_operating_day_ref_or_from_date
-    period_to = period.to_operating_day_ref_or_to_date
-    from_date = period_from.to_datetime().date() if isinstance(period_from, XmlDateTime) else None
-    to_date = period_to.to_datetime().date() if isinstance(period_to, XmlDateTime) else None
-    n_days = (to_date - from_date).days + 1 if from_date and to_date else '?'
-    print(f"  Creating {new_day_type_id} [{from_date} .. {to_date}] ({n_days} days)")
-
-    period.id = new_period_id
-    period.version = '1'
-
-    period_ref = (
-        UicOperatingPeriodRef(ref=new_period_id, version='1')
-        if isinstance(period, UicOperatingPeriod)
-        else OperatingPeriodRef(ref=new_period_id, version='1')
-    )
+    new_period_id = f"{line_id}:{existing_dt_id}:OperatingPeriod:{safe_version}"
+    n_days = max(1, (line_to_date - line_from_date).days + 1)
+    print(f"  Creating {new_day_type_id} [{line_from_date} .. {line_to_date}] ({n_days} days)")
+    period = OperatingPeriod(id=new_period_id, version='1', from_operating_day_ref_or_from_date=validity.from_date, to_operating_day_ref_or_to_date=validity.to_date)
+    period_ref = OperatingPeriodRef(ref=new_period_id, version='1')
 
     return (
         DayType(id=new_day_type_id, version='1'),
         period,
-        DayTypeAssignment(
-            id=new_dta_id,
-            version='1',
-            day_type_ref=DayTypeRef(ref=new_day_type_id, version='1'),
-            uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=period_ref,
-        ),
+        DayTypeAssignment(id=new_dta_id, version='1', day_type_ref=DayTypeRef(ref=new_day_type_id, version='1'), uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date=period_ref),
     )
 
 
@@ -191,8 +174,7 @@ def _process_journey(
             if hasattr(period_ref, 'ref'):
                 existing_period = uic_periods.get(period_ref.ref)
 
-        period = _compute_period(existing_period, validity)
-        objs = _make_calendar_objects(line_id, existing_dt_id, safe_version, period)
+        objs = _make_calendar_objects(line_id, existing_dt_id, safe_version, existing_period, validity)
         new_objects.extend(objs)
 
         created[cache_key] = objs[0].id
