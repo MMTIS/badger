@@ -506,9 +506,6 @@ def get_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dic
     from_date: datetime = datetime.max
     to_date: datetime = datetime.min
     for uic in db_read.iter_only_objects(txn, UicOperatingPeriod):
-        if uic.from_operating_day_ref_or_from_date is None or uic.to_operating_day_ref_or_to_date is None:
-            continue
-
         dt = uic.from_operating_day_ref_or_from_date.to_datetime()
         dt = dt.replace(tzinfo=None)
         if from_date > dt:
