@@ -27,6 +27,7 @@ from domain.netex.model import (
     ServiceLink,
     TimingLink,
 )
+from domain.netex.services.recursive_attributes import recursive_attributes
 from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_all, prepare_logger
 
@@ -41,22 +42,12 @@ def _new_id(old_id: str) -> str | None:
 
 
 def _update_refs(obj: Any) -> bool:
-    if obj is None or not dataclasses.is_dataclass(obj) or isinstance(obj, type):
-        return False
     modified = False
-    for f in dataclasses.fields(obj):
-        val = getattr(obj, f.name)
-        if isinstance(val, (ScheduledStopPointRef, RoutePointRef)):
-            new_ref = _new_id(val.ref)
+    for ref, _path in recursive_attributes(obj, []):
+        if isinstance(ref, (ScheduledStopPointRef, RoutePointRef)):
+            new_ref = _new_id(ref.ref)
             if new_ref is not None:
-                val.ref = new_ref
-                modified = True
-        elif isinstance(val, list):
-            for item in val:
-                if _update_refs(item):
-                    modified = True
-        elif dataclasses.is_dataclass(val):
-            if _update_refs(val):
+                ref.ref = new_ref
                 modified = True
     return modified
 
