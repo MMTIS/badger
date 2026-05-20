@@ -41,17 +41,6 @@ def _new_id(old_id: str) -> str | None:
     return None
 
 
-def _update_refs(obj: Any) -> bool:
-    modified = False
-    for ref, _path in recursive_attributes(obj, []):
-        if isinstance(ref, (ScheduledStopPointRef, RoutePointRef)):
-            new_ref = _new_id(ref.ref)
-            if new_ref is not None:
-                ref.ref = new_ref
-                modified = True
-    return modified
-
-
 # Object types that may transitively contain ScheduledStopPointRef or RoutePointRef.
 _REF_BEARING_TYPES = [
     ServiceJourneyPattern,
@@ -68,7 +57,14 @@ def _iter_updated_objects(
 ) -> Generator[Any, None, None]:
     for cls in _REF_BEARING_TYPES:
         for obj in db.iter_only_objects(txn, cls):
-            if _update_refs(obj):
+            changed = False
+            for ref, _path in recursive_attributes(obj, []):
+                if isinstance(ref, (ScheduledStopPointRef, RoutePointRef)):
+                    new_ref = _new_id(ref.ref)
+                    if new_ref is not None:
+                        ref.ref = new_ref
+                        changed = True
+            if changed:
                 yield obj
 
 
