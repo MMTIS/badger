@@ -7,7 +7,7 @@ https://public.3.basecamp.com/p/fVFt3mGJiK52ewcsr8nFgu6o
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from pathlib import Path
 
 from xsdata.models.datatype import XmlDateTime
@@ -70,33 +70,18 @@ def _build_version_validity(
     lines: defaultdict[str, list[Line]],
     frame_end: XmlDateTime,
 ) -> dict[tuple[str, str | None], LineValidity]:
-    raw: dict[tuple[str, str | None], tuple[XmlDateTime, XmlDateTime | None]] = {}
+    result: dict[tuple[str, str | None], LineValidity] = {}
     for line_id, line_versions in lines.items():
         if len(line_versions) <= 1:
             continue
         for line in line_versions:
             for vb in line.validity_conditions_or_valid_between:
                 if hasattr(vb, 'from_date') and vb.from_date is not None:
-                    raw[(line_id, line.version)] = (vb.from_date, vb.to_date)
+                    result[(line_id, line.version)] = LineValidity(
+                        from_dt=vb.from_date,
+                        to_dt=vb.to_date if vb.to_date is not None else frame_end,
+                    )
                     break
-
-    result: dict[tuple[str, str | None], LineValidity] = {}
-    for line_id, line_versions in lines.items():
-        if len(line_versions) <= 1:
-            continue
-        sorted_vers = sorted(
-            [(line.version, raw[(line_id, line.version)])
-             for line in line_versions if (line_id, line.version) in raw],
-            key=lambda item: item[1][0],
-        )
-        for i, (ver, (from_dt, to_dt)) in enumerate(sorted_vers):
-            if to_dt is None:
-                if i + 1 < len(sorted_vers):
-                    next_from = sorted_vers[i + 1][1][0].to_datetime().date()
-                    to_dt = _xml_date(next_from - timedelta(days=1))
-                else:
-                    to_dt = frame_end
-            result[(line_id, ver)] = LineValidity(from_dt=from_dt, to_dt=to_dt)
     return result
 
 
