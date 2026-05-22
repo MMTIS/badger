@@ -33,6 +33,7 @@ Further reading:
 import logging
 from collections import defaultdict
 from collections.abc import Generator
+from datetime import timedelta
 from pathlib import Path
 
 from xsdata.models.datatype import XmlDateTime
@@ -62,32 +63,82 @@ def fmt_dt(dt: XmlDateTime | None) -> str:
     return dt.to_datetime().isoformat() if dt else "None"
 
 
+def _xml_dt(dt) -> XmlDateTime:
+    return XmlDateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second)
+
+
+def _compute_default_segments(
+    from_dt: XmlDateTime,
+    default_end: XmlDateTime,
+    overrides: list[tuple[XmlDateTime, XmlDateTime]],
+) -> list[ValidBetween]:
+    """Return non-overlapping ValidBetween segments for a default version, excluding override windows."""
+    segments: list[ValidBetween] = []
+    current = from_dt.to_datetime()
+    end = default_end.to_datetime()
+
+    for od_from, od_to in sorted(overrides, key=lambda x: x[0].to_datetime()):
+        od_start = od_from.to_datetime()
+        od_end = od_to.to_datetime()
+        if od_start >= end:
+            break
+        if od_end <= current:
+            continue
+        if current < od_start:
+            segments.append(ValidBetween(
+                from_date=_xml_dt(current),
+                to_date=_xml_dt(od_start - timedelta(seconds=1)),
+            ))
+        current = od_end + timedelta(seconds=1)
+
+    if current < end:
+        segments.append(ValidBetween(from_date=_xml_dt(current), to_date=_xml_dt(end)))
+
+    return segments
+
+
 def _iter_version_validity(
     lines: defaultdict[str, list[Line]],
     frame_end: XmlDateTime,
-) -> Generator[tuple[tuple[str, str | None], ValidBetween], None, None]:
-    raw: dict[tuple[str, str | None], tuple[XmlDateTime, XmlDateTime | None]] = {}
+) -> Generator[tuple[tuple[str, str | None], list[ValidBetween]], None, None]:
+    """Yield (line_id, version) → list of ValidBetween segments.
+
+    Versions without a ToDate are "defaults": they run continuously from their
+    FromDate (until the next default's FromDate, or frame_end), interrupted only
+    by "override" versions that carry an explicit ToDate.
+
+    Versions with a ToDate are "overrides": they run exactly during their window.
+    """
     for line_id, line_versions in lines.items():
         if len(line_versions) <= 1:
             continue
+
+        raw: list[tuple[str | None, XmlDateTime, XmlDateTime | None]] = []
         for line in line_versions:
             for vb in line.validity_conditions_or_valid_between:
                 if hasattr(vb, 'from_date') and vb.from_date is not None:
-                    raw[(line_id, line.version)] = (vb.from_date, vb.to_date)
+                    raw.append((line.version, vb.from_date, vb.to_date))
                     break
 
-    for line_id, line_versions in lines.items():
-        if len(line_versions) <= 1:
-            continue
-        sorted_vers = sorted(
-            [(line.version, raw[(line_id, line.version)])
-             for line in line_versions if (line_id, line.version) in raw],
-            key=lambda item: item[1][0],
+        defaults = sorted(
+            [(ver, from_dt) for ver, from_dt, to_dt in raw if to_dt is None],
+            key=lambda x: x[1].to_datetime(),
         )
-        for i, (ver, (from_dt, to_dt)) in enumerate(sorted_vers):
-            if to_dt is None:
-                to_dt = sorted_vers[i + 1][1][0] if i + 1 < len(sorted_vers) else frame_end
-            yield (line_id, ver), ValidBetween(from_date=from_dt, to_date=to_dt)
+        overrides = [(ver, from_dt, to_dt) for ver, from_dt, to_dt in raw if to_dt is not None]
+
+        for ver, from_dt, to_dt in raw:
+            if to_dt is not None:
+                yield (line_id, ver), [ValidBetween(from_date=from_dt, to_date=to_dt)]
+            else:
+                idx = next(i for i, (v, _) in enumerate(defaults) if v == ver)
+                if idx + 1 < len(defaults):
+                    default_end = _xml_dt(defaults[idx + 1][1].to_datetime() - timedelta(seconds=1))
+                else:
+                    default_end = frame_end
+                override_windows = [(od_from, od_to) for _, od_from, od_to in overrides]
+                segments = _compute_default_segments(from_dt, default_end, override_windows)
+                if segments:
+                    yield (line_id, ver), segments
 
 
 def _make_calendar_objects(
@@ -156,12 +207,12 @@ def _process_journey(
     day_type_assignments: dict[str, DayTypeAssignment],
     uic_periods: dict[str, UicOperatingPeriod],
     new_objects: list,
-    created: dict[tuple[str, str | None, str], str],
+    created: dict[tuple[str, str, str], str],
 ) -> list[DayTypeRef]:
     new_refs: list[DayTypeRef] = []
     for dt_ref in journey.day_types.day_type_ref:  # type: ignore[union-attr]
         existing_dt_id = dt_ref.ref
-        cache_key = (line_id, line_version, existing_dt_id)
+        cache_key = (line_id, safe_version, existing_dt_id)
 
         if cache_key in created:
             new_refs.append(DayTypeRef(ref=created[cache_key], version='1'))
@@ -187,37 +238,42 @@ def _resolve_journeys(
     routes: defaultdict[str, list[Route]],
     sjps: defaultdict[str, list[ServiceJourneyPattern]],
     journeys: defaultdict[str, list[ServiceJourney]],
-    version_validity: dict[tuple[str, str | None], ValidBetween],
+    version_validity: dict[tuple[str, str | None], list[ValidBetween]],
     day_type_assignments: dict[str, DayTypeAssignment],
     uic_periods: dict[str, UicOperatingPeriod],
 ) -> tuple[list[DayType | UicOperatingPeriod | OperatingPeriod | DayTypeAssignment], list[ServiceJourney]]:
     new_objects: list[DayType | UicOperatingPeriod | OperatingPeriod | DayTypeAssignment] = []
     updated_journeys: list[ServiceJourney] = []
-    created: dict[tuple[str, str | None, str], str] = {}
+    created: dict[tuple[str, str, str], str] = {}
 
     for line_id, line_versions in lines.items():
         if len(line_versions) <= 1:
             continue
 
         for route in routes.get(line_id, []):
-            validity = version_validity.get((line_id, route.line_ref.version))
-            if validity is None:
+            validities = version_validity.get((line_id, route.line_ref.version))
+            if not validities:
                 print(f"  Skipping route {route.id}: no validity for line {line_id} v={route.line_ref.version}")
                 continue
 
-            safe_version = (route.line_ref.version or 'unknown').replace(':', '_')
+            base_safe = (route.line_ref.version or 'unknown').replace(':', '_')
 
             for sjp in sjps.get(route.id, []):
                 for journey in journeys.get(sjp.id, []):
                     if journey.day_types is None:
                         continue
 
-                    new_refs = _process_journey(
-                        journey, line_id, route.line_ref.version, safe_version,
-                        validity, day_type_assignments, uic_periods, new_objects, created,
-                    )
-                    if new_refs:
-                        journey.day_types = DayTypeRefsRelStructure(day_type_ref=new_refs)
+                    all_new_refs: list[DayTypeRef] = []
+                    for seg_idx, validity in enumerate(validities):
+                        safe_version = f"{base_safe}_{seg_idx}"
+                        new_refs = _process_journey(
+                            journey, line_id, route.line_ref.version, safe_version,
+                            validity, day_type_assignments, uic_periods, new_objects, created,
+                        )
+                        all_new_refs.extend(new_refs)
+
+                    if all_new_refs:
+                        journey.day_types = DayTypeRefsRelStructure(day_type_ref=all_new_refs)
                         updated_journeys.append(journey)
 
     return new_objects, updated_journeys
