@@ -9,8 +9,8 @@ from storage.interface import Serializer
 
 import inspect
 
-from utils.mro_attributes import list_attributes
-from utils import netex_monkeypatching
+from utils.mro_attributes import resolve_class, unembed
+from utils import netex_monkeypatching  # noqa: F401
 
 from dataclasses import fields, MISSING
 
@@ -43,18 +43,10 @@ GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Poly
 
 def get_all_geo_elements() -> Generator[Any, None, None]:
     for clazz_parent in get_boring_classes():
-        attrs = list_attributes(clazz_parent)
-        for attr in attrs:
-            clazz = attr[3].type
-            if clazz is not None and hasattr(clazz, '_name'):
-                if (clazz._name == 'Optional' or clazz._name == 'Union') and not isinstance(clazz, str):
-                    clazz_resolved = [x for x in clazz.__args__ if x is not None][0]
-                else:
-                    clazz_resolved = clazz
-
-                if clazz_resolved in GEO_CLASSES:
-                    yield clazz_parent
-                    break
+        for _name, _field, field_type in unembed(clazz_parent):
+            if resolve_class(field_type) in GEO_CLASSES:
+                yield clazz_parent
+                break
 
 
 netex.set_geo_types = frozenset(get_all_geo_elements())  # type: ignore[attr-defined]
