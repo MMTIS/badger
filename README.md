@@ -39,7 +39,7 @@ As such, the processing has an audit trail.
 
 Our (de)serialisation takes place using [xsData](https://xsdata.readthedocs.io/en/latest/), via Python Data Classes.
 This guarantees us XML Schema compliance.
-Our intermediate presentation is serialised using [cloudpickle](https://github.com/cloudpipe/cloudpickle) and is stored in compressed [lz4](https://lmdb.readthedocs.io/en/release/) form.
+Our intermediate presentation is serialised using [cloudpickle](https://github.com/cloudpipe/cloudpickle) and is stored in compressed [lz4](https://lz4.github.io/lz4/) form.
 During the development of this software we have evaluated various database technologies, for our intermediate computing requirements [mdbx](https://github.com/erthink/libmdbx) is used.
 The processing of other CSV-based formats such as GTFS is mediated via  [DuckDB](https://duckdb.org/docs/stable/clients/python/overview.html).
 
