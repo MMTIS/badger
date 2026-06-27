@@ -20,8 +20,8 @@ from typing import Optional, Generator
 
 
 def resolve_embeddings_iterable(
-    storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[Tid]] = None, ignore: Optional[set[Tid]] = None
-) -> Generator[tuple[bytes, type[EntityStructure], type[EntityStructure]], None, None]:
+    storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[type[Tid]]] = None, ignore: Optional[set[type[Tid]]] = None
+) -> Generator[tuple[bytes, EntityStructure, tuple[Optional[bytes], EntityStructure, list[int]]], None, None]:
     """
     In resolve_embeddings we are creating a lookup from an existing instance to the location an embedded object remains.
     Hence, it is not 'you can find this embedded object there' but 'this object has a relationship with that object'.

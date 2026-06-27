@@ -1,33 +1,65 @@
-import unittest
-from pathlib import Path
-
 from domain.netex.model import (
-    ServiceJourney,
     Line,
-    NoticeAssignment,
-    PassengerStopAssignment,
+    LineRef,
+    MultilingualString,
     Route,
+    RouteRef,
+    RouteRefsRelStructure,
     ServiceJourneyPattern,
+    TextType,
 )
-from storage.mdbx.core.implementation import MdbxStorage
 
-class MyTestCase(unittest.TestCase):
-    def test_something(self):
-        # self.assertEqual(True, False)  # add assertion here
-        with MdbxStorage(Path("/tmp/wsf.mdbx")) as source_db:
-            with source_db.env.ro_transaction() as txn_read:
-                # full_key, sj = source_db.load_object_by_id_version(txn_read, "NL:WSF:ServiceJourney:V_B_16-18-00", ServiceJourney)
-                # for obj in source_db.load_references_by_object_values_dfs(txn_read, full_key):
-                #    print(obj)
+from storage.mdbx.core.references import resolve
 
-                full_key, sj = source_db.load_object_by_id_version(txn_read, "NL:WSF:ServiceJourneyPattern:V-B", ServiceJourneyPattern)
-                for obj in source_db.load_references_by_object_values_dfs(txn_read, full_key, {ServiceJourneyPattern}):
-                    print(obj)
-
-                # full_key, sj = source_db.load_object_by_id_version(txn_read, "NL:WSF:Line:WSF", Line)
-                # for obj in source_db.load_references_by_object_values_dfs(txn_read, full_key, {Line, NoticeAssignment, PassengerStopAssignment, Route, ServiceJourneyPattern}):
-                #    print(obj)
+from tests.base import MdbxStorageTestCase
 
 
-if __name__ == '__main__':
-    unittest.main()
+class TestRecursiveReferences(MdbxStorageTestCase):
+    def test_dfs_walks_outward_reference_chain(self) -> None:
+        line, route, sjp = self.make_line_route_sjp()
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage.insert_any_object_on_queue(txn_write, [line, route, sjp])
+            txn_write.commit()
+
+        with self.storage.env.ro_transaction() as txn_read:
+            result = self.storage.load_object_by_id_version(txn_read, "sjp1", ServiceJourneyPattern, "1")
+            self.assertIsNotNone(result)
+            assert result is not None
+            full_key, loaded_sjp = result
+            self.assertEqual(loaded_sjp, sjp)
+
+            visited = list(self.storage.load_references_by_object_values_dfs(txn_read, full_key))
+
+        visited_ids = {(obj.__class__, obj.id) for obj in visited}
+        self.assertGreaterEqual(visited_ids, {(ServiceJourneyPattern, "sjp1"), (Route, "r1"), (Line, "l1")})
+
+    def test_dfs_terminates_on_cyclic_references(self) -> None:
+        # Line <-> Route reference each other, forming a cycle.
+        line = Line(
+            id="l1",
+            version="1",
+            name=MultilingualString(content=[TextType(value="Line l1")]),
+            routes=RouteRefsRelStructure(route_ref=[RouteRef(ref="r1", version="1")]),
+        )
+        route = Route(id="r1", version="1", line_ref=LineRef(ref="l1", version="1"))
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage.insert_any_object_on_queue(txn_write, [line, route])
+            txn_write.commit()
+
+        # One direction stays unresolved at insert time; resolve() wires the back-edge,
+        # so DB_REFERENCE_OUTWARD now holds both edges of the cycle.
+        resolve(self.storage)
+
+        with self.storage.env.ro_transaction() as txn_read:
+            result = self.storage.load_object_by_id_version(txn_read, "l1", Line, "1")
+            self.assertIsNotNone(result)
+            assert result is not None
+            full_key, _ = result
+            visited = list(self.storage.load_references_by_object_values_dfs(txn_read, full_key))
+
+        visited_ids = [(obj.__class__, obj.id) for obj in visited]
+        # Terminates despite the cycle, and `visited` yields each object exactly once.
+        self.assertEqual(set(visited_ids), {(Line, "l1"), (Route, "r1")})
+        self.assertEqual(len(visited_ids), 2)

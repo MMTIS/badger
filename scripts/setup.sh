@@ -14,9 +14,9 @@ sh scripts/install-precommit-hook.sh
 
 sh scripts/generate-schema.sh
 
-echo "Install optional development dependencies"
+echo "Install dependencies, including the development tools (mypy, black, ruff)"
 
-uv pip install mypy black ruff
+uv sync
 
 echo "Install gtfs validator"
 

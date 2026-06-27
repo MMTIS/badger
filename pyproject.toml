@@ -29,6 +29,13 @@ dependencies = [
 ]
 requires-python = ">=3.12"
 
+[dependency-groups]
+dev = [
+    "mypy",
+    "black",
+    "ruff",
+]
+
 [tool.black]
 extend-exclude = "domain/netex/model/*.py"
 preview = true
