@@ -1,6 +1,9 @@
+import logging
+
 from mdbx import MDBXCursorOp, MDBXDBFlags
 
 from domain.netex.indexes.inverse_class import collect_classes_index
+from utils.aux_logging import log_all
 from domain.netex.services.model_typing import Tid
 from domain.netex.model import EntityStructure, Network, NameOfClass
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
@@ -64,8 +67,6 @@ def variant_of_candidate_in_list(storage, candidate, obj, unresolved_pairs: dict
 
     # TODO: Abstract the separator, so it is uniform through the code
     separator = bytes([ByteSerializer.SEPARATOR])
-
-    print(candidate)
 
     if candidate in unresolved_pairs:
         return candidate, False, False, candidate
@@ -136,9 +137,11 @@ def resolve_embeddings(storage: MdbxStorage):
 
         almost_resolved_queue = {}
 
-        print(missing_classes)
+        log_all(logging.INFO, f"[resolve_embeddings] {len(unresolved_pairs)} unresolved refs, "
+                              f"scanning {len(class_count)} class maps for {len(missing_classes)} missing classes")
 
         for clazz, count in sorted(class_count.items(), key=lambda item: item[1]):
+            log_all(logging.INFO, f"[resolve_embeddings] scanning {clazz.__name__} ({count} objects)")
             db = txn.open_map(storage.class_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
@@ -252,16 +255,22 @@ def resolve(storage: MdbxStorage) -> None:
         
     separator = bytes([ByteSerializer.SEPARATOR])
 
+    seen_count = 0
+
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
         db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
+        log_all(logging.INFO, "[resolve] resolving references")
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
             references_to_fix: list[tuple] = []
 
             for idx, value in it:
+                seen_count += 1
+                if seen_count % 1_000_000 == 0:
+                    log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
                 parts: list[str] | None = None
                 prefix: str | None = None
                 resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check

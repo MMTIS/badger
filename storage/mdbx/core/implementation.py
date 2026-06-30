@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from pathlib import Path
 from sys import exception
@@ -21,6 +22,7 @@ from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
 from storage.mdbx.serialization.byteserializer import ByteSerializer
+from utils.aux_logging import log_all
 
 DB_CLASS_IDX = bytes(b'_class_idx')
 DB_UNRESOLVED = bytes(b'_unresolved')
@@ -209,7 +211,7 @@ class MdbxStorage:
             obj = self.load_object_by_full_key(txn, full_reference)
             if skip_existing:
                 if obj.__class__ not in clazzes:
-                    print(obj.__class__, clazzes)
+                    log_all(logging.DEBUG, f"yielding unexpected class {obj.__class__} not in interesting classes {clazzes}")
                     yield obj
             else:
                 yield obj
@@ -481,7 +483,7 @@ class MdbxStorage:
 
             if True:
                 # TODO: Fallback should not happen, because the references should already have been updated, but since we are here
-                print("Fallback...")
+                log_all(logging.WARNING, f"[load_object_by_reference] fallback prefix-scan for ref {ref.ref}")
                 prefix = self.serializer.encode_prefix(str(ref.ref), None, False)
                 cursor = txn.cursor(db_id_idx)
                 for check_key, resolved_idx in cursor.iter(prefix):

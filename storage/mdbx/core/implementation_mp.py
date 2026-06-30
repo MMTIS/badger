@@ -1,7 +1,10 @@
+import logging
 from pathlib import Path
 from types import TracebackType
 from typing import Optional, Type, Literal, Iterable
 import multiprocessing as mp
+
+from utils.aux_logging import log_all
 
 from mdbx.mdbx import DBI, Env
 
@@ -44,7 +47,7 @@ class MdbxStorageMP(MdbxStorage):
         return super().__exit__(exception_type, exception_value, exception_traceback)
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
-        print(klass)
+        log_all(logging.DEBUG, f"[mp] insert_objects_on_queue {klass}")
 
         if self.readonly:
             raise

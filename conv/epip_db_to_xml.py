@@ -11,8 +11,11 @@ import logging
 def epip_db_to_xml(database_epip: Path, output_filename: Path) -> None:
     with MdbxStorage(database_epip) as db_epip:
         with db_epip.env.ro_transaction() as txn:
+            log_all(logging.INFO, f"[epip_db_to_xml] building EPIP publication delivery from {database_epip}")
             publication_delivery: PublicationDelivery = export_epip_network_offer(db_epip, txn)
+            log_all(logging.INFO, f"[epip_db_to_xml] serialising to {output_filename}")
             export_publication_delivery_xml(publication_delivery, output_filename)
+            log_all(logging.INFO, f"[epip_db_to_xml] done: {output_filename}")
 
 
 def main(source: str, target: str) -> None:

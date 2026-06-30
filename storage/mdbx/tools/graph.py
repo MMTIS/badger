@@ -1,8 +1,10 @@
+import logging
 from typing import Generator
 
 from mdbx.mdbx import TXN
 
 from domain.netex.services.model_typing import Tid
+from utils.aux_logging import log_all
 from storage.mdbx.core.implementation import (
     MdbxStorage,
     DB_ID_IDX,
@@ -254,13 +256,16 @@ def list_forward_examples(order: List[bytes], graph: Dict[bytes, Set[bytes]], li
 
 # --- 7) streaming export generator ---
 def export_objects(txn: TXN, storage: MdbxStorage) -> Iterable[Any]:
+    log_all(logging.INFO, "[export_objects] building export order...")
     graph = build_graph(txn)
     order = order_graph(graph, storage)
-    # quick diagnostics (log when you want)
     total_forwards = count_forward_refs(order, graph)
-    # optional: print or log
-    # print(f"[export_objects] nodes={len(order)} forward_refs={total_forwards}")
-    # stream objects
-    for full_key in order:
+    total = len(order)
+    log_all(logging.INFO, f"[export_objects] exporting {total} objects ({total_forwards} forward references)")
+    # stream objects (consumed lazily during XML serialisation)
+    for i, full_key in enumerate(order, start=1):
+        if i % 100_000 == 0:
+            log_all(logging.INFO, f"[export_objects] {i}/{total} objects exported...")
         yield storage.load_object_by_full_key(txn, full_key)
+    log_all(logging.INFO, f"[export_objects] {total} objects exported")
 
