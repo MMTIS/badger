@@ -95,20 +95,3 @@ class XmlAssertions(unittest.TestCase):
         can be indented to fit the test file (or written compactly) without affecting the result.
         """
         self.assertEqual(canonical_xml(actual), canonical_xml(expected), msg)
-
-
-def make_db(path: Path, frames_xml: str) -> Path:
-    """Create a fresh on-disk db at ``path``, load ``frames_xml`` into it, and close it.
-
-    For the ``fix.*`` / ``conv.*`` steps, which open the database file themselves by path.
-    """
-    with MdbxStorage(path, readonly=False) as db:
-        load_netex(db, frames_xml)
-    return path
-
-
-def read_objects(path: Path, clazz: type[T]) -> list[T]:
-    """Open the db at ``path`` read-only and return all stored objects of ``clazz``."""
-    with MdbxStorage(path, readonly=True) as db:
-        with db.env.ro_transaction() as txn:
-            return list(db.iter_only_objects(txn, clazz))

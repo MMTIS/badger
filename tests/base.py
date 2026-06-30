@@ -1,10 +1,17 @@
 import tempfile
 import unittest
 from pathlib import Path
+from typing import TypeVar
+
+from xsdata.models.datatype import XmlDateTime
 
 from domain.netex.model import Line, LineRef, MultilingualString, Route, RouteRef, ServiceJourneyPattern, TextType
 
 from storage.mdbx.core.implementation import MdbxStorage
+from tests.netex_harness import load_netex, to_xml
+from transformers.generalframe import export_to_general_frame
+
+T = TypeVar("T")
 
 
 class MdbxStorageTestCase(unittest.TestCase):
@@ -18,6 +25,24 @@ class MdbxStorageTestCase(unittest.TestCase):
         cm = MdbxStorage(Path(tmp.name) / "test.mdbx", readonly=False)
         self.storage = cm.__enter__()
         self.addCleanup(cm.__exit__, None, None, None)
+
+    def load_netex(self, frames_xml: str) -> None:
+        """Parse ``frames_xml`` (the inner content of ``<frames>``).
+
+        Wrap one or more frames, e.g. ``<ServiceFrame>…</ServiceFrame>``, and pass the string.
+        """
+        load_netex(self.storage, frames_xml)
+
+    def read_objects(self, clazz: type[T]) -> list[T]:
+        """Return all stored objects of ``clazz``."""
+        with self.storage.env.ro_transaction() as txn:
+            return list(self.storage.iter_only_objects(txn, clazz))
+
+    def export_netex(self):
+        with self.storage.env.ro_transaction() as txn:
+            publication_delivery = export_to_general_frame(self.storage, txn)
+            publication_delivery.publication_timestamp = XmlDateTime.from_string("2026-01-01T00:00:00")
+            return to_xml(publication_delivery)
 
     def make_line_route_sjp(self) -> tuple[Line, Route, ServiceJourneyPattern]:
         """A small outward-reference chain: ServiceJourneyPattern -> Route -> Line."""

@@ -1,24 +1,20 @@
 from domain.netex.model import ScheduledStopPoint
 
 from tests.base import MdbxStorageTestCase
-from tests.netex_harness import XmlAssertions, load_netex, to_xml_all
+from tests.netex_harness import XmlAssertions, to_xml_all
 
 
 class TestHarnessSmoke(XmlAssertions, MdbxStorageTestCase):
     def test_load_netex_round_trips_an_entity(self) -> None:
-        load_netex(
-            self.storage,
-            """
+        self.load_netex("""
             <ServiceFrame id="sf" version="1">
               <scheduledStopPoints>
                 <ScheduledStopPoint id="ssp1" version="1"><Name>Test</Name></ScheduledStopPoint>
               </scheduledStopPoints>
             </ServiceFrame>
-            """,
-        )
+            """        )
 
-        with self.storage.env.ro_transaction() as txn:
-            ssps = list(self.storage.iter_only_objects(txn, ScheduledStopPoint))
+        ssps = self.read_objects(ScheduledStopPoint)
 
         self.assertXmlEqual(
             to_xml_all(ssps),
