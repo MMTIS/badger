@@ -6,8 +6,11 @@ so a test reads like a tiny NeTEx file plus an assertion on what a transformer m
 """
 
 import io
+import unittest
 from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
+
+from lxml import etree
 
 from domain.netex.model import Codespace
 from storage.lxml.core.insert import get_interesting_classes, insert_database
@@ -57,10 +60,41 @@ def to_xml_all(objs: Iterable[Any]) -> str:
     """Serialise a sequence of objects and join them, for full-output XML assertions.
 
     Each object is serialised with :func:`to_xml` (pretty-printed) and stripped, then joined
-    with newlines, so a test can assert the exact output XML a transform produces against a
-    readable expected block.
+    with newlines. Compare the result against an expected block with
+    :meth:`XmlAssertions.assertXmlEqual` (which canonicalises both sides) rather than an exact
+    ``==``, so the comparison is not sensitive to whitespace/indentation.
     """
     return "\n".join(to_xml(o).strip() for o in objs)
+
+
+def canonical_xml(xml: str) -> str:
+    """Canonical (C14N) form of one or more serialised NeTEx objects, with formatting
+    (indentation between elements) stripped, so comparisons ignore layout.
+
+    Parsing with ``remove_blank_text`` drops only *formatting* whitespace; significant
+    leading/trailing whitespace inside text nodes is preserved, so a transform that mangles
+    text content is still caught. C14N then normalises attribute order and namespace declarations.
+
+    ``xml`` may hold several concatenated top-level objects (as produced by :func:`to_xml_all`);
+    they are wrapped in a throwaway root so the fragment parses as one document. The wrapper is
+    applied identically to both sides of a comparison, so it cancels out.
+    """
+    parser = etree.XMLParser(remove_blank_text=True)
+    root = etree.fromstring(f"<_harness>{xml}</_harness>".encode("utf-8"), parser)
+    canonical: bytes = etree.tostring(root, method="c14n2")
+    return canonical.decode("utf-8")
+
+
+class XmlAssertions(unittest.TestCase):
+    """Mixin adding XML-aware assertions; combine with a test's base class."""
+
+    def assertXmlEqual(self, actual: str, expected: str, msg: Any = None) -> None:
+        """``assertEqual`` for XML that ignores formatting / attribute-order differences.
+
+        Both sides are canonicalised via :func:`canonical_xml` first, so an ``expected`` block
+        can be indented to fit the test file (or written compactly) without affecting the result.
+        """
+        self.assertEqual(canonical_xml(actual), canonical_xml(expected), msg)
 
 
 def make_db(path: Path, frames_xml: str) -> Path:
