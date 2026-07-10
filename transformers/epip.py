@@ -808,6 +808,10 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                     and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
                     == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 )
+                or (
+                    isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
+                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref in uic_operating_periods
+                )
             ]
             my_operating_periods: list[OperatingPeriod] = [
                 operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
@@ -819,6 +823,7 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
                     == NameOfClassOperatingPeriodRefStructureType.OPERATING_PERIOD
                 )
                 and (dta.is_available is None or dta.is_available)
+                and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref in operating_periods
             ]
             # my_operating_days = [operating_days[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref] for dta in day_type_assignments if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingDayRef)]
             my_operational_dates = [
