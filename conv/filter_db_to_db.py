@@ -133,6 +133,14 @@ def attribute_filter(
             yield full_key, obj
 
 def filter_db_to_db(source_database_file: Path, target_database_file: Path, filter_function: callable, inward_classes: set[type[EntityStructure]], conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]]) -> None:
+    with MdbxStorage(source_database_file, readonly=False) as db_write:
+        # Assure we have a inward index.
+        resolve(db_write)
+        resolve_embeddings_index(db_write)
+        with db_write.env.rw_transaction() as txn:
+            db_write._index_references_inwards(txn, force=True)
+            txn.commit()
+
     with MdbxStorage(source_database_file) as db_read:
         # Assure we have a inward index.
         with db_read.env.rw_transaction() as txn:
@@ -143,6 +151,7 @@ def filter_db_to_db(source_database_file: Path, target_database_file: Path, filt
             visited: set[bytes] = set()
             full_keys = [full_key for full_key, obj in filter_function(db_read, txn)]
             with MdbxStorage(target_database_file, readonly=False) as db_write:
+
                 with db_write.env.rw_transaction() as txn_write:
                     db_write.insert_any_object_on_queue(
                         txn_write,
