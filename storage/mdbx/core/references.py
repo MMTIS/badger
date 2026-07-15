@@ -405,7 +405,7 @@ def resolve_embeddings_index(storage: MdbxStorage):
             unresolved_pairs.setdefault(value, set()).add(idx)
             missing_classes.add(storage.idx_class[parts[-1]])
 
-        # print("IN: ", db_unresolved.get_stat(txn).ms_entries)
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 
         used_classes_in_database = set(storage.db_names(txn).values())
         index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
@@ -528,7 +528,7 @@ def resolve_embeddings_index(storage: MdbxStorage):
                 db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
                 db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
-        # print("OUT: ", db_unresolved.get_stat(txn).ms_entries)
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 
         db_id_idx.drop(txn, delete=True)
         txn.commit()
