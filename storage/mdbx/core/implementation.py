@@ -352,7 +352,7 @@ class MdbxStorage:
         create = True
         try:
             db_inward = txn.open_map(DB_REFERENCE_INWARD, flags=DB_REFERENCE_INWARD_FLAGS)
-            create = db_inward.get_stat(txn).ms_entries > 0 and not force
+            create = db_inward.get_stat(txn).ms_entries > 0 or force
         except:
             pass
         finally:
