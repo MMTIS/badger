@@ -190,8 +190,10 @@ class CallsProfile:
 
         calls = CallsRelStructure(call=[])
 
+        order = 0
         # If there are no onward timing links, we must consider links in sequence
         for pis in service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern:
+            order += 1
             wait_time = None
             run_time = None
             ssp_ref = None
@@ -231,8 +233,7 @@ class CallsProfile:
             departure += CallsProfile.getDuration(wait_time)
             if spijp is not None:
                 call = Call(
-                    id=service_journey.id.replace(":ServiceJourney:", ":Call:") + '-' + str(pis.order),
-                    order=pis.order,
+                    id=service_journey.id.replace(":ServiceJourney:", ":Call:") + '-' + str(order),
                     version=service_journey.version,
                     fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point_view=ssp_ref,
                     arrival=CallsProfile.getArrival(spijp, arrival, offset),
@@ -308,8 +309,10 @@ class CallsProfile:
 
         tpts = TimetabledPassingTimesRelStructure(timetabled_passing_time=[])
 
+        order = 0
         # If there are no onward timing links, we must consider links in sequence
         for pis in service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern:
+            order += 1
             wait_time = None
             run_time = None
             spijp = None
@@ -348,7 +351,7 @@ class CallsProfile:
                 arrival_time, arrival_day_offset = CallsProfile.getArrivalTime(arrival, offset)
                 departure_time, departure_day_offset = CallsProfile.getDepartureTimeOffset(arrival, offset)
                 timetabled_passing_time = TimetabledPassingTime(
-                    id=service_journey.id.replace(":ServiceJourney:", ":TimetabledPassingTime:") + '-' + str(pis.order),
+                    id=service_journey.id.replace(":ServiceJourney:", ":TimetabledPassingTime:") + '-' + str(order),
                     version=service_journey.version,
                     point_in_journey_pattern_ref=getRef(spijp),
                     arrival_time=arrival_time,

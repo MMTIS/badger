@@ -1,7 +1,7 @@
 import traceback
 from pathlib import Path
 
-from storage.mdbx.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.references import resolve, resolve_embeddings, resolve_embeddings_index
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
 from storage.mdbx.core.implementation import MdbxStorage
@@ -17,6 +17,7 @@ def netex_to_db(filenames: set[Path], database: Path, clean_database: bool = Tru
             storage.clean()
         """
 
+
         interesting_classes = get_interesting_classes()
         for filename in filenames:
             xml_storage = XmlStorage(filename)
@@ -26,8 +27,8 @@ def netex_to_db(filenames: set[Path], database: Path, clean_database: bool = Tru
 
         log_all(logging.INFO, "[netex_to_db] resolving references")
         resolve(storage)
-        log_all(logging.INFO, "[netex_to_db] resolving embeddings")
-        resolve_embeddings(storage)
+        log_all(logging.INFO, "[netex_to_db] resolving embeddings via index")
+        resolve_embeddings_index(storage)
         log_all(logging.INFO, f"[netex_to_db] done: {database}")
 
 

@@ -21,7 +21,7 @@ class MyTestCase(unittest.TestCase):
                 #    print(obj)
 
                 full_key, sj = source_db.load_object_by_id_version(txn_read, "NL:WSF:ServiceJourneyPattern:V-B", ServiceJourneyPattern)
-                for obj in source_db.load_references_by_object_values_dfs(txn_read, full_key, {ServiceJourneyPattern}):
+                for obj in source_db.load_references_by_object_values_dfs(txn_read, [full_key], {ServiceJourneyPattern}):
                     print(obj)
 
                 # full_key, sj = source_db.load_object_by_id_version(txn_read, "NL:WSF:Line:WSF", Line)

@@ -20,17 +20,17 @@ from domain.netex.services.recursive_attributes import (
 transformers: dict[str, Transformer] = {}
 
 
-def reprojection(deserialized: Tid, crs_to: str) -> Tid:
+def reprojection(deserialized: Tid, crs_to: str, force_latlon=False) -> Tid:
     # TODO: This function would walk over the class iteratively.
     # A general optimisation would be to precompute the paths within
     # a class to directly have a list (per class) of possible location targets
     for obj, path in recursive_attributes(deserialized, []):
         if isinstance(obj, LocationStructure2):
-            project_location(obj, crs_to)
+            project_location(obj, crs_to, force_latlon)
 
         elif isinstance(obj, SimplePointVersionStructure):
             if obj.location:
-                project_location(obj.location, crs_to)
+                project_location(obj.location, crs_to, force_latlon)
 
         elif isinstance(obj, LineString):
             if obj.srs_name == crs_to:
@@ -59,7 +59,7 @@ def reprojection(deserialized: Tid, crs_to: str) -> Tid:
     return deserialized
 
 
-def reprojection_update(db: MdbxStorage, txn: TXN, crs_to: str) -> Generator[Tid, None, None]:
+def reprojection_update(db: MdbxStorage, txn: TXN, crs_to: str, force_latlon=False) -> Generator[Tid, None, None]:
     # Within this function we are reading and writing towards the target database.
     # This effectively means that if we would need to resize for whatever reason,
     # we cannot hold the cursor since access has to be disabled.
@@ -69,7 +69,7 @@ def reprojection_update(db: MdbxStorage, txn: TXN, crs_to: str) -> Generator[Tid
     for clazz in set(db.db_names(txn).values()).intersection(set(get_all_geo_elements())):
         obj: Tid
         for _key, obj in db.iter_objects(txn, clazz):
-            yield reprojection(obj, crs_to)
+            yield reprojection(obj, crs_to, force_latlon)
 
 
 def get_transformer_by_srs_name(location: LocationStructure2 | LineString, crs_to: str) -> Transformer | None:
@@ -119,7 +119,7 @@ def project_location_4326(location: LocationStructure2, quantize: str = '0.00000
         print("TODO: Crazy not WGS84")
 
 
-def project_location(location: LocationStructure2, crs_to: str, quantize: str = '0.000001') -> None:
+def project_location(location: LocationStructure2, crs_to: str, force_latlon=False, quantize: str = '0.000001') -> None:
     if location.srs_name == crs_to:
         return
 
@@ -130,7 +130,12 @@ def project_location(location: LocationStructure2, crs_to: str, quantize: str = 
             x = Decimal(x).quantize(Decimal(quantize), ROUND_HALF_UP)
             y = Decimal(y).quantize(Decimal(quantize), ROUND_HALF_UP)
             location.srs_name = crs_to
-            location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
+            if force_latlon:
+                location.pos = None
+                location.latitude = x # only correct in this case
+                location.longitude = y # only correct in this case
+            else:
+                location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
 
     elif location.longitude is not None and location.latitude is not None:
         transformer = get_transformer_by_srs_name(location, crs_to)
@@ -139,7 +144,12 @@ def project_location(location: LocationStructure2, crs_to: str, quantize: str = 
             x = Decimal(x).quantize(Decimal(quantize), ROUND_HALF_UP)
             y = Decimal(y).quantize(Decimal(quantize), ROUND_HALF_UP)
             location.srs_name = crs_to
-            location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
+            if force_latlon:
+                location.pos = None
+                location.latitude = x # only correct in this case
+                location.longitude = y # only correct in this case
+            else:
+                location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
 
     else:
         print("TODO: Crazy not WGS84")

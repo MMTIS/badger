@@ -16,13 +16,14 @@ def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generat
 
     def process(sjp: ServiceJourneyPattern, generator_defaults: dict[str, Any]) -> ServiceJourneyPattern | None:
         if sjp.direction_type is not None and sjp.direction_ref_or_direction_view is None:
-            key = str(sjp.direction_type.value)
+            key = str(sjp.direction_type.value.value)
             direction: Direction | None = directions.get(key, None)
             if direction is None:
                 direction = Direction(
                     id=getId(generator_defaults['codespace'], Direction, key),
-                    version='any',
-                    name=MultilingualString(content=[TextType(value=key)]),
+                    version=sjp.version,
+                    # name=MultilingualString(content=[TextType(value=key)]),
+                    name=MultilingualString(content=[key]),
                     direction_type=sjp.direction_type,
                 )
                 directions[key] = direction

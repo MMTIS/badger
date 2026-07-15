@@ -13,9 +13,11 @@ from storage.mdbx.core.implementation import (
     DB_UNRESOLVED,
     DB_REFERENCE_OUTWARD,
     DB_ID_IDX,
+    DB_EMBEDDED_ID_IDX,
     DB_UNRESOLVED_FLAGS,
     DB_REFERENCE_OUTWARD_FLAGS,
     DB_ID_IDX_FLAGS,
+    DB_EMBEDDED_ID_IDX_FLAGS,
 )
 from storage.mdbx.serialization.byteserializer import ByteSerializer
 from mdbx.mdbx import TXN
@@ -100,6 +102,7 @@ def variant_of_candidate_in_list(storage, candidate, obj, unresolved_pairs: dict
 
     return resolved_idx, version_change, class_change, result
 
+
 def resolve_embeddings(storage: MdbxStorage):
     """
     We have a list of unresolved elements, from this elements we know their "origin" meaning the objects in which this reference appears.
@@ -122,10 +125,15 @@ def resolve_embeddings(storage: MdbxStorage):
             unresolved_pairs.setdefault(value, set()).add(idx)
             missing_classes.add(storage.idx_class[parts[-1]])
 
+        # TODO: computer the superset of missing_classes.
+
         # TODO: wat hier ontbreekt is dat we hier kijken naar de nameOfRefClass, onder de aanname "dit zou het kunnen zijn"
         # wat we hier moeten doen is alle kind varianten ook meenemen, waar kan deze reference nog meer naar verwijzen, gegeven dat de class foutief of niet is bepaald.
         # Dus voor OperatingPeriodRef niet alleen OperingPeriod, maar ook UicOperatingPeriod.
 
+        # TODO: Here we compute where we could find the missing_classes, as embedded objects. But we must not forget that there may be sub classes referenced as well,
+        # hence these subclasses must also be computed. In case of a fully invalid class ref, this won't hold, because we don't have a clue what it should be.
+        # This should already be covered by our upstream, setting the default or most generic class.
         used_classes_in_database = set(storage.db_names(txn).values())
         index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
         clazzes: set[type] = set().union(*index.values())
@@ -147,6 +155,7 @@ def resolve_embeddings(storage: MdbxStorage):
                 for idx, value in cur.iter():
                     obj: Tid = storage.serializer.unmarshall(value, clazz)
                     write = False
+                    # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes.
                     for candidate, obj in only_embedding(storage.serializer, obj, None): # we zouden hier direct het path binnen het object ook kunnen opslaan
                         # for candidate in only_embedding(storage.serializer, obj, missing_classes):
                         # TODO: deze operatie faalt op het moment dat a) de nameOfRefClass foutief is, b) version foutief is c) het verwacht ook dat we alle classen zoeken, terwijl we eigenlijk zouden willen limiteren op de missende classen
@@ -228,7 +237,10 @@ def resolve_embeddings(storage: MdbxStorage):
 
                         # TODO
                         db_reference_outward.put(txn, referencing_idx, parent_full_idx)
-                        db_unresolved.delete(txn, referencing_idx, cmp_value) # Deze is correct...
+                        try:
+                            db_unresolved.delete(txn, referencing_idx, cmp_value) # Deze is correct...
+                        except:
+                            pass
                         write = True
 
                 if write:
@@ -369,4 +381,154 @@ def resolve(storage: MdbxStorage) -> None:
                 db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
                 db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
+        txn.commit()
+
+def resolve_embeddings_index(storage: MdbxStorage):
+    missing_classes = set([])
+    unresolved_pairs: dict[bytes, set[bytes]] = {}
+    references_to_fix: list[tuple] = []
+
+    separator = bytes([ByteSerializer.SEPARATOR])
+
+    if storage.readonly:
+        raise
+
+    with storage.env.rw_transaction() as txn:
+        db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        db_id_idx = txn.create_map(DB_EMBEDDED_ID_IDX, flags=DB_EMBEDDED_ID_IDX_FLAGS)
+        db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
+
+        unresolved_cursor = txn.cursor(db=db_unresolved)
+        for idx, value in unresolved_cursor.iter():
+            # print(idx, value)
+            parts = storage.serializer.split_key(value)
+            unresolved_pairs.setdefault(value, set()).add(idx)
+            missing_classes.add(storage.idx_class[parts[-1]])
+
+        # print("IN: ", db_unresolved.get_stat(txn).ms_entries)
+
+        used_classes_in_database = set(storage.db_names(txn).values())
+        index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
+        clazzes: set[type] = set().union(*index.values())
+
+        for clazz in clazzes:
+            this_class_idx = storage.class_idx[clazz]
+            db = txn.open_map(this_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+            with txn.cursor(db) as cur:
+                for idx, value in cur.iter():
+                    full_key = idx + this_class_idx.ljust(4, b'\x00')
+                    obj: Tid = storage.serializer.unmarshall(value, clazz)
+
+                    # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes
+                    for candidate, _obj in only_embedding(storage.serializer, obj, None):  # we zouden hier direct het path binnen het object ook kunnen opslaan
+                        db_id_idx.put(txn, candidate, full_key)
+
+        # TODO: If this works, deduplicate the code with the regular one
+        unresolved_cursor = txn.cursor(db=db_unresolved)
+        for it in unresolved_cursor.iter_dupsort_rows():
+            references_to_fix: list[tuple] = []
+
+            for idx, value in it:
+                parts: list[str] | None = None
+                prefix: str | None = None
+                resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
+                class_change = False
+                version_change = False
+                if not resolved_idx:
+                    cursor = txn.cursor(db=db_id_idx)
+
+                    parts = storage.serializer.split_key(value)
+                    class_part = separator + parts[-1]
+
+                    # Alternative 1, id + version exists, class does not match
+                    parts.pop()
+                    prefix = separator.join(parts) + separator
+                    for check_key, check_idx in cursor.iter(prefix):
+                        if check_key.startswith(prefix):
+                            class_change = check_idx
+                            resolved_idx = check_idx
+                        break
+
+                    if not resolved_idx:
+                        # Alternative 2, id exists
+                        parts.pop()
+
+                        prefix = separator.join(parts) + separator
+                        for check_key, check_idx in cursor.iter(prefix):
+                            if check_key.startswith(prefix) and check_key.endswith(class_part):
+                                class_change = False
+                                version_change = check_idx
+                                resolved_idx = check_idx
+                                break
+
+                            elif check_key.startswith(prefix):
+                                class_change = check_idx
+                                version_change = check_idx
+                                resolved_idx = check_idx
+                                # Continue to find a better match
+
+                            else:
+                                break
+
+                if resolved_idx:
+                    if version_change or class_change:
+                        references_to_fix.append((resolved_idx, value, version_change, class_change))
+
+                    # f = storage.load_object_by_full_key(txn, idx)
+                    # t = storage.load_object_by_full_key(txn, resolved_idx)
+
+                    # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
+
+                    db_reference_forward.put(txn, idx, resolved_idx)
+                    unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
+
+                # else:
+                #    print("unresolved", value, idx)
+
+            # In this situation the original reference was incomplete
+            if len(references_to_fix) > 0:
+                referencing_class_idx, referencing_key = storage.serializer.full_key_to_idx(idx)
+                referencing_class = storage.idx_class[referencing_class_idx]
+                referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
+
+                for resolved_idx, value, version_change, class_change in references_to_fix:
+                    referenced_class_idx, referenced_key = storage.serializer.full_key_to_idx(resolved_idx)
+
+                    for reference in only_reference_objects(referencing_obj):
+                        if isinstance(reference.name_of_ref_class, str):
+                            # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
+                            # print(reference.name_of_ref_class, reference)
+                            if reference.name_of_ref_class not in storage.serializer.name_object:
+                                reference.name_of_ref_class = 'DataManagedObject'
+                            name_of_ref_class = reference.name_of_ref_class
+
+                        elif reference.name_of_ref_class.value not in storage.serializer.name_object:
+                            # TODO: Add a warning.
+                            reference.name_of_ref_class = 'DataManagedObject'
+
+                        else:
+                            name_of_ref_class = reference.name_of_ref_class.value
+
+                        cmp_value = storage.serializer.encode_key(
+                            reference.ref, getattr(reference, "version", "any"),
+                            storage.serializer.name_object[name_of_ref_class], True
+                        )
+                        if value == cmp_value:
+                            if class_change:
+                                referenced_class = storage.idx_class[referenced_class_idx]
+                                reference.name_of_ref_class = NameOfClass(
+                                    get_object_name(referenced_class)
+                                )  # I am very afraid how this might be handled in terms of comparisons later.
+                            if version_change:
+                                referenced_clazz = storage.idx_class[referenced_class_idx]
+                                referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key)
+                                reference.version = referenced_obj.version
+
+                # TODO: buffer this write to ~10000 objects of the same type?
+                db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+                db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+
+        # print("OUT: ", db_unresolved.get_stat(txn).ms_entries)
+
+        db_id_idx.drop(txn, delete=True)
         txn.commit()

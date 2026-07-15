@@ -1,10 +1,15 @@
 import functools
+from typing import Generator
 
-import netex
-from netex import VersionOfObjectRef, VersionOfObjectRefStructure
-from netexio.database import Database
-from netexio.serializer import Serializer
-from utils.utils import get_object_name
+# import netex
+from mdbx.mdbx import TXN
+# from netex import VersionOfObjectRef, VersionOfObjectRefStructure
+# from netexio.database import Database
+# from netexio.serializer import Serializer
+
+from domain.netex import EntityStructure, VersionOfObjectRef, VersionOfObjectRefStructure
+from storage.mdbx.core.implementation import MdbxStorage
+from utils.utils import get_object_name, Tid
 
 
 def simple_recursive_attributes(obj):
@@ -31,13 +36,15 @@ def simple_recursive_attributes(obj):
                                 yield from simple_recursive_attributes(x)
 
 
-def reversion_object(deserialized, updated_version, any_too=False):
+def reversion_object(deserialized, updated_version, any_too=False) -> Generator[EntityStructure, None, None]:
     for obj in simple_recursive_attributes(deserialized):
         if hasattr(obj, 'version') and (any_too or obj.version != 'any'):
             obj.version = updated_version
 
-    if hasattr(object, 'version') and (any_too or object.version != 'any'):
-        object.version = updated_version
+    if hasattr(deserialized, 'version') and (any_too or deserialized.version != 'any'):
+        deserialized.version = updated_version
+
+    yield deserialized
 
 
 def reversion_udf(serializer: Serializer, serialized: bytes, clazz: str, updated_version: str, any_too: bool = False) -> bytes:
@@ -73,3 +80,16 @@ def reversion_all_objects(db: Database, updated_version: str, any_too: bool = Fa
         con.execute("UPDATE embedded SET version = ? WHERE version <> 'any';", (updated_version,))
         con.execute("UPDATE referencing SET parent_version = ? WHERE parent_version <> 'any';", (updated_version,))
         con.execute("UPDATE referencing SET version = ? WHERE version <> 'any';", (updated_version,))
+
+
+def reversion_update(db: MdbxStorage, txn: TXN, version: int) -> Generator[Tid, None, None]:
+    # Within this function we are reading and writing towards the target database.
+    # This effectively means that if we would need to resize for whatever reason,
+    # we cannot hold the cursor since access has to be disabled.
+    # We will first validate that we do have remaining capacity.
+
+    clazz: EntityStructure
+    for clazz in db.db_names(txn).values():
+        obj: Tid
+        for _key, obj in db.iter_objects(txn, clazz):
+            yield reversion_object(obj, version, True)

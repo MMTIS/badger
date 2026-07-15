@@ -22,9 +22,9 @@ class ByteSerializer(Serializer):
     @staticmethod
     def encode_string(value: str) -> bytes:
         """Encodes a string by replacing special characters."""
-        value = value.upper()
+        # value = value.upper()
         return bytes(
-            (ord(char) if char in string.ascii_uppercase or char in string.digits or char == ByteSerializer.WORD_MASK else ByteSerializer.SPECIAL_CHAR)
+            (ord(char) if char in string.ascii_letters or char in string.digits or char == ByteSerializer.WORD_MASK else ByteSerializer.SPECIAL_CHAR)
             for char in value
         )
 
