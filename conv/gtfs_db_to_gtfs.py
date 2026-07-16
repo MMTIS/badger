@@ -1,4 +1,5 @@
 import datetime
+import logging
 from itertools import groupby
 from pathlib import Path
 from typing import List, Iterator, cast, Any
@@ -35,6 +36,7 @@ from domain.netex.model import (
 
 import zipfile
 from configuration import defaults
+from utils.aux_logging import prepare_logger
 
 
 def extract(archive: zipfile.ZipFile, database: Path) -> None:
@@ -325,6 +327,7 @@ if __name__ == '__main__':
     argument_parser = argparse.ArgumentParser(description='Convert prepared lmdb database into GTFS')
     argument_parser.add_argument('netex', type=str, help='The lmdb database')
     argument_parser.add_argument('gtfs', type=str, help='The output gtfs filename')
-    argument_parser.add_argument('--log_file', type=str, required=False, help='the logfile')  # TODO: use logger in this file
+    argument_parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = argument_parser.parse_args()
+    prepare_logger(logging.INFO, args.log_file)
     main(args.netex, args.gtfs)

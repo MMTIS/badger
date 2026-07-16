@@ -21,6 +21,15 @@ from domain.netex.model import (
 import re
 from storage.mdbx.core.implementation import MdbxStorage
 
+def avv_sjp_order(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyPattern, None, None]:
+    for sjp in db_read.iter_only_objects(txn, ServiceJourneyPattern):
+        sjp: ServiceJourneyPattern
+        i: int = 0
+        for pis in sjp.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern:
+            i += 1
+            pis.order = i
+
+        yield sjp
 
 def avv_service_journey_operator(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
     line_operator_ref = {line.id: line.operator_ref for line in db_read.iter_only_objects(txn, Line)}

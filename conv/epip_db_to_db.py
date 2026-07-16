@@ -28,6 +28,7 @@ from domain.netex.model import (
     DefaultConnection,
     FlexibleLine,
     Notice,
+    NoticeAssignment,
     PassengerStopAssignment,
     ServiceJourneyInterchange,
     SiteConnection,
@@ -54,7 +55,7 @@ from transformers.epip import (
     epip_service_journey_generator,
     epip_service_journey_interchange,
 )
-from transformers.ivu import avv_service_journey_operator, avv_vehicle_type_short_name, avv_quay_name
+from transformers.ivu import avv_service_journey_operator, avv_vehicle_type_short_name, avv_quay_name, avv_sjp_order
 from transformers.projection import reprojection_update
 from transformers.scheduledstoppoint import infer_locations_from_quay_or_stopplace_and_apply
 
@@ -169,10 +170,13 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                         # TransportAdministrativeZone,
                         # VehicleType,
                         ResponsibilitySet,
+                        Notice,
+                        NoticeAssignment,
                         # TopographicPlace,
                         # Network,
-                        # DestinationDisplay,
+                        DestinationDisplay,
                         PassengerStopAssignment,
+                        VehicleType
                     ]:
                         # We need to have something like a backwards compatible copy,
                         # that takes the MultilingualString and only uses the features of NeTEx 1.3
@@ -194,14 +198,21 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
 
                     target_db.insert_any_object_on_queue(txn_write, infer_directions_from_sjps_and_apply(target_db, txn_write, generator_defaults))
 
+                    # TODO: apply NoticeAssignment directly on ServiceJourney (per EPIP)
+
                     # Reprojection update would copy the entire database, instead we would actually want to filter what we introduce,
                     # If we take a national stop registry it will have all the points, but we would want to limit this to the objects that
                     # we would have queried.
-                    target_db.insert_any_object_on_queue(txn_write, reprojection_update(target_db, txn_write, "urn:ogc:def:crs:EPSG::4326"))
+                    target_db.insert_any_object_on_queue(txn_write, reprojection_update(target_db, txn_write, "urn:ogc:def:crs:EPSG::4326", force_latlon=True))
 
                     target_db.insert_any_object_on_queue(txn_write, avv_service_journey_operator(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_vehicle_type_short_name(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_quay_name(target_db, txn_write))
+                    target_db.insert_any_object_on_queue(txn_write, avv_sjp_order(target_db, txn_write))
+
+
+
+                    # TODO: overwrite with a single version
 
             txn_write.commit()
 

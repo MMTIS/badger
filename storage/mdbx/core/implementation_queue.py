@@ -1,6 +1,9 @@
+import logging
 from pathlib import Path
 from typing import Iterable, Any
 import multiprocessing as mp
+
+from utils.aux_logging import log_all
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
@@ -16,7 +19,7 @@ class MdbxStorageQueue(MdbxStorage):
         self.queue = queue
 
     def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
-        print(klass)
+        log_all(logging.DEBUG, f"[queue] insert_objects_on_queue {klass}")
 
         this_class_idx = self.class_idx[klass]
 

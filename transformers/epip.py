@@ -12,6 +12,7 @@ from dateutil.rrule import rrule, DAILY
 from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
+from domain.netex import Block
 from domain.netex.indexes.byid import getIndex
 from domain.netex.services.recursive_attributes import recursive_attributes
 from domain.netex.services.refs import getRef, getFakeRef
@@ -37,6 +38,8 @@ from domain.netex.model import (
     GeneralFrame,
     GeneralFrameMembersRelStructure,
     ServiceJourney,
+    Notice,
+    NoticeAssignment,
     StopPlace,
     CompositeFrame,
     FramesRelStructure,
@@ -126,7 +129,7 @@ from domain.netex.model import (
     DayTypeRef,
     EntityStructure,
     Locale,
-    NameOfClassOperatingPeriodRefStructureType, TextType,
+    NameOfClassOperatingPeriodRefStructureType, TextType, ServiceJourneyRef
 )
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
@@ -547,6 +550,8 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
     day_types_ids: Set[str] = set()
     uic_operating_periods_ids: Set[str] = set()
     day_type_assignments_ids: Set[str] = set()
+    notice_assignments: dict[str, Notice] = dict()
+    vehicle_types: dict[str, VehicleType] = dict()
 
     # availability_conditions: Dict[str, AvailabilityCondition] = {}
     # day_types: Dict[str, DayType] = {}
@@ -669,6 +674,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
+            log_all(logging.INFO, f'{service_journey_pattern.id}')
             yield service_journey_pattern
 
             # TODO: We might be able to avoid it if we work with prefix keys
@@ -685,19 +691,31 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         sj.time_demand_type_ref = None
         sj.key_list = None
         sj.private_code = None
-        sj.train_numbers = None
+        sj.train_numbers = None # Leonard, this must be removed
         sj.extensions = None
         sj.notice_assignments = None
         sj.calls = None
         sj.link_sequence_projection_ref_or_link_sequence_projection = None
         sj.journey_pattern_view = None
         sj.direction_type = None
+        sj.vehicle_type_ref_or_train_ref = vehicle_types.get(sj.id, None) if sj.vehicle_type_ref_or_train_ref is None else None
 
         # TODO: prevent caching altogether?
         # db_read.clean_cache()
         yield sj
 
     def query(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
+        # for notice_assignment in db_read.iter_only_objects(txn, NoticeAssignment):
+        #    notice_assignment: NoticeAssignment
+        #    # Maybe implement this via the reference table directly?
+        #    if notice_assignment.noticed_object_ref.name_of_ref_class == NameOfClass.SERVICE_JOURNEY:
+        #        notice_assignments[notice_assignment.noticed_object_ref.ref] = notice_assignment.notice_ref
+
+        for block in db_read.iter_only_objects(txn, Block):
+            for sjr in block.journeys.choice:
+                if isinstance(sjr, ServiceJourneyRef):
+                    vehicle_types[sjr.ref] = block.vehicle_type_ref_or_train_ref
+
         for sj in db_read.iter_only_objects(txn, ServiceJourney):
             yield from process(sj, db_read, txn, generator_defaults)
 
@@ -993,9 +1011,9 @@ def export_epip_network_offer(
     txn: TXN,
     composite_frame_id: str = "EU_NETWORK_OFFER",
     type_of_frame_ref: TypeOfFrameRef = TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0'),
+    default_locale: LocaleStructure = LocaleStructure(default_language="nl", time_zone="Europe/Amsterdam")
 ) -> PublicationDelivery:
     # Maybe generalize this for other profiles too
-    default_locale: Locale | None = None
     default_codespace: Codespace | None = None
     frame_defaults: VersionFrameDefaultsStructure
     # TODO:
@@ -1279,6 +1297,9 @@ def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_d
         """
 
     yield from query1(db_read, txn)
+
+def epip_service_journey_notices(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
+    print(sys._getframe().f_code.co_name)
 
 
 """

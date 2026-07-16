@@ -1,7 +1,7 @@
 import traceback
 from pathlib import Path
 
-from storage.mdbx.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.references import resolve, resolve_embeddings, resolve_embeddings_index
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
 from storage.mdbx.core.implementation import MdbxStorage
@@ -17,14 +17,19 @@ def netex_to_db(filenames: set[Path], database: Path, clean_database: bool = Tru
             storage.clean()
         """
 
+
         interesting_classes = get_interesting_classes()
         for filename in filenames:
             xml_storage = XmlStorage(filename)
             for sub_file, real_filename in xml_storage.open_netex_file():
+                log_all(logging.INFO, f"[netex_to_db] loading {real_filename}")
                 insert_database(storage, interesting_classes, sub_file)
 
+        log_all(logging.INFO, "[netex_to_db] resolving references")
         resolve(storage)
-        resolve_embeddings(storage)
+        log_all(logging.INFO, "[netex_to_db] resolving embeddings via index")
+        resolve_embeddings_index(storage)
+        log_all(logging.INFO, f"[netex_to_db] done: {database}")
 
 
 def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
@@ -48,11 +53,15 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
 if __name__ == '__main__':
     import argparse
 
+    from utils.aux_logging import prepare_logger
+
     argument_parser = argparse.ArgumentParser(description='Import any NeTEx source into lmdb')
     argument_parser.add_argument('netex', nargs='+', default=[], help='NeTEx files')
     argument_parser.add_argument('database', type=str, help='The lmdb to be overwritten with the NeTEx context')
     argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=True)
+    argument_parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = argument_parser.parse_args()
+    prepare_logger(logging.INFO, args.log_file)
 
     try:
         main(args.netex, args.database, args.clean_database)

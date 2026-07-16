@@ -1,7 +1,10 @@
 import inspect
+import logging
 import warnings
 from typing import IO, Any
 from zoneinfo import ZoneInfo
+
+from utils.aux_logging import log_once
 
 from xsdata.formats.dataclass.context import XmlContext
 from xsdata.formats.dataclass.parsers import XmlParser
@@ -180,8 +183,7 @@ def insert_database(
 
             elif localname == "TypeOfFrameRef":
                 if type_of_frame_filter is not None and element.attrib["ref"] not in type_of_frame_filter:
-                    # TODO: log a single warning that an unknown TypeOfFrame is found, and is not processed
-                    print(f"{element.attrib['ref']} is not a known TypeOfFrame")
+                    log_once(logging.WARNING, element.attrib["ref"], f"{element.attrib['ref']} is not a known TypeOfFrame")
                     skip_frame = True
 
             if localname in all_frames:

@@ -164,7 +164,7 @@ class RoutesProfile:
                                 line_string.id = "LineString_" + object_id
 
                                 sl = ServiceLink(
-                                    id=getId(ServiceLink, generator_defaults['codespace'], id=object_id),
+                                    id=getId(generator_defaults['codespace'], ServiceLink, id=object_id),
                                     version=route.version,
                                     distance=distance,
                                     from_point_ref=project(from_ssp, ScheduledStopPointRefStructure),

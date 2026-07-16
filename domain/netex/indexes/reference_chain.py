@@ -1,9 +1,6 @@
 import inspect
 from collections import defaultdict
-import inspect
 
-from collections import defaultdict
-import inspect
 
 def build_transitive_instance_clusters(module, stop_class):
     """
@@ -11,22 +8,10 @@ def build_transitive_instance_clusters(module, stop_class):
     that share the same VersionStructure or ValueStructure lineage.
     """
     # 1️⃣ Alle dataclass subclasses van stop_class ophalen
-    classes = [
-        cls for name, cls in inspect.getmembers(module, inspect.isclass)
-        if issubclass(cls, stop_class)
-        and cls is not stop_class
-        and hasattr(cls, "__dataclass_fields__")
-    ]
+    classes = [cls for name, cls in inspect.getmembers(module, inspect.isclass) if issubclass(cls, stop_class) and cls is not stop_class and hasattr(cls, "__dataclass_fields__")]
 
     # 2️⃣ Alleen concrete instanties (geen *VersionStructure of *Dummy of *ValueStructure)
-    concrete_classes = [
-        cls for cls in classes
-        if not (
-            cls.__name__.endswith("VersionStructure")
-            or cls.__name__.endswith("ValueStructure")
-            or cls.__name__.endswith("Dummy")
-        )
-    ]
+    concrete_classes = [cls for cls in classes if not (cls.__name__.endswith("VersionStructure") or cls.__name__.endswith("ValueStructure") or cls.__name__.endswith("Dummy"))]
 
     # 3️⃣ Vind hoogste structure class (VersionStructure of ValueStructure)
     highest_structure_map = {}
@@ -71,13 +56,15 @@ def build_transitive_instance_clusters(module, stop_class):
 
     return transitive_clusters
 
+
 if __name__ == "__main__":
     import domain.netex.model
-    x = build_transitive_instance_clusters(domain.netex.model,  domain.netex.model.DataManagedObjectStructure)
-    print('JourneyPattern', x[domain.netex.model.JourneyPattern])
-    print('ServiceJourneyPattern', x[domain.netex.model.ServiceJourneyPattern])
-    print('FareScheduledStopPoint', x[domain.netex.model.FareScheduledStopPoint])
-    print('ScheduledStopPoint', x[domain.netex.model.ScheduledStopPoint])
-    print('ActivationPoint', x[domain.netex.model.ActivationPoint])
-    print('TimingPoint', x[domain.netex.model.TimingPoint])
-    print('Link', x[domain.netex.model.Link])
+
+    x = build_transitive_instance_clusters(domain.netex.model, domain.netex.model.DataManagedObjectStructure)
+    print("JourneyPattern", x[domain.netex.model.JourneyPattern])
+    print("ServiceJourneyPattern", x[domain.netex.model.ServiceJourneyPattern])
+    print("FareScheduledStopPoint", x[domain.netex.model.FareScheduledStopPoint])
+    print("ScheduledStopPoint", x[domain.netex.model.ScheduledStopPoint])
+    print("ActivationPoint", x[domain.netex.model.ActivationPoint])
+    print("TimingPoint", x[domain.netex.model.TimingPoint])
+    print("Link", x[domain.netex.model.Link])

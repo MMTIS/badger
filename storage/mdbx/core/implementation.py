@@ -1,3 +1,5 @@
+import logging
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from sys import exception
@@ -12,6 +14,7 @@ from domain.netex.model import (
     EntityStructure,
     NoticeAssignment,
     PassengerStopAssignment,
+    ScheduledStopPoint,
     ServiceJourneyPattern,
     ServiceJourney,
     DayTypeAssignment,
@@ -21,15 +24,20 @@ from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
 from storage.mdbx.serialization.byteserializer import ByteSerializer
+from utils.aux_logging import log_all
 
 DB_CLASS_IDX = bytes(b'_class_idx')
 DB_UNRESOLVED = bytes(b'_unresolved')
 DB_ID_IDX = bytes(b'_id_idx')
 DB_REFERENCE_OUTWARD = bytes(b'_reference_outward')
+DB_REFERENCE_INWARD = bytes(b'_reference_inwards')
+DB_EMBEDDED_ID_IDX = bytes(b'_embedded_id_idx')
 
 DB_UNRESOLVED_FLAGS = MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT
 DB_ID_IDX_FLAGS = MDBXDBFlags.MDBX_DB_DEFAULTS
+DB_EMBEDDED_ID_IDX_FLAGS = MDBXDBFlags.MDBX_DB_DEFAULTS
 DB_REFERENCE_OUTWARD_FLAGS = MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP
+DB_REFERENCE_INWARD_FLAGS = MDBXDBFlags.MDBX_INTEGERKEY | MDBXDBFlags.MDBX_DUPSORT | MDBXDBFlags.MDBX_DUPFIXED | MDBXDBFlags.MDBX_INTEGERDUP
 
 class MdbxStorage:
     readonly: bool
@@ -140,7 +148,7 @@ class MdbxStorage:
                 for db_name, _ in cur.iter():
                     dbi = txn.open_map(name=db_name, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
                     if dbi:
-                        dbi.drop(delete=True)
+                        dbi.drop(txn, delete=True)
             txn.commit()
         self._populate_class_idx()
 
@@ -209,7 +217,7 @@ class MdbxStorage:
             obj = self.load_object_by_full_key(txn, full_reference)
             if skip_existing:
                 if obj.__class__ not in clazzes:
-                    print(obj.__class__, clazzes)
+                    log_all(logging.DEBUG, f"yielding unexpected class {obj.__class__} not in interesting classes {clazzes}")
                     yield obj
             else:
                 yield obj
@@ -331,14 +339,46 @@ class MdbxStorage:
                 if reference_key == full_key:
                     yield referencing_key
 
-    def _load_references_inwards_by_fullkeys(self, txn: TXN, full_keys: set[bytes]) -> Generator[bytes, None, None]:
+    def _load_references_inwards_by_fullkeys(self, txn: TXN, full_keys: set[bytes]) -> Generator[tuple[bytes, bytes], None, None]:
         # This will do everything in one sequential scan
         db = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
                 if reference_key in full_keys:
-                    yield referencing_key
+                    yield reference_key, referencing_key
+
+    def _index_references_inwards(self, txn: TXN, force=False) -> Generator[tuple[bytes, bytes], None, None]:
+        create = True
+        try:
+            db_inward = txn.open_map(DB_REFERENCE_INWARD, flags=DB_REFERENCE_INWARD_FLAGS)
+            create = db_inward.get_stat(txn).ms_entries > 0 or force
+        except:
+            pass
+        finally:
+            if create:
+                db_inward = txn.create_map(DB_REFERENCE_INWARD, flags=DB_REFERENCE_INWARD_FLAGS)
+                db_inward.drop(txn, delete=False)
+                db = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
+                cursor = txn.cursor(db)
+
+                for it in cursor.iter_dupsort_rows():
+                    for referencing_key, reference_key in it:
+                        db_inward.put(txn, reference_key, referencing_key)
+
+    def _load_references_inwards_by_fullkeys_index(self, txn: TXN, full_keys: set[bytes]) -> Generator[bytes, None, None]:
+        db = txn.open_map(DB_REFERENCE_INWARD, flags=DB_REFERENCE_INWARD_FLAGS)
+        cursor = txn.cursor(db)
+
+        # Maybe sort full_keys?
+        for full_key in full_keys:
+            for it in cursor.iter_dupsort_rows(start_key=full_key):
+                for reference_key, referencing_key in it:
+                    if reference_key != full_key:
+                        break
+
+                    yield reference_key, referencing_key
+                break
 
     def _load_references_inwards(self, txn: TXN, full_key: bytes) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         for full_key in self._load_references_inwards_by_fullkey(txn, full_key):
@@ -390,18 +430,24 @@ class MdbxStorage:
     def load_references_by_object_values_dfs(
         self,
         txn: TXN,
-        full_key: bytes,
-        inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment},
+        full_keys: list[bytes],
+        inward_classes: set[type[EntityStructure]] = {NoticeAssignment, DayTypeAssignment},
+        conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {(PassengerStopAssignment, ScheduledStopPoint)},
+        visited: set[bytes] = set()
     ) -> Generator[EntityStructure, None, None]:
 
-        stack = [full_key]
-        visited: set[bytes] = set()
+        stack = list(full_keys)
 
         # Ideally we would only check objects that would make sense to check
         clazz_idxs = [self.class_idx[clazz] for clazz in inward_classes]
 
+        conditional = defaultdict(set)
+        for f, t in conditional_inward_classes:
+            conditional[self.class_idx[t]].add(self.class_idx[f])
+
         while stack:
             to_visit_inwards: set[bytes] = set([])
+
             while stack:
                 identifier = stack.pop()
 
@@ -411,18 +457,28 @@ class MdbxStorage:
                     full_key = identifier
                     obj = self.load_object_by_full_key(txn, full_key)
                     if obj:
+                        # print(obj.id)
                         yield obj
 
                         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
-                        if this_clazz_idx in clazz_idxs:
+                        if this_clazz_idx in clazz_idxs or this_clazz_idx in conditional:
                             to_visit_inwards.add(full_key)
 
-                        for _referenced_full_key in self.load_references_by_clazz_full_key(txn, full_key, False):
-                            stack.append(_referenced_full_key)
+                        for referenced_full_key in self.load_references_by_clazz_full_key(txn, full_key, False):
+                            # TODO: We could move the visited check here? we could also make our stack a set?
+                            stack.append(referenced_full_key)
 
-            for _referenced_full_key in self._load_references_inwards_by_fullkeys(txn, to_visit_inwards):
-                if _referenced_full_key not in visited:
-                    stack.append(_referenced_full_key)
+            for referencing_full_key, referenced_full_key in self._load_references_inwards_by_fullkeys_index(txn, to_visit_inwards):
+                # print("by_fullkeys", referenced_full_key)
+                if referenced_full_key not in visited:
+                    referenced_clazz_idx, _referenced_key = self.serializer.full_key_to_idx(referenced_full_key)
+                    if referenced_clazz_idx in clazz_idxs:
+                        stack.append(referenced_full_key)
+                    else:
+                        referencing_clazz_idx, _referencing_key = self.serializer.full_key_to_idx(referencing_full_key)
+                        if referencing_clazz_idx in conditional.get(referenced_clazz_idx, {}):
+                            # print("by conditional", referenced_full_key)
+                            stack.append(referenced_full_key)
 
     def load_object_by_id_version(
         self, txn: TXN, id: str, clazz: type[EntityStructure], version: Optional[str] = None
@@ -445,6 +501,7 @@ class MdbxStorage:
     def load_object_by_full_key(self, txn: TXN, full_key: bytes) -> Optional[EntityStructure]:
         this_clazz_idx, key = self.serializer.full_key_to_idx(full_key)
         clazz = self.idx_class[this_clazz_idx]
+
         with txn.open_map(name=this_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS) as db:
             value = db.get(txn, key)
             if value:
@@ -465,6 +522,7 @@ class MdbxStorage:
             # idx = ((int.from_bytes(this_class_idx, 'little') << 32) | int.from_bytes(key, 'little')).to_bytes(8, 'little')
             return obj
 
+    # TODO: It would be nice if we could do a caching layer here
     def load_object_by_reference(self, txn: TXN, ref: VersionOfObjectRefStructure) -> Optional[EntityStructure]:
         with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
             # TODO: With our current schema, we always will have a name_of_ref_class filled in.
@@ -480,7 +538,7 @@ class MdbxStorage:
 
             if True:
                 # TODO: Fallback should not happen, because the references should already have been updated, but since we are here
-                print("Fallback...")
+                log_all(logging.WARNING, f"[load_object_by_reference] fallback prefix-scan for ref {ref.ref}")
                 prefix = self.serializer.encode_prefix(str(ref.ref), None, False)
                 cursor = txn.cursor(db_id_idx)
                 for check_key, resolved_idx in cursor.iter(prefix):
