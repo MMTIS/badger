@@ -29,7 +29,7 @@
     {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
     {"script": "tools.gtfs_sanitize_stops", "args": "%%dir%%/08-%%block%%-gtfs.zip"},
     {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-    {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+    {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
     ]
 },
 {
@@ -52,7 +52,7 @@
 },
 {
     "block": "lux",
-    "worked":"testing",
+    "worked":"testing  AuthorityRef missing",
     "url":"https://data.public.lu/fr/datasets/horaires-et-arrets-des-transport-publics-netex/",
     "download_url":"https://data.public.lu/fr/datasets/r/e3c3f7b2-7867-451c-84fd-91f6d939c37e",
     "scripts": [
