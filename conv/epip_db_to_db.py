@@ -205,7 +205,8 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                     # we would have queried.
                     target_db.insert_any_object_on_queue(txn_write, reprojection_update(target_db, txn_write, "urn:ogc:def:crs:EPSG::4326", force_latlon=True))
 
-                    target_db.insert_any_object_on_queue(txn_write, avv_service_journey_operator(target_db, txn_write))
+                    # already done in input
+                    # target_db.insert_any_object_on_queue(txn_write, avv_service_journey_operator(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_vehicle_type_short_name(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_quay_name(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_sjp_order(target_db, txn_write))
