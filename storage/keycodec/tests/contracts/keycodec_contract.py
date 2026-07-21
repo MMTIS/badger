@@ -7,8 +7,6 @@ def assert_keycodec(
     keycodec: Any,
     value: Any,
 ) -> None:
-    encoded = keycodec.encode(value)
+    encoded = keycodec.encode_obj(value)
 
-    assert isinstance(encoded, bytes), (
-        "Keycodec must return bytes"
-    )
+    assert isinstance(encoded, bytes), "Keycodec must return bytes"

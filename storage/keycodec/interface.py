@@ -1,28 +1,22 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 from domain.netex.model import EntityInVersionStructure
+from domain.netex.services.model_typing import Tid
+
 
 class KeyCodec(ABC):
     class_byte: dict[type, bytes]
 
-    def __init__(self, class_byte: dict):
+    def __init__(self, class_byte: dict[type[Tid], bytes]):
         self.class_byte = class_byte
 
     @abstractmethod
-    def encode(self, key: EntityInVersionStructure) -> bytes:
-        """
-        Convert logical object identity to MDBX key.
-        """
+    def encode_key(self, id: str, version: str | None, clazz: type[Tid] | None, include_clazz: bool = True) -> bytes:
         pass
 
     @abstractmethod
-    def prefix(
-        self,
-        key: EntityInVersionStructure,
-        version: bool = True,
-        class_idx: bool = True,
-    ) -> bytes:
-        """
-        Generate MDBX prefix for cursor iteration.
-        """
+    def encode_obj(self, obj: EntityInVersionStructure, include_clazz: bool = True) -> bytes:
+        pass
+
+    @abstractmethod
+    def split_key(self, key: bytes) -> list[bytes]:
         pass
