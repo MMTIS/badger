@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-from typing import Generic, Sequence, TypeVar
+from typing import Sequence, Any
 
 from storage.objectserializer.interface import (
     ByteCodec,
     ObjectSerializer,
 )
 
-T = TypeVar("T")
 
-
-class PipelineSerializer(Generic[T], ObjectSerializer[T]):
+class PipelineSerializer(ObjectSerializer):
     """
     Serializer pipeline.
 
@@ -24,13 +22,13 @@ class PipelineSerializer(Generic[T], ObjectSerializer[T]):
 
     def __init__(
         self,
-        object_serializer: ObjectSerializer[T],
+        object_serializer: ObjectSerializer,
         codecs: Sequence[ByteCodec] = (),
     ):
         self._object_serializer = object_serializer
         self._codecs = tuple(codecs)
 
-    def dumps(self, obj: T) -> bytes:
+    def dumps(self, obj: Any) -> bytes:
         data = self._object_serializer.dumps(obj)
 
         for codec in self._codecs:
@@ -38,7 +36,7 @@ class PipelineSerializer(Generic[T], ObjectSerializer[T]):
 
         return data
 
-    def loads(self, data: bytes) -> T:
+    def loads(self, data: bytes) -> Any:
         for codec in reversed(self._codecs):
             data = codec.decode(data)
 
