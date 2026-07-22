@@ -1,7 +1,7 @@
 import traceback
 from pathlib import Path
 
-from storage.mdbx.core.references import resolve, resolve_embeddings, resolve_embeddings_index
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import insert_database, get_interesting_classes
 from storage.mdbx.core.implementation import MdbxStorage
@@ -9,14 +9,11 @@ from utils.aux_logging import log_all, log_flush
 import logging
 
 
-def netex_to_db(filenames: set[Path], database: Path, clean_database: bool = True) -> None:
+def netex_to_db(filenames: list[Path], database: Path, clean_database: bool = True) -> None:
     with MdbxStorage(database, readonly=False) as storage:
-        """
         if clean_database:
-            print("Is cleaned!")
+            log_all(logging.INFO, f"[netex_to_db] {database} is cleaned")
             storage.clean()
-        """
-
 
         interesting_classes = get_interesting_classes()
         for filename in filenames:
@@ -39,13 +36,17 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
         log_flush()
         exit(1)
 
-    paths: set[Path] = set([])
+    paths: list[Path] = []
     for filename in filenames:
         path = Path(filename)
-        if not path.exists():
-            log_all(logging.WARNING, f'{filename} does not exist.')
+        if path in paths:
+            log_all(logging.WARNING, f'{filename} is a duplicate.')
+
         else:
-            paths.add(path)
+            if not path.exists():
+                log_all(logging.WARNING, f'{filename} does not exist.')
+            else:
+                paths.append(path)
 
     netex_to_db(paths, Path(database), clean_database)
 
@@ -55,10 +56,10 @@ if __name__ == '__main__':
 
     from utils.aux_logging import prepare_logger
 
-    argument_parser = argparse.ArgumentParser(description='Import any NeTEx source into lmdb')
+    argument_parser = argparse.ArgumentParser(description='Import any NeTEx source into mdbx')
     argument_parser.add_argument('netex', nargs='+', default=[], help='NeTEx files')
     argument_parser.add_argument('database', type=str, help='The lmdb to be overwritten with the NeTEx context')
-    argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=True)
+    argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=False)
     argument_parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = argument_parser.parse_args()
     prepare_logger(logging.INFO, args.log_file)

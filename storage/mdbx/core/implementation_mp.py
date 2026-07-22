@@ -67,7 +67,7 @@ class MdbxStorageMP(MdbxStorage):
 
                 full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
                 for referenced_class_idx, ref, version in only_references(obj, self.serializer):
-                    unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
+                    unresolved_value = self.serializer.encode_key_idx(ref, version, referenced_class_idx)
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         self.queue.put(
@@ -97,7 +97,7 @@ class MdbxStorageMP(MdbxStorage):
                 self.queue.put(
                     (
                         DB_ID_IDX,
-                        self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True),
+                        self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__),
                         full_key,
                     )
                 )

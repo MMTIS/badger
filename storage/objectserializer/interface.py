@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Any
-
-T = TypeVar("T")
+from typing import Any
 
 
-class ObjectSerializer(Generic[T], ABC):
+class ObjectSerializer(ABC):
     """
     Converts Python objects to bytes and back.
     """
@@ -19,7 +17,7 @@ class ObjectSerializer(Generic[T], ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def loads(self, data: bytes) -> T:
+    def loads(self, data: bytes) -> Any:
         """
         Deserialize bytes.
         """

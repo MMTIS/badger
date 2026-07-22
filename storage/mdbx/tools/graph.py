@@ -1,9 +1,8 @@
 import logging
-from typing import Generator
+from storage.interface import Serializer
 
 from mdbx.mdbx import TXN
 
-from domain.netex.services.model_typing import Tid
 from utils.aux_logging import log_all
 from storage.mdbx.core.implementation import (
     MdbxStorage,
@@ -12,8 +11,6 @@ from storage.mdbx.core.implementation import (
 )
 
 from collections import defaultdict
-
-from collections import defaultdict, deque
 from typing import Dict, Set, List, Iterable, Any, Tuple
 
 # --- 1) graph bouwen (nodes uit DB_ID_IDX, edges uit DB_REFERENCE_OUTWARD) ---
@@ -115,7 +112,7 @@ def sort_scc_by_internal_indegree(members: Iterable[bytes], graph: Dict[bytes, S
             if v in members_set:
                 indeg[v] += 1
     # eerst hoge interne indegree (veel anderen verwijzen naar deze), dan type, dan key
-    return sorted(members_set, key=lambda n: (-indeg[n], storage.serializer.full_key_to_idx(n)[0], n))
+    return sorted(members_set, key=lambda n: (-indeg[n], Serializer.full_key_to_clazz(n), n))
 
 def greedy_minimize_forward_within_scc(members: Iterable[bytes], graph: Dict[bytes, Set[bytes]], storage, max_size: int = 500) -> List[bytes]:
     members = list(members)
@@ -131,7 +128,7 @@ def greedy_minimize_forward_within_scc(members: Iterable[bytes], graph: Dict[byt
         best_key = None
         for n in remaining:
             score = len(out_inside[n])                          # minder is beter
-            cls_idx = storage.serializer.full_key_to_idx(n)[0]
+            cls_idx = Serializer.full_key_to_clazz(n)
             key = (score, cls_idx, n)
             if best is None or key < best_key:
                 best = n
@@ -168,12 +165,12 @@ def order_graph(graph: Dict[bytes, Set[bytes]], storage, scc_lookahead_threshold
     scc_meta = {}
     for i, members in enumerate(sccs):
         # compute min class_idx as representative priority
-        class_idxs = [storage.serializer.full_key_to_idx(n)[0] for n in members]
+        class_idxs = [Serializer.full_key_to_clazz(n) for n in members]
         min_class = min(class_idxs) if class_idxs else 0
         size = len(members)
         if size == 1:
             # singleton: deterministic single-member list (still sort by class_idx,key for stability)
-            ordered_members = sorted(members, key=lambda n: (storage.serializer.full_key_to_idx(n)[0], n))
+            ordered_members = sorted(members, key=lambda n: (Serializer.full_key_to_clazz(n), n))
         else:
             if size <= scc_lookahead_threshold:
                 ordered_members = greedy_minimize_forward_within_scc(members, graph, storage, max_size=scc_lookahead_threshold)

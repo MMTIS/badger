@@ -8,7 +8,7 @@ from domain.netex.model import DataManagedObject, EntityStructure, LineString, L
 from domain.netex.services.model_typing import Tid, Tref
 from domain.netex.services.utils import get_boring_classes
 from storage.interface import Serializer
-from utils import netex_monkeypatching
+from utils import netex_monkeypatching  # noqa: F401
 from utils.mro_attributes import list_attributes
 
 
@@ -135,10 +135,30 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                     if f.default is not MISSING and f.default is not None:
                         obj.name_of_ref_class = f.default
                         ref_class = serializer.name_object[obj.name_of_ref_class.value]
+
+                    # TODO: Remove hack when https://github.com/tefra/xsdata/issues/1184 is resolved
+                    elif obj.__class__.__name__.endswith("RefStructure"):
+                        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                        if obj.name_of_ref_class in serializer.name_object:
+                            ref_class = serializer.name_object[obj.name_of_ref_class]
+                        else:
+                            obj.name_of_ref_class = "DataManagedObject"
+                            ref_class = DataManagedObject
+
+                    elif obj.__class__.__name__.endswith("Ref"):
+                        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+                        if obj.name_of_ref_class in serializer.name_object:
+                            ref_class = serializer.name_object[obj.name_of_ref_class]
+                        else:
+                            obj.name_of_ref_class = "DataManagedObject"
+                            ref_class = DataManagedObject
+
                     else:
                         # TODO: We should handle the case were we really have no clue, no default, not set
                         obj.name_of_ref_class = "DataManagedObject"
                         ref_class = DataManagedObject
+
+
                 else:
                     ref_class = serializer.name_object[obj.name_of_ref_class.value]
 
@@ -151,6 +171,22 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                     if f.default is not MISSING and f.default is not None:
                         obj.name_of_ref_class = f.default
                         ref_class = serializer.name_object[obj.name_of_ref_class.value]  # because this one has a value
+
+                    elif obj.__class__.__name__.endswith("RefStructure"):
+                        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                        if obj.name_of_ref_class in serializer.name_object:
+                            ref_class = serializer.name_object[obj.name_of_ref_class]
+                        else:
+                            obj.name_of_ref_class = "DataManagedObject"
+                            ref_class = DataManagedObject
+
+                    elif obj.__class__.__name__.endswith("Ref"):
+                        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+                        if obj.name_of_ref_class in serializer.name_object:
+                            ref_class = serializer.name_object[obj.name_of_ref_class]
+                        else:
+                            obj.name_of_ref_class = "DataManagedObject"
+                            ref_class = DataManagedObject
 
                     else:
                         # TODO: We should handle the case were we really have no clue, no default, not set
@@ -172,7 +208,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                     yield result
 
 
-def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
+def only_reference_objects(serializer: Serializer, deserialized: Tid) -> Generator[Tref, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
@@ -183,7 +219,18 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
             # continue
 
             if obj.name_of_ref_class is None:
-                obj.name_of_ref_class = "DataManagedObject"
+                if obj.__class__.__name__.endswith("RefStructure"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-12]
+                    if obj.name_of_ref_class not in serializer.name_object:
+                        obj.name_of_ref_class = "DataManagedObject"
+
+                elif obj.__class__.__name__.endswith("Ref"):
+                    obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+                    if obj.name_of_ref_class not in serializer.name_object:
+                        obj.name_of_ref_class = "DataManagedObject"
+
+                else:
+                    obj.name_of_ref_class = "DataManagedObject"
                 # Hack, because NeTEx does not define the default name of ref class yet
                 # if obj.__class__.__name__.endswith("RefStructure"):
                 #     obj.name_of_ref_class = obj.__class__.__name__[0:-12]
@@ -203,7 +250,7 @@ def embedding_obj_iter(serializer: Serializer, deserialized: Tid, interesting_cl
         if obj.__class__.__name__ in serializer.name_object:  # TODO: The object should not even enter here
             if hasattr(obj, "id") and obj.id is not None:
                 if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
-                    yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj, path
+                    yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj, path
 
 
 def only_embedding(serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]], ignore: Optional[set[type[Tid]]] = None) -> Generator[bytes, None, None]:
@@ -215,4 +262,4 @@ def only_embedding(serializer: Serializer, deserialized: Tid, interesting_classe
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
             if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
-                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj

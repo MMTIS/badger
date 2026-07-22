@@ -25,7 +25,7 @@ dependencies = [
     "paramiko",
     "types-paramiko",
     "tqdm",
-    "xsdata[cli,soap,lxml]>=25.7",
+    "xsdata[cli,soap,lxml]==26.2",
 ]
 requires-python = ">=3.12"
 

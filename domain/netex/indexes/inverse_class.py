@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import fields, is_dataclass
-from typing import Any, Dict, Iterable, List, Set, Type, Union, get_args, get_origin
+from typing import Any, Dict, Iterable, List, Set, Type, Union, get_args, get_origin, get_type_hints
+from types import NoneType
 
 from domain.netex.model import GeneralFrameMembersRelStructure
 
@@ -59,8 +60,9 @@ def _collect_contained_types(clazz: Type[Any], ignore_classes: Set[Type[Any]], s
         seen = set()
 
     result: Set[Type[Any]] = set()
+    hints = get_type_hints(clazz)
     for f in fields(clazz):
-        candidates = _extract_types(f.type)
+        candidates = _extract_types(hints[f.name])
         for c in candidates:
             if not _is_valid_dataclass(c, ignore_classes):
                 continue
@@ -73,22 +75,25 @@ def _collect_contained_types(clazz: Type[Any], ignore_classes: Set[Type[Any]], s
     return result
 
 
-def _extract_types(tp: Any) -> Set[Type[Any]]:
-    """
-    Haal alle relevante dataclass types uit een typehint.
-    Bijvoorbeeld: list[X] -> {X}, Optional[Y] -> {Y}
-    """
-    result: Set[Type[Any]] = set()
+def _extract_types(tp: Any) -> set[type]:
+    """Recursief alle concrete classes uit een typehint halen."""
+
+    if tp is None or tp is NoneType:
+        return set()
 
     origin = get_origin(tp)
-    args = get_args(tp)
 
+    # Gewone class
     if origin is None:
-        if isinstance(tp, type):
-            result.add(tp)
-    else:
-        for arg in args:
-            result |= _extract_types(arg)
+        if isinstance(tp, type) and tp is not NoneType:
+            return {tp}
+        return set()
+
+    result: set[type] = set()
+
+    # list[T], dict[K, V], tuple[T], Union[A, B], A | B, etc.
+    for arg in get_args(tp):
+        result |= _extract_types(arg)
 
     return result
 

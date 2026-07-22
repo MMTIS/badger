@@ -37,7 +37,7 @@ class MyXmlSerializer(Serializer):
         self.serializer = XmlSerializer(config=serializer_config)
 
     @staticmethod
-    def encode_key(id: str | None, version: str | None, clazz: type[T], include_clazz: bool = False) -> bytes:
+    def encode_key(id: str | None, version: str | None, clazz: type[T]) -> bytes:
         return ((id or '') + "-" + (version or 'any')).encode("utf-8")
 
     @staticmethod
