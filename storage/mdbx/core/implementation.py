@@ -151,7 +151,7 @@ class MdbxStorage:
 
     def fetch_all_references_by_class(
         self, txn: TXN, clazzes: set[type[EntityStructure]], skip_existing: bool = False
-    ) -> Generator[type[EntityStructure], None, None]:
+    ) -> Generator[EntityStructure, None, None]:
         # Scan for all collected objects, this delivers their keys, a full key needs to be created for the lookup in reference outward
         # Referenced objects may by itself introduce new references, hence it should be checked if the set contains (already) those
         # When the scan is complete, all referenced objects should be made available via the generator.
@@ -484,6 +484,8 @@ class MdbxStorage:
         if version is not None:
             db_id_idx = txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
             full_key = db_id_idx.get(txn, my_id)
+            if full_key is None:
+                return None
             return full_key, self.load_object_by_full_key(txn, full_key)
 
         else:
