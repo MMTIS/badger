@@ -36,7 +36,9 @@ netex.set_ref_types = frozenset(  # type: ignore
 # netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
 
 # TODO: dit gaat fout omdat we nu geen netex meer heten, maar domain.netex.model
-netex.set_all = frozenset({name: cls for name, cls in inspect.getmembers(netex, inspect.isclass) }) # if cls.__module__ == domain.netex.model.__name__})  # type: ignore[attr-defined]
+netex.set_all = frozenset(
+    {name: cls for name, cls in inspect.getmembers(netex, inspect.isclass)}
+)  # if cls.__module__ == domain.netex.model.__name__})  # type: ignore[attr-defined]
 
 GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
 
@@ -149,7 +151,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                     f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
                     if f.default is not MISSING and f.default is not None:
                         obj.name_of_ref_class = f.default
-                        ref_class = serializer.name_object[obj.name_of_ref_class.value] # because this one has a value
+                        ref_class = serializer.name_object[obj.name_of_ref_class.value]  # because this one has a value
 
                     else:
                         # TODO: We should handle the case were we really have no clue, no default, not set
@@ -201,10 +203,10 @@ def embedding_obj_iter(
         interesting_classes = serializer.class_idx.keys()
 
     for obj, path in recursive_attributes(deserialized, []):
-        if obj.__class__.__name__ in serializer.name_object: # TODO: The object should not even enter here
+        if obj.__class__.__name__ in serializer.name_object:  # TODO: The object should not even enter here
             if hasattr(obj, "id") and obj.id is not None:
                 if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
-                    yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj, path
+                    yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj, path
 
 
 def only_embedding(
@@ -218,4 +220,4 @@ def only_embedding(
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "id") and obj.id is not None:
             if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
-                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True), obj
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj

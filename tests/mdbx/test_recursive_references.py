@@ -9,7 +9,7 @@ from domain.netex.model import (
     TextType,
 )
 
-from storage.mdbx.core.references import resolve
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
 
 from tests.base import MdbxStorageTestCase
 
@@ -22,6 +22,13 @@ class TestRecursiveReferences(MdbxStorageTestCase):
             self.storage.insert_any_object_on_queue(txn_write, [line, route, sjp])
             txn_write.commit()
 
+        resolve(self.storage)
+        resolve_embeddings_index(self.storage)
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage._index_references_inwards(txn_write, force=True)
+            txn_write.commit()
+
         with self.storage.env.ro_transaction() as txn_read:
             result = self.storage.load_object_by_id_version(txn_read, "sjp1", ServiceJourneyPattern, "1")
             self.assertIsNotNone(result)
@@ -29,7 +36,7 @@ class TestRecursiveReferences(MdbxStorageTestCase):
             full_key, loaded_sjp = result
             self.assertEqual(loaded_sjp, sjp)
 
-            visited = list(self.storage.load_references_by_object_values_dfs(txn_read, full_key))
+            visited = list(self.storage.load_references_by_object_values_dfs(txn_read, [full_key]))
 
         visited_ids = {(obj.__class__, obj.id) for obj in visited}
         self.assertGreaterEqual(visited_ids, {(ServiceJourneyPattern, "sjp1"), (Route, "r1"), (Line, "l1")})
@@ -57,7 +64,7 @@ class TestRecursiveReferences(MdbxStorageTestCase):
             self.assertIsNotNone(result)
             assert result is not None
             full_key, _ = result
-            visited = list(self.storage.load_references_by_object_values_dfs(txn_read, full_key))
+            visited = list(self.storage.load_references_by_object_values_dfs(txn_read, [full_key]))
 
         visited_ids = [(obj.__class__, obj.id) for obj in visited]
         # Terminates despite the cycle, and `visited` yields each object exactly once.
