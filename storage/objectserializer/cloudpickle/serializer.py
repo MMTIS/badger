@@ -7,7 +7,7 @@ import cloudpickle
 from storage.objectserializer.interface import ObjectSerializer
 
 
-class CloudPickleSerializer(ObjectSerializer[Any]):
+class CloudPickleSerializer(ObjectSerializer):
     """
     Serializer based on cloudpickle.
     """
