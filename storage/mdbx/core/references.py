@@ -24,6 +24,7 @@ from storage.mdbx.core.implementation import (
 from mdbx.mdbx import TXN
 from typing import Optional, Generator
 
+
 def resolve_embeddings_iterable(
     storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[Tid]] = None, ignore: Optional[set[Tid]] = None
 ) -> Generator[tuple[bytes, type[EntityStructure], type[EntityStructure]], None, None]:
@@ -59,13 +60,14 @@ def resolve_embeddings_iterable(
         for candidate in embedding_obj_iter(storage.serializer, obj, interesting_classes, ignore):
             yield key, obj, candidate
 
+
 def resolve(storage: MdbxStorage) -> None:
+    log_all(logging.INFO, "[resolve] resolving references")
     if storage.readonly:
         raise
 
     # TODO: get exclusively from KeyCodec
     separator = bytes([10])
-
 
     seen_count = 0
 
@@ -74,7 +76,8 @@ def resolve(storage: MdbxStorage) -> None:
         db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
-        log_all(logging.INFO, "[resolve] resolving references")
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
+
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
             references_to_fix: list[tuple] = []
@@ -163,7 +166,9 @@ def resolve(storage: MdbxStorage) -> None:
                         else:
                             name_of_ref_class = reference.name_of_ref_class.value
 
-                        cmp_value = storage.serializer.encode_key(reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[name_of_ref_class])
+                        cmp_value = storage.serializer.encode_key(
+                            reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[name_of_ref_class]
+                        )
                         if value == cmp_value:
                             if class_change:
                                 referenced_class = storage.idx_class[referenced_class_idx]
@@ -179,9 +184,13 @@ def resolve(storage: MdbxStorage) -> None:
                 db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
                 db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
         txn.commit()
 
+
 def resolve_embeddings_index(storage: MdbxStorage):
+    log_all(logging.INFO, "[resolve] resolving embeddings")
+
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
     references_to_fix: list[tuple] = []
@@ -309,8 +318,7 @@ def resolve_embeddings_index(storage: MdbxStorage):
                             name_of_ref_class = reference.name_of_ref_class.value
 
                         cmp_value = storage.serializer.encode_key(
-                            reference.ref, getattr(reference, "version", "any"),
-                            storage.serializer.name_object[name_of_ref_class]
+                            reference.ref, getattr(reference, "version", "any"), storage.serializer.name_object[name_of_ref_class]
                         )
                         if value == cmp_value:
                             if class_change:
