@@ -39,8 +39,8 @@ As such, the processing has an audit trail.
 
 Our (de)serialisation takes place using [xsData](https://xsdata.readthedocs.io/en/latest/), via Python Data Classes.
 This guarantees us XML Schema compliance.
-Our intermediate presentation is serialised using [cloudpickle](https://github.com/cloudpipe/cloudpickle) and is stored in compressed [lz4](https://lmdb.readthedocs.io/en/release/) form.
-During the development of this software we have evaluated various database technologies, for our intermediate computing requirements [lmdb](https://lmdb.readthedocs.io/en/release/) is used.
+Our intermediate presentation is serialised using [cloudpickle](https://github.com/cloudpipe/cloudpickle) and is stored in compressed [lz4](https://lz4.github.io/lz4/) form.
+During the development of this software we have evaluated various database technologies, for our intermediate computing requirements [mdbx](https://github.com/erthink/libmdbx) is used.
 The processing of other CSV-based formats such as GTFS is mediated via  [DuckDB](https://duckdb.org/docs/stable/clients/python/overview.html).
 
 ### Extract, Transform, Load
@@ -61,25 +61,25 @@ In the case a different format is required, our intermediate NeTEx presentation 
 
 #### NeTEx EPIP example
 ```sh
-uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.lmdb
-uv run python -m conv.netex_db_to_generalframe path_to_input_netex.lmdb path_to_intermediate_presentation.xml.gz
-uv run python -m conv.epip_db_to_db path_to_input_netex.lmdb path_to_output_epip.lmdb
-uv run python -m conv.epip_db_to_xml path_to_output_epip.lmdb path_to_output_epip.xml.gz
+uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.mdbx
+uv run python -m conv.netex_db_to_generalframe path_to_input_netex.mdbx path_to_intermediate_presentation.xml.gz
+uv run python -m conv.epip_db_to_db path_to_input_netex.mdbx path_to_output_epip.mdbx
+uv run python -m conv.epip_db_to_xml path_to_output_epip.mdbx path_to_output_epip.xml.gz
 ```
 
 #### GTFS to NeTEx EPIP example
 ```sh
 uv run python -m conv.gtfs_import_to_db path_to_gtfs.zip path_to_gtfs.duckdb
-uv run python -m conv.gtfs_convert_to_db path_to_gtfs.duckdb path_to_intermediate.lmdb
-uv run python -m conv.epip_db_to_db path_to_intermediate.lmdb path_to_output_epip.lmdb
-uv run python -m conv.epip_db_to_xml path_to_output_epip.lmdb path_to_output_epip.xml.gz
+uv run python -m conv.gtfs_convert_to_db path_to_gtfs.duckdb path_to_intermediate.mdbx
+uv run python -m conv.epip_db_to_db path_to_intermediate.mdbx path_to_output_epip.mdbx
+uv run python -m conv.epip_db_to_xml path_to_output_epip.mdbx path_to_output_epip.xml.gz
 ```
 
 #### NeTEx EPIP to GTFS example
 ```sh
-uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.lmdb
-uv run python -m conv.gtfs_db_to_db path_to_input_netex.lmdb path_to_output_gtfs.lmdb
-uv run python -m conv.gtfs_db_to_gtfs path_to_output_gtfs.lmdb path_to_output_gtfs.zip
+uv run python -m conv.netex_to_db path_to_xml.gz path_to_input_netex.mdbx
+uv run python -m conv.gtfs_db_to_db path_to_input_netex.mdbx path_to_output_gtfs.mdbx
+uv run python -m conv.gtfs_db_to_gtfs path_to_output_gtfs.mdbx path_to_output_gtfs.zip
 ```
 
 
@@ -94,3 +94,6 @@ An object in, would be ideally flow as a new object towards the second database.
 For performance reasons we cannot always follow this pattern, because we would like to prevent database access and minimise computing power for already created (similar) objects.
 There are some custom compression patterns we use to retain prefix encoding, with fewer bytes used as table key, this only works for ASCII based ids.
 For writing towards XML we create generators that would be called exactly when the data is being serialised towards XML at element level, just in time.
+
+### Tools
+Badger comes with some tools. Those are described [here](./tools/README.md)

@@ -18,9 +18,7 @@ def split_path(path: str) -> list[str | int]:
     return split
 
 
-def replace_with_reference_inplace(
-    obj: T, path: str, klass: type[Tref] | None = None
-) -> None:
+def replace_with_reference_inplace(obj: T, path: str, klass: type[Tref] | None = None) -> None:
     split = split_path(path)
 
     attribute = resolve_attr(obj, split)

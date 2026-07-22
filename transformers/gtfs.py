@@ -3,53 +3,52 @@ import logging
 import sys
 import warnings
 from datetime import timedelta, datetime, time
-from typing import Generator, TypeVar, Iterable, Any, Iterator
+from typing import Generator, TypeVar, Any, cast, Iterable, Optional
+import itertools
 import copy
 
+from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDate, XmlDateTime
 
-from transformers.callsprofile import CallsProfile
-from netex import (
-    Line,
-    Branding,
+from domain.netex.indexes.byid import getIndex
+from domain.netex.model import (
     Operator,
-    Authority,
-    ResponsibilitySet,
-    StakeholderRoleTypeEnumeration,
+    Line,
     ServiceJourney,
-    TemplateServiceJourney,
-    ServiceJourneyPattern,
-    TimeDemandType,
-    RouteView,
-    RouteRef,
-    Route,
+    DayTypeRefsRelStructure,
     ValidityConditionsRelStructure,
     AvailabilityCondition,
     AvailabilityConditionRef,
-    DayType,
-    DayTypeAssignment,
-    OperatingPeriod,
-    ServiceCalendar,
-    DayTypesRelStructure,
-    OperatingPeriodRef,
-    UicOperatingPeriodRef,
-    OperatingDay,
-    DayTypeRef,
-    OperatingDaysRelStructure,
-    OperatingDayRefStructure,
-    UicOperatingPeriod,
-    OperatingDayRef,
-    PropertiesOfDayRelStructure,
-    PropertyOfDay,
-    DayOfWeekEnumeration,
-    DayTypeRefsRelStructure,
+    Branding,
+    Authority,
+    ResponsibilitySet,
+    StakeholderRoleTypeEnumeration,
+    ResponsibilitySetRef,
     Version,
+    OperatingPeriod,
+    DayTypeAssignment,
+    OperatingDay,
+    OperatingDayRef,
+    DayOfWeekEnumeration,
+    DayType,
+    UicOperatingPeriod,
+    DayTypeRef,
+    TimeDemandType,
+    Route,
+    RouteRef,
+    RouteView,
+    ServiceJourneyPattern,
+    ServiceCalendar,
+    UicOperatingPeriodRef,
+    OperatingPeriodRef,
 )
-from netexio.database import Database
-from netexio.dbaccess import load_generator, load_local, copy_table
+from domain.netex.model.name_of_class_operating_period_ref_structure_type import NameOfClassOperatingPeriodRefStructureType
+from domain.netex.services.refs import getRef, getFakeRef
+from storage.mdbx.core.implementation import MdbxStorage
+from transformers.callsprofile import CallsProfile
 from transformers.nordicprofile import NordicProfile
-from utils.refs import getRef, getIndex, getIndexByGroup
 from transformers.daytype import get_day_type_from_availability_condition, datetime_weekday_to_dow
+from utils.refs import getIndexByGroup
 from utils.utils import project
 from utils.aux_logging import log_all, log_once
 
@@ -58,51 +57,46 @@ import utils.netex_monkeypatching  # noqa: F401
 T = TypeVar("T")
 
 
-def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
+def gtfs_operator_line_memory(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Operator | Line, None, None]:
     operator: Operator
     print(sys._getframe().f_code.co_name)
-    lines: list[Line] = load_local(db_read, Line)
-    operators_local: list[Operator] = load_local(db_read, Operator)
+    lines: list[Line] = list(db_read.iter_only_objects(txn, Line))
+    operators_local: list[Operator] = list(db_read.iter_only_objects(txn, Operator))
 
     operators: dict[str, Operator] = {}
     for line in lines:
         # GTFS only has the concept agency (operator) hence all variants will become OperatorRef.
         if line.branding_ref is not None:
-            branding: Branding = db_read.get_single(Branding, line.branding_ref.ref, line.branding_ref.version)
+            branding: Branding = cast(Branding, db_read.load_object_by_reference(txn, line.branding_ref))
             operator = project(branding, Operator)
             operators[operator.id] = operator
             line.operator_ref = getRef(operator)
 
         elif line.operator_ref is not None:
             if line.operator_ref.ref not in operators:
-                operator = db_read.get_single(Operator, line.operator_ref.ref, line.operator_ref.version)
+                operator = cast(Operator, db_read.load_object_by_reference(txn, line.operator_ref))
                 operators[operator.id] = operator
                 line.operator_ref = getRef(operator)
 
         elif line.authority_ref is not None:
-            authority: Authority = db_read.get_single(Authority, line.authority_ref.ref, line.authority_ref.version)
+            authority = cast(Authority, db_read.load_object_by_reference(txn, line.authority_ref))
             operator = project(authority, Operator)
             operators[operator.id] = operator
             line.operator_ref = getRef(operator)
 
         elif line.responsibility_set_ref_attribute is not None:
             # TODO: ResponsibilitySet to Operator/Authority should be a separate function
-            responsibility_set: ResponsibilitySet = db_read.get_single(ResponsibilitySet, line.responsibility_set_ref_attribute)
+            responsibility_set = cast(
+                ResponsibilitySet, db_read.load_object_by_reference(txn, getFakeRef(line.responsibility_set_ref_attribute, ResponsibilitySetRef, line.version))
+            )
             if responsibility_set is not None and responsibility_set.roles is not None:
                 for role_assignment in responsibility_set.roles.responsibility_role_assignment:
                     if (
                         StakeholderRoleTypeEnumeration.OPERATION in role_assignment.stakeholder_role_type
                         or StakeholderRoleTypeEnumeration.OPERATION_1 in role_assignment.stakeholder_role_type
                     ):
-                        operator = db_read.get_single(
-                            (
-                                db_read.get_class_by_name(role_assignment.responsible_organisation_ref.name_of_ref_class)
-                                if role_assignment.responsible_organisation_ref.name_of_ref_class
-                                else Operator
-                            ),
-                            role_assignment.responsible_organisation_ref.ref,
-                            role_assignment.responsible_organisation_ref.version,
-                        )
+                        # TODO: review!
+                        operator = cast(Operator, db_read.load_object_by_reference(txn, role_assignment.responsible_organisation_ref))
                         operators[operator.id] = operator
                         line.operator_ref = getRef(operator)
 
@@ -131,16 +125,16 @@ def gtfs_operator_line_memory(db_read: Database, db_write: Database, generator_d
         if line.operator_ref is None:
             log_all(logging.ERROR, f"Line {line.id} does not have an operator_ref assigned.")
 
-    db_write.insert_objects_on_queue(Operator, list(operators.values()), True)
-    db_write.insert_objects_on_queue(Line, lines, True)
+    yield from operators.values()
+    yield from lines
 
 
 # TODO: move to separate file (calls profiles)
-def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
+def add_calls(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> ServiceJourney:
     if sj.calls:
         return sj
     else:
-        sjp: ServiceJourneyPattern = db_read.get_single(ServiceJourneyPattern, sj.journey_pattern_ref.ref)
+        sjp: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
         if sjp is None:
             log_all(logging.ERROR, "No SJP")
 
@@ -154,7 +148,7 @@ def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
                         )
                     elif isinstance(sjp.route_ref_or_route_view, RouteRef):
                         sj.route_ref = sjp.route_ref_or_route_view
-                        route: Route = db_read.get_single(Route, sjp.route_ref_or_route_view.ref)
+                        route: Route = db_read.load_object_by_reference(txn, sjp.route_ref_or_route_view)
                         sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view = route.line_ref
 
             if sj.passing_times:
@@ -164,7 +158,7 @@ def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
                 return sj
 
             elif sj.time_demand_type_ref:
-                tdt: TimeDemandType = db_read.get_single(TimeDemandType, sj.time_demand_type_ref.ref)
+                tdt: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
                 CallsProfile.getCallsFromTimeDemandType(sj, sjp, tdt)
                 sj.journey_pattern_ref = None
                 sj.time_demand_type_ref = None
@@ -174,7 +168,7 @@ def add_calls(db_read: Database, sj: ServiceJourney) -> ServiceJourney:
                 log_all(logging.ERROR, "Unimplemented method to calls")
 
 
-def calendars_to_daytype(db_read: Database, sj: ServiceJourney) -> DayTypeRefsRelStructure | ValidityConditionsRelStructure:
+def calendars_to_daytype(db_read: MdbxStorage, txn: TXN, sj: ServiceJourney) -> DayTypeRefsRelStructure | ValidityConditionsRelStructure:
     vcs: set[str] = set()
     vcs2: list[AvailabilityCondition | AvailabilityConditionRef] = []
 
@@ -270,7 +264,8 @@ def gtfs_day_type(
             if dta.is_available is not False:
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 ):
                     my_operating_period = project(
                         uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref], OperatingPeriod
@@ -294,7 +289,8 @@ def gtfs_day_type(
             if dta.is_available in (None, True):
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 ):
                     uic_operating_period = uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
                     for dt in NordicProfile.getOperationalDates(uic_operating_period):
@@ -316,7 +312,8 @@ def gtfs_day_type(
             if dta.is_available in (None, True):
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 ):
 
                     uic_operating_period = uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
@@ -354,7 +351,8 @@ def gtfs_day_type(
             else:
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
                     isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 ):
                     uic_operating_period = uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date]
 
@@ -385,11 +383,11 @@ def gtfs_day_type(
     return (day_type, my_day_type_assignments, my_operating_period)
 
 
-def gtfs_generate_deprecated_version(db_write: Database) -> Version:
+def gtfs_generate_deprecated_version(db_write: MdbxStorage, txn_write: TXN) -> Version:
     my_from = None
     my_to = None
     last_op = None
-    for op in load_generator(db_write, OperatingPeriod):
+    for op in db_write.iter_only_objects(txn_write, OperatingPeriod):
         op: OperatingPeriod
         dt = op.from_operating_day_ref_or_from_date.to_datetime().date()
         if my_from is None or my_from > dt:
@@ -401,7 +399,7 @@ def gtfs_generate_deprecated_version(db_write: Database) -> Version:
             my_to = dt
             last_op = op
 
-    for dta in load_generator(db_write, DayTypeAssignment):
+    for dta in db_write.iter_only_objects(txn_write, DayTypeAssignment):
         xml_date = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
         if isinstance(xml_date, XmlDate):
             dt = xml_date.to_date()
@@ -417,20 +415,19 @@ def gtfs_generate_deprecated_version(db_write: Database) -> Version:
         version: Version = project(last_op, Version)
         version.start_date = XmlDateTime.from_datetime(datetime.combine(my_from, time.min))
         version.end_date = XmlDateTime.from_datetime(datetime.combine(my_to, time.min))
-        db_write.insert_one_object(version)
+        yield version
     else:
         warnings.warn("No calendars at all?")
 
 
-def gtfs_sj_processing(db_read: Database, db_write: Database):
+def gtfs_sj_processing(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney | DayTypeAssignment | DayType | OperatingPeriod, None, None]:
     calendar_combinations = []
 
-    def query_sj(db_read: Database) -> Iterator[ServiceJourney]:
-        _load_generator = load_generator(db_read, ServiceJourney)
+    def query_sj(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
         sj: ServiceJourney
-        for sj in _load_generator:
-            add_calls(db_read, sj)
-            _tmp = calendars_to_daytype(db_read, sj)
+        for sj in db_read.iter_only_objects(txn, ServiceJourney):
+            add_calls(db_read, txn, sj)
+            _tmp = calendars_to_daytype(db_read, txn, sj)
             calendar_combinations.append(_tmp)
             sj.route_ref = None  # TODO: #112
             yield sj
@@ -446,18 +443,93 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
             """
 
     log_all(logging.INFO, "Processing ServiceJourneys")
-    db_write.insert_objects_on_queue(ServiceJourney, query_sj(db_read))
+    yield from query_sj(db_read, txn)
 
-    def query_daytype(db_read, calendar_combinations):
-        dtas = getIndexByGroup(load_local(db_read, DayTypeAssignment, cursor=True, embedding=True), 'day_type_ref.ref')
+    def query_daytype(db_read: MdbxStorage, txn: TXN, calendar_combinations):
+        service_calendars: list[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
+
+        all_day_type_assignments = [
+            x
+            for x in itertools.chain.from_iterable(
+                [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
+            )
+            if isinstance(x, DayTypeAssignment)
+        ] + list(
+            db_read.iter_only_objects(txn, DayTypeAssignment)
+        )  # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
+
+        dtas = getIndexByGroup(all_day_type_assignments, 'day_type_ref.ref')
+
+        all_day_types = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [service_calendar.day_types.day_type_ref_or_day_type_dummy for service_calendar in service_calendars if service_calendar.day_types]
+                )
+                if isinstance(x, DayType)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, DayType)
+            )  # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
+        )
+
+        all_uic_operating_periods = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_periods
+                    ]
+                )
+                if isinstance(x, UicOperatingPeriod)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, UicOperatingPeriod)
+            )  # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
+        )
+
+        all_operating_periods = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_periods
+                    ]
+                )
+                if isinstance(x, OperatingPeriod)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, OperatingPeriod)
+            )  # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
+        )
+
+        all_operating_days = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_days.operating_day_ref_or_operating_day
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_days
+                    ]
+                )
+                if isinstance(x, OperatingDay)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, OperatingDay)
+            )  # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
+        )
 
         for option in calendar_combinations:
             if isinstance(option, ValidityConditionsRelStructure):
                 if len(option.choice) == 1:
                     if isinstance(option.choice[0], AvailabilityConditionRef):
-                        availability_condition = load_local(
-                            db_read, AvailabilityCondition, limit=1, filter_id=option.choice[0].ref, cursor=True, embedding=True
-                        )[0]
+                        # TODO: This does not take embedded AvailabilityConditions
+                        availability_condition = db_read.load_object_by_reference(txn, option.choice[0])
                     elif isinstance(option.choice[0], AvailabilityCondition):
                         availability_condition = option.choice[0]
                     else:
@@ -465,11 +537,12 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                         log_once(logging.WARN, "vc-2", "We cannot yet handle other validity conditions")
 
                     day_type, day_type_assignments, operating_days, uic_operating_period = get_day_type_from_availability_condition(
-                        db_read, availability_condition
+                        db_read, txn, availability_condition
                     )
                     day_type, day_type_assignments, operating_period = gtfs_day_type(day_type, day_type_assignments, operating_days, [uic_operating_period], [])
                     if operating_period is not None:
                         operating_period = [operating_period]
+                        all_operating_periods.update(getIndex(operating_period))
 
                     yield day_type, day_type_assignments, operating_period
                 else:
@@ -478,7 +551,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
             elif isinstance(option, DayTypeRefsRelStructure):
                 if len(option.day_type_ref) == 1:
-                    day_type = load_local(db_read, DayType, limit=1, filter_id=option.day_type_ref[0].ref, embedding=True)[0]
+                    day_type = all_day_types[option.day_type_ref[0].ref]
                     day_type_assignments = dtas[day_type.id]
                     uic_operating_periods = []
                     operating_periods = []
@@ -487,21 +560,23 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                         ref = dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
 
                         # TODO: Fix this kind of pattern by abstracting the reference fetching
-                        if isinstance(ref, UicOperatingPeriodRef) or (isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'):
-                            uic_operating_periods.append(load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
+                        if isinstance(ref, UicOperatingPeriodRef) or (
+                            isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
+                        ):
+                            uic_operating_periods.append(all_uic_operating_periods[ref.ref])
                         elif isinstance(ref, OperatingPeriodRef):
-                            r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
-                            if len(r) > 0:
-                                operating_periods.append(r[0])
+                            op = all_operating_periods.get(ref.ref, None)
+                            if op:
+                                operating_periods.append(op)
                             else:
-                                # TODO: we must be able to query child classes directly.
-                                r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
-                                if len(r) > 0:
-                                    uic_operating_periods.append(r[0])
+                                uop = all_uic_operating_periods.get(ref.ref, None)
+                                if uop:
+                                    uic_operating_periods.append(uop)
                                 else:
                                     log_all(logging.ERROR, f"{ref} cannot be found.")
+
                         elif isinstance(ref, OperatingDayRef):
-                            operating_days.append(load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
+                            operating_days.append(all_operating_days[ref.ref])
 
                     if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                         day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -509,6 +584,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                         )
                         if operating_period is not None:
                             operating_period = [operating_period]
+                            all_operating_periods.update(getIndex(operating_period))
 
                         yield day_type, day_type_assignments, operating_period
                     else:
@@ -523,7 +599,7 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                     aggregated_day_type_ref = getRef(aggregated_day_type)
 
                     for day_type_ref in option.day_type_ref:
-                        day_type = load_local(db_read, DayType, limit=1, filter_id=day_type_ref.ref, embedding=True)[0]
+                        day_type = db_read.load_object_by_reference(txn, day_type_ref)
                         day_type_assignments = copy.deepcopy(dtas[day_type.id])
                         uic_operating_periods = []
                         operating_periods = []
@@ -537,24 +613,22 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
 
                             # TODO: Fix this kind of pattern by abstracting the reference fetching
                             if isinstance(ref, UicOperatingPeriodRef) or (
-                                isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == 'UicOperatingPeriod'
+                                isinstance(ref, OperatingPeriodRef) and ref.name_of_ref_class == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                             ):
-                                uic_operating_periods.append(
-                                    load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0]
-                                )
+                                uic_operating_periods.append(all_uic_operating_periods[ref.ref])
                             elif isinstance(ref, OperatingPeriodRef):
-                                r = load_local(db_read, OperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
-                                if len(r) > 0:
-                                    operating_periods.append(r[0])
+                                op = all_operating_periods.get(ref.ref, None)
+                                if op:
+                                    operating_periods.append(op)
                                 else:
-                                    # TODO: we must be able to query child classes directly.
-                                    r = load_local(db_read, UicOperatingPeriod, limit=1, filter_id=ref.ref, cursor=True, embedding=True)
-                                    if len(r) > 0:
-                                        uic_operating_periods.append(r[0])
+                                    uop = all_uic_operating_periods.get(ref.ref, None)
+                                    if uop:
+                                        uic_operating_periods.append(uop)
                                     else:
                                         log_all(logging.ERROR, f"{ref} cannot be found.")
+
                             elif isinstance(ref, OperatingDayRef):
-                                operating_days.append(load_local(db_read, OperatingDay, limit=1, filter_id=ref.ref, cursor=True, embedding=True)[0])
+                                operating_days.append(all_operating_days[ref.ref])
 
                         if len(uic_operating_periods) > 0 or len(operating_days) > 0:
                             day_type, day_type_assignments, operating_period = gtfs_day_type(
@@ -562,22 +636,80 @@ def gtfs_sj_processing(db_read: Database, db_write: Database):
                             )
                             if operating_period is not None:
                                 operating_period = [operating_period]
+                                all_operating_periods.update(getIndex(operating_period))
 
                             yield aggregated_day_type, day_type_assignments, operating_period
                         else:
                             yield aggregated_day_type, day_type_assignments, operating_periods
 
     log_all(logging.INFO, "Processing Calendars")
-    for day_type, day_type_assignments, operating_periods in query_daytype(db_read, calendar_combinations):
-        db_write.insert_one_object(day_type)
-        db_write.insert_objects_on_queue(DayTypeAssignment, day_type_assignments)
-        if operating_periods is not None and len(operating_periods) > 0:
-            db_write.insert_objects_on_queue(OperatingPeriod, operating_periods)
-
-    # db_write.block_until_done()
+    for day_type_1, day_type_assignments_1, operating_periods_1 in query_daytype(db_read, txn, calendar_combinations):
+        yield day_type_1
+        yield from day_type_assignments_1
+        if operating_periods_1 is not None and len(operating_periods_1) > 0:
+            yield from operating_periods_1
 
 
-def gtfs_calls_generator(db_read: Database, db_write: Database, generator_defaults: dict):
+def gtfs_calendar2(
+    service_id: str, day_type: DayType, operating_period: OperatingPeriod
+) -> Generator[tuple[dict[str, Any] | None, dict[str, Any]] | None, None, None]:
+    if day_type.properties:
+        yield tuple(
+            (
+                {
+                    'service_id': service_id,
+                    'monday': int(DayOfWeekEnumeration.MONDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'tuesday': int(DayOfWeekEnumeration.TUESDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'wednesday': int(DayOfWeekEnumeration.WEDNESDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'thursday': int(DayOfWeekEnumeration.THURSDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'friday': int(DayOfWeekEnumeration.FRIDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'saturday': int(DayOfWeekEnumeration.SATURDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'sunday': int(DayOfWeekEnumeration.SUNDAY in day_type.properties.property_of_day[0].days_of_week),
+                    'start_date': str(operating_period.from_operating_day_ref_or_from_date.to_datetime().date()).replace('-', ''),
+                    'end_date': str(operating_period.to_operating_day_ref_or_to_date.to_datetime().date()).replace('-', ''),
+                },
+                None,
+            )
+        )
+
+
+def gtfs_calendar_and_dates2(
+    db_read: MdbxStorage, txn: TXN, day_type: DayType, day_type_assignments: Iterable[DayTypeAssignment]
+) -> Generator[tuple[dict[str, Any] | None, dict[str, Any] | None], None, None]:
+    if day_type.private_codes:
+        service_ids = [private_code.value for private_code in day_type.private_codes.private_code if private_code.type_value == 'service_id']
+        service_id = service_ids[0] if len(service_ids) > 0 else day_type.id
+    else:
+        service_id = day_type.id
+
+    assert service_id is not None, f"{day_type.id}, service_id must not be None"
+
+    for day_type_assignment in day_type_assignments:
+        if isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, XmlDate):
+            yield tuple(
+                (
+                    None,
+                    {
+                        'service_id': service_id,
+                        'date': (
+                            str(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.to_date()).replace('-', '')
+                        ),
+                        'exception_type': 2 if day_type_assignment.is_available is not None and day_type_assignment.is_available is False else 1,
+                    },
+                )
+            )
+        elif isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef):
+            operating_period: Optional[OperatingPeriod] = db_read.load_object_by_reference(
+                txn, day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
+            )
+            if operating_period:
+                yield from gtfs_calendar2(service_id, day_type, operating_period)
+            else:
+                print(f"Missing {day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref}")
+
+
+"""
+def gtfs_calls_generator(db_read: MdbxStorage, db_write: Database, generator_defaults: dict):
     def query_sj(db_read: Database) -> Generator:
         _load_generator = load_generator(db_read, ServiceJourney)
         sj: ServiceJourney
@@ -653,7 +785,8 @@ def day_type_assignment_to_ac(
     # Most specific class first
     if isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef) or (
         isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
-        or day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+        or day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+        == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
     ):
         uic_operating_period_ref = day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date
         uic_operating_period: UicOperatingPeriod = ops[uic_operating_period_ref.ref]
@@ -761,27 +894,6 @@ def apply_availability_conditions_via_day_type_ref(db_read: Database, db_write: 
     db_write.insert_objects_on_queue(TemplateServiceJourney, query_sj(db_read, mapping, TemplateServiceJourney))
 
 
-def gtfs_calendar2(
-    service_id: str, day_type: DayType, operating_period: OperatingPeriod
-) -> Generator[tuple[dict[str, Any] | None, dict[str, Any]] | None, None, None]:
-    if day_type.properties:
-        yield tuple(
-            (
-                {
-                    'service_id': service_id,
-                    'monday': int(DayOfWeekEnumeration.MONDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'tuesday': int(DayOfWeekEnumeration.TUESDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'wednesday': int(DayOfWeekEnumeration.WEDNESDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'thursday': int(DayOfWeekEnumeration.THURSDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'friday': int(DayOfWeekEnumeration.FRIDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'saturday': int(DayOfWeekEnumeration.SATURDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'sunday': int(DayOfWeekEnumeration.SUNDAY in day_type.properties.property_of_day[0].days_of_week),
-                    'start_date': str(operating_period.from_operating_day_ref_or_from_date.to_datetime().date()).replace('-', ''),
-                    'end_date': str(operating_period.to_operating_day_ref_or_to_date.to_datetime().date()).replace('-', ''),
-                },
-                None,
-            )
-        )
 
 
 def gtfs_calendar(service_id: str, uic_operating_period: UicOperatingPeriod):
@@ -818,37 +930,6 @@ def netex_to_python_weekday(days_of_week: list[DayOfWeekEnumeration]) -> set[int
     )
 
 
-def gtfs_calendar_and_dates2(
-    db_read: Database, day_type: DayType, day_type_assignments: Iterable[DayTypeAssignment]
-) -> Generator[tuple[dict[str, Any] | None, dict[str, Any] | None], None, None]:
-    if day_type.private_codes:
-        service_ids = [private_code.value for private_code in day_type.private_codes.private_code if private_code.type_value == 'service_id']
-        service_id = service_ids[0] if len(service_ids) > 0 else day_type.id
-    else:
-        service_id = day_type.id
-
-    assert service_id is not None, f"{day_type.id}, service_id must not be None"
-
-    for day_type_assignment in day_type_assignments:
-        if isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, XmlDate):
-            yield tuple(
-                (
-                    None,
-                    {
-                        'service_id': service_id,
-                        'date': (
-                            str(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.to_date()).replace('-', '')
-                        ),
-                        'exception_type': 2 if day_type_assignment.is_available is not None and day_type_assignment.is_available is False else 1,
-                    },
-                )
-            )
-        elif isinstance(day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef):
-            operating_period: OperatingPeriod = db_read.get_single(
-                OperatingPeriod, day_type_assignment.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref
-            )
-            if operating_period:
-                yield from gtfs_calendar2(service_id, day_type, operating_period)
 
 
 def gtfs_calendar_and_dates(db_read: Database, day_type_ref: DayTypeRef, day_type_assignments: list[DayTypeAssignment]):
@@ -1006,7 +1087,7 @@ def gtfs_calendar_and_dates(db_read: Database, day_type_ref: DayTypeRef, day_typ
                         )
                     )
 
-
+"""
 """
 def gtfs_calendar_generator(db_read: Database, db_write: Database, generator_defaults: dict):
     # This functions purpose is to transform calendars from NeTEx in such way it can be referenced by GTFS.

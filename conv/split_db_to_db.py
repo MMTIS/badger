@@ -11,7 +11,11 @@ from netex import (
     EntityStructure,
     DayTypeAssignment,
     DayType,
-    UicOperatingPeriod, PublicationDelivery, TypeOfFrameRef, ResponsibilitySet, StopPointInJourneyPattern,
+    UicOperatingPeriod,
+    PublicationDelivery,
+    TypeOfFrameRef,
+    ResponsibilitySet,
+    StopPointInJourneyPattern,
 )
 from netexio.attributes import update_attr
 from netexio.database import Database
@@ -28,6 +32,7 @@ import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 
 Tid = TypeVar("Tid", bound=EntityStructure)
+
 
 def generate_epip_line_split(source_database_file: str, target_database_file: str, object_type: str, object_id: str) -> None:
     filter_set = {Line, ServiceJourneyPattern, DayType, ScheduledStopPoint}
@@ -91,16 +96,17 @@ def generate_epip_line_split(source_database_file: str, target_database_file: st
 
             db_write.block_until_done()
 
-            publication_delivery: PublicationDelivery = export_epip_network_offer(db_write, composite_frame_id=split_by.id,
-                                                                                  type_of_frame_ref=TypeOfFrameRef(
-                                                                                      ref='epip:EU_PI_LINE_OFFER',
-                                                                                      version_ref='1.0'))
+            publication_delivery: PublicationDelivery = export_epip_network_offer(
+                db_write, composite_frame_id=split_by.id, type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_LINE_OFFER', version_ref='1.0')
+            )
             export_publication_delivery_xml(publication_delivery, new_xml_file)
             print(new_xml_file)
+
 
 def _process_wrapper(args):
     source_database_file, target_database_file, object_type, object_id = args
     generate_epip_line_split(source_database_file, target_database_file, object_type, object_id)
+
 
 def main(source_database_file: str, target_database_file: str, object_type: str) -> None:
     object_ids = []
@@ -114,10 +120,7 @@ def main(source_database_file: str, target_database_file: str, object_type: str)
             object_ids.append(split_by.id)
 
     cpu_count = multiprocessing.cpu_count() - 1 or 1
-    args = [
-        (source_database_file, target_database_file, object_type, object_id)
-        for object_id in object_ids
-    ]
+    args = [(source_database_file, target_database_file, object_type, object_id) for object_id in object_ids]
 
     with ProcessPoolExecutor(max_workers=cpu_count) as executor:
         futures = [executor.submit(generate_epip_line_split, *args) for args in args]

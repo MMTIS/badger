@@ -1,10 +1,13 @@
+import logging
 import time
-from typing import Callable
+from typing import Callable, Generator
 
 from netex import ServiceJourney
-from netexio.database import Database
-from netexio.dbaccess import update_embedded_referencing, load_local
+from netexio.database import Database, Tid
+from netexio.dbaccess import load_local
 from netexio.pickleserializer import MyPickleSerializer
+from netexio.serializer import Serializer
+from utils.aux_logging import log_once
 
 
 def _drain(gen):
@@ -33,8 +36,12 @@ serializer = MyPickleSerializer(compression=True)
 with Database("/storage/compressed/avv.lmdb", serializer, readonly=True) as source_db:
     sj = load_local(source_db, ServiceJourney, 1)[0]
 
+from netexio.binaryserializer import recursive_attributes
+
+
+
 best, count, total = bench(lambda: _drain(update_embedded_referencing(serializer, sj)))
 print(best, count, total)
 
-# for a, b, x, y, z, u, v, w in update_embedded_referencing(serializer, sj):
-#     print(a, b, x, y, z, u, v, w)
+for a, b, x, y, z, u, v, w in update_embedded_referencing(serializer, sj):
+     print(a, b, x, y, z, u, v, w)

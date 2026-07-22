@@ -1,50 +1,36 @@
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from itertools import chain
-from typing import Any, Generator, TypeVar
+from typing import Generator
 
+from mdbx.mdbx import TXN
 from pyproj import Transformer
 from pyproj.exceptions import CRSError
 
+from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_once
-from utils.mro_attributes import list_attributes
-from netex import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, EntityStructure, LinearRing, SimplePointVersionStructure
-from netexio.database import Database
-from netexio.dbaccess import recursive_attributes
-from utils.utils import get_interesting_classes
-
-Tid = TypeVar("Tid", bound=EntityStructure)
+from domain.netex.model import Polygon, PosList, Pos, LocationStructure2, LineString, MultiSurface, LinearRing, \
+    SimplePointVersionStructure, EntityStructure
+from domain.netex.services.model_typing import Tid
+from domain.netex.services.recursive_attributes import (
+    recursive_attributes,
+    get_all_geo_elements,
+)
 
 transformers: dict[str, Transformer] = {}
 
-GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
 
-
-def get_all_geo_elements() -> Generator[Any, None, None]:
-    classes = get_interesting_classes()
-    clean_element_names, interesting_element_names, interesting_classes = classes
-    for clazz_parent in interesting_classes:
-        attrs = list_attributes(clazz_parent)
-        for attr in attrs:
-            clazz = attr[3].type
-            if clazz is not None and hasattr(clazz, '_name'):
-                if (clazz._name == 'Optional' or clazz._name == 'Union') and not isinstance(clazz, str):
-                    clazz_resolved = [x for x in clazz.__args__ if x is not None][0]
-                else:
-                    clazz_resolved = clazz
-
-                if clazz_resolved in GEO_CLASSES:
-                    yield clazz_parent
-                    break
-
-
-def reprojection(deserialized: Tid, crs_to: str) -> Tid:
+def reprojection(deserialized: Tid, crs_to: str, force_latlon=False) -> Tid:
     # TODO: This function would walk over the class iteratively.
     # A general optimisation would be to precompute the paths within
     # a class to directly have a list (per class) of possible location targets
     for obj, path in recursive_attributes(deserialized, []):
         if isinstance(obj, LocationStructure2):
-            project_location(obj, crs_to)
+            project_location(obj, crs_to, force_latlon)
+
+        elif isinstance(obj, SimplePointVersionStructure):
+            if obj.location:
+                project_location(obj.location, crs_to, force_latlon)
 
         elif isinstance(obj, LineString):
             if obj.srs_name == crs_to:
@@ -69,30 +55,21 @@ def reprojection(deserialized: Tid, crs_to: str) -> Tid:
                             project_polygon(polygon, crs_to)
 
             obj.srs_name = crs_to
-
+    # TODO: Ideally don't return anything which is not changed.
     return deserialized
 
 
-def reprojection_update(db: Database, crs_to: str) -> None:
+def reprojection_update(db: MdbxStorage, txn: TXN, crs_to: str, force_latlon=False) -> Generator[Tid, None, None]:
     # Within this function we are reading and writing towards the target database.
     # This effectively means that if we would need to resize for whatever reason,
     # we cannot hold the cursor since access has to be disabled.
     # We will first validate that we do have remaining capacity.
-    db.guard_free_space(0.10)
 
-    for clazz in db.tables(exclusively=set(get_all_geo_elements())):
-        src_db = db.open_database(clazz, readonly=True)
-        if not src_db:
-            continue
-
-        with db.env.begin(db=src_db, buffers=True, write=False) as src_txn:
-            cursor = src_txn.cursor()
-
-            for key, value in cursor:
-                # transformed_value = db.serializer.marshall(reprojection(db.serializer.unmarshall(value, clazz), crs_to), clazz)
-                # TODO: We may not want to expose our internal task queue.
-                # db.task_queue.put((LmdbActions.WRITE, src_db, key, transformed_value))
-                db.insert_one_object(reprojection(db.serializer.unmarshall(value, clazz), crs_to), False, False)
+    clazz: EntityStructure
+    for clazz in set(db.db_names(txn).values()).intersection(set(get_all_geo_elements())):
+        obj: Tid
+        for _key, obj in db.iter_objects(txn, clazz):
+            yield reprojection(obj, crs_to, force_latlon)
 
 
 def get_transformer_by_srs_name(location: LocationStructure2 | LineString, crs_to: str) -> Transformer | None:
@@ -142,7 +119,7 @@ def project_location_4326(location: LocationStructure2, quantize: str = '0.00000
         print("TODO: Crazy not WGS84")
 
 
-def project_location(location: LocationStructure2, crs_to: str, quantize: str = '0.000001') -> None:
+def project_location(location: LocationStructure2, crs_to: str, force_latlon=False, quantize: str = '0.000001') -> None:
     if location.srs_name == crs_to:
         return
 
@@ -153,7 +130,12 @@ def project_location(location: LocationStructure2, crs_to: str, quantize: str = 
             x = Decimal(x).quantize(Decimal(quantize), ROUND_HALF_UP)
             y = Decimal(y).quantize(Decimal(quantize), ROUND_HALF_UP)
             location.srs_name = crs_to
-            location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
+            if force_latlon:
+                location.pos = None
+                location.latitude = x # only correct in this case
+                location.longitude = y # only correct in this case
+            else:
+                location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
 
     elif location.longitude is not None and location.latitude is not None:
         transformer = get_transformer_by_srs_name(location, crs_to)
@@ -162,7 +144,12 @@ def project_location(location: LocationStructure2, crs_to: str, quantize: str = 
             x = Decimal(x).quantize(Decimal(quantize), ROUND_HALF_UP)
             y = Decimal(y).quantize(Decimal(quantize), ROUND_HALF_UP)
             location.srs_name = crs_to
-            location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
+            if force_latlon:
+                location.pos = None
+                location.latitude = x # only correct in this case
+                location.longitude = y # only correct in this case
+            else:
+                location.pos = Pos(value=[x, y], srs_name=crs_to, srs_dimension=2)
 
     else:
         print("TODO: Crazy not WGS84")

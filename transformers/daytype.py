@@ -1,7 +1,9 @@
 from typing import cast
 
+from mdbx.mdbx import TXN
+
 import utils.netex_monkeypatching  # noqa: F401
-from netex import (
+from domain.netex.model import (
     AvailabilityCondition,
     UicOperatingPeriod,
     OperatingDay,
@@ -12,9 +14,12 @@ from netex import (
     DayOfWeekEnumeration,
     UicOperatingPeriodRef,
 )
-from netexio.database import Database
-from netexio.dbaccess import load_local
-from utils.refs import getRef
+from domain.netex.services.refs import getRef
+from storage.mdbx.core.implementation import MdbxStorage
+
+# from netexio.database import Database
+# from netexio.dbaccess import load_local
+# from utils.refs import getRef
 from utils.utils import project
 
 
@@ -39,7 +44,7 @@ def datetime_weekday_to_dow(wd: int) -> DayOfWeekEnumeration:
 
 
 def get_day_type_from_availability_condition(
-    db_read: Database, availability_condition: AvailabilityCondition
+    db_read: MdbxStorage, txn: TXN, availability_condition: AvailabilityCondition
 ) -> tuple[DayType, list[DayTypeAssignment], list[OperatingDay], UicOperatingPeriod]:
     day_type: DayType
     day_type_assignments: list[DayTypeAssignment] = []
@@ -47,11 +52,11 @@ def get_day_type_from_availability_condition(
     uic_operating_period: UicOperatingPeriod
 
     if availability_condition.day_types is not None:
-        if len(availability_condition.day_types.day_type_ref_or_day_type) == 1:
-            if isinstance(availability_condition.day_types.day_type_ref_or_day_type[0], DayType):
-                day_type = availability_condition.day_types.day_type_ref_or_day_type[0]
-            elif isinstance(availability_condition.day_types.day_type_ref_or_day_type[0], DayTypeRef):
-                day_type = load_local(db_read, DayType, limit=1, filter_id=availability_condition.day_types.day_type_ref_or_day_type[0].ref, cursor=True)[0]
+        if len(availability_condition.day_types.day_type_ref_or_day_type_dummy) == 1:
+            if isinstance(availability_condition.day_types.day_type_ref_or_day_type_dummy[0], DayType):
+                day_type = availability_condition.day_types.day_type_ref_or_day_type_dummy[0]
+            elif isinstance(availability_condition.day_types.day_type_ref_or_day_type_dummy[0], DayTypeRef):
+                day_type = db_read.load_object_by_reference(txn, availability_condition.day_types.day_type_ref_or_day_type_dummy[0])
         else:
             day_type = cast(DayType, project(availability_condition, DayType))
     else:
@@ -76,7 +81,7 @@ def get_day_type_from_availability_condition(
         for operating_day in availability_condition.operating_days.operating_day_ref_or_operating_day:
             if isinstance(operating_day, OperatingDayRef):
                 operating_day_ref = operating_day
-                operating_day = load_local(db_read, OperatingDay, limit=1, filter_id=operating_day.ref, cursor=True)[0]
+                operating_day = db_read.load_object_by_reference(txn, operating_day)
             else:
                 operating_day_ref = cast(OperatingDayRef, getRef(operating_day))
 

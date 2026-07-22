@@ -1,6 +1,6 @@
 from typing import Generator, Any, TypeVar, cast
 
-from netex import (
+from domain.netex.model import (
     InterchangeRule,
     ScheduledStopPointRef,
     StopPlace,
@@ -22,9 +22,8 @@ from netex import (
     StopPointInJourneyPattern,
     TimingPointInJourneyPattern,
     TimingPointRef,
+    NameOfClassScheduledStopPointRefStructure,
 )
-from netexio.database import Database
-from netexio.dbaccess import load_local, load_generator
 from utils.utils import project, projectRef
 from utils.aux_logging import log_once
 import logging
@@ -136,7 +135,7 @@ def get_all_stops(db: Database, sj: ServiceJourney) -> Generator[ScheduledStopPo
                         ssp = pis.timing_point_ref_or_scheduled_stop_point_ref_or_parking_point_ref_or_relief_point_ref
                         if isinstance(ssp, ScheduledStopPointRef):
                             yield ssp
-                        elif isinstance(ssp, TimingPointRef) and ssp.name_of_ref_class == 'ScheduledStopPoint':
+                        elif isinstance(ssp, TimingPointRef) and ssp.name_of_ref_class == NameOfClassScheduledStopPointRefStructure.SCHEDULED_STOP_POINT:
                             yield projectRef(ssp, ScheduledStopPointRef)
 
 

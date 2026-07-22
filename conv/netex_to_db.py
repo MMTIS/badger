@@ -1,43 +1,71 @@
+import traceback
+from pathlib import Path
+
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
+from storage.lxml.core.implementation import XmlStorage
+from storage.lxml.core.insert import insert_database, get_interesting_classes
+from storage.mdbx.core.implementation import MdbxStorage
+from utils.aux_logging import log_all, log_flush
 import logging
 
-from netexio.database import Database
-from netexio.dbaccess import setup_database, open_netex_file, insert_database
-from netexio.pickleserializer import MyPickleSerializer
-from utils.utils import get_interesting_classes
-from utils.aux_logging import *
-from netexio.dbaccess import check_referencing
+
+def netex_to_db(filenames: list[Path], database: Path, clean_database: bool = True) -> None:
+    with MdbxStorage(database, readonly=False) as storage:
+        if clean_database:
+            log_all(logging.INFO, f"[netex_to_db] {database} is cleaned")
+            storage.clean()
+
+        interesting_classes = get_interesting_classes()
+        for filename in filenames:
+            xml_storage = XmlStorage(filename)
+            for sub_file, real_filename in xml_storage.open_netex_file():
+                log_all(logging.INFO, f"[netex_to_db] loading {real_filename}")
+                insert_database(storage, interesting_classes, sub_file)
+
+        log_all(logging.INFO, "[netex_to_db] resolving references")
+        resolve(storage)
+        log_all(logging.INFO, "[netex_to_db] resolving embeddings via index")
+        resolve_embeddings_index(storage)
+        log_all(logging.INFO, f"[netex_to_db] done: {database}")
+
 
 def main(filenames: list[str], database: str, clean_database: bool = True) -> None:
     # if filenames is not a list of str  => error
     if not (isinstance(filenames, list) and all(isinstance(item, str) for item in filenames)):
-        log_all(logging.ERROR, f'filenames parameter must be a [] of file names.')
+        log_all(logging.ERROR, 'filenames parameter must be a [] of file names.')
         log_flush()
         exit(1)
 
-    with Database(database, MyPickleSerializer(compression=True), readonly=False,
-                  logger=logging.getLogger("script_runner")) as db:
-        classes = get_interesting_classes()
+    paths: list[Path] = []
+    for filename in filenames:
+        path = Path(filename)
+        if path in paths:
+            log_all(logging.WARNING, f'{filename} is a duplicate.')
 
-        if clean_database:
-            print("Is cleaned!")
-            setup_database(db, classes, clean_database)
+        else:
+            if not path.exists():
+                log_all(logging.WARNING, f'{filename} does not exist.')
+            else:
+                paths.append(path)
 
-        for filename in filenames:
-            for sub_file, real_filename in open_netex_file(filename):
-                insert_database(db, classes, sub_file)
-
-        db.block_until_done()
-
-        # check_referencing(db)
+    netex_to_db(paths, Path(database), clean_database)
 
 
 if __name__ == '__main__':
     import argparse
 
-    argument_parser = argparse.ArgumentParser(description='Import any NeTEx source into lmdb')
+    from utils.aux_logging import prepare_logger
+
+    argument_parser = argparse.ArgumentParser(description='Import any NeTEx source into mdbx')
     argument_parser.add_argument('netex', nargs='+', default=[], help='NeTEx files')
     argument_parser.add_argument('database', type=str, help='The lmdb to be overwritten with the NeTEx context')
-    argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=True)
+    argument_parser.add_argument('--clean_database', action="store_true", help='Clean the current file', default=False)
+    argument_parser.add_argument('--log_file', type=str, required=False, help='the logfile')
     args = argument_parser.parse_args()
+    prepare_logger(logging.INFO, args.log_file)
 
-    main(args.netex, args.database, args.clean_database)
+    try:
+        main(args.netex, args.database, args.clean_database)
+    except Exception as e:
+        log_all(logging.ERROR, traceback.format_exc())
+        raise e

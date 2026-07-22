@@ -1,12 +1,16 @@
 from typing import Dict, Any, Generator, cast
 
-from netexio.database import Database
-from netexio.dbaccess import load_generator
-from netex import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef, DirectionType
-from utils.refs import getId, getRef
+from mdbx.mdbx import TXN
+from domain.netex.model import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef, TextType
+from domain.netex.services.ids import getId
+from domain.netex.services.refs import getRef
+
+from storage.mdbx.core.implementation import MdbxStorage
 
 
-def infer_directions_from_sjps_and_apply(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+def infer_directions_from_sjps_and_apply(
+    db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]
+) -> Generator[ServiceJourneyPattern | Direction, None, None]:
     directions: Dict[str, Direction] = {}
     direction_refs: Dict[str, DirectionRef | None] = {}
 
@@ -16,10 +20,10 @@ def infer_directions_from_sjps_and_apply(db_read: Database, db_write: Database, 
             direction: Direction | None = directions.get(key, None)
             if direction is None:
                 direction = Direction(
-                    id=getId(Direction, generator_defaults['codespace'], key),
-                    version='any',
-                    name=MultilingualString(value=key),
-                    direction_type=DirectionType(value=sjp.direction_type),
+                    id=getId(generator_defaults['codespace'], Direction, key),
+                    version=sjp.version,
+                    name=MultilingualString(content=[TextType(value=key)]) if False else MultilingualString(content=[key]),  # TODO: NeTEx 2.0
+                    direction_type=sjp.direction_type,
                 )
                 directions[key] = direction
                 direction_refs[key] = cast(DirectionRef, getRef(direction))
@@ -28,13 +32,11 @@ def infer_directions_from_sjps_and_apply(db_read: Database, db_write: Database, 
 
         return None
 
-    def query(db_read: Database) -> Generator[ServiceJourneyPattern, None, None]:
-        _load_generator = load_generator(db_read, ServiceJourneyPattern)
-        for sjp in _load_generator:
+    def query(db_read: MdbxStorage) -> Generator[ServiceJourneyPattern, None, None]:
+        for sjp in db_read.iter_only_objects(txn, ServiceJourneyPattern):
             new_sjp = process(sjp, generator_defaults)
             if new_sjp is not None:
                 yield new_sjp
 
-    db_write.guard_free_space(0.10)
-    db_write.insert_objects_on_queue(ServiceJourneyPattern, query(db_read))
-    db_write.insert_objects_on_queue(Direction, list(directions.values()), True)
+    yield from query(db_read)
+    yield from directions.values()

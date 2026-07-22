@@ -1,0 +1,58 @@
+# WORKING
+# =======
+
+#nl epip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1epip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4epip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl3
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl2
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+
+# basic gtfs generation
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl1gtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log nl4gtfs
+
+# basic gtfs loading
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
+
+# combined
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
+
+
+# NOT WORKING
+# ===========
+
+#Possible data problems
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangeepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissinterchangegtfs
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
+
+# Problems in Grand Est: Operator not included: NAP informed
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_aubegtfs
+
+# Problem with SimplePointVersionStructure: #84
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_ardennesepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log fr_aubeepip
+
+
+# needs fix for relational contraints
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log lombardiatrainitaliaepip
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiavarese
+
+
+# problem unknown (or perhaps also needs relational contraint fix)
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lombardiafunbus
+
+# needs relational contraints and dayofset tixes
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_sncf_ter
+
+# long runners
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lux
+#python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swiss4epip
+
+#mandatory test
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
+#python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip
+
+
