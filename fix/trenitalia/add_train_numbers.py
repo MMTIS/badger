@@ -22,7 +22,7 @@ from domain.netex.model import (
     TrainNumberRefsRelStructure,
 )
 from storage.mdbx.core.implementation import MdbxStorage
-from storage.mdbx.core.references import resolve_embeddings
+from storage.mdbx.core.references import resolve_embeddings_index
 from utils.aux_logging import log_all, prepare_logger
 
 _DIGITS = re.compile(r"\d+")
@@ -76,7 +76,7 @@ def add_train_numbers(db: MdbxStorage) -> None:
         db.insert_any_object_on_queue(wtx, [sj for sj, _ in todo])
         wtx.commit()
 
-    resolve_embeddings(db)
+    resolve_embeddings_index(db)
     log_all(logging.INFO, f"[add_train_numbers] done: added {len(train_numbers)} TrainNumbers, " f"linked {len(todo)} Trenitalia journeys")
 
 

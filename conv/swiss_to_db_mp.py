@@ -4,7 +4,7 @@ from pathlib import Path
 
 from storage.mdbx.core.implementation import MdbxStorage
 from storage.mdbx.core.implementation_mp import MdbxStorageMP
-from storage.mdbx.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
 from storage.lxml.core.implementation import XmlStorage
 from utils.aux_logging import log_all, prepare_logger
 from domain.netex.services.profiles import SWISS_CLASSES
@@ -62,7 +62,7 @@ def swiss_to_db_mp(source: Path, target: Path, clean_database: bool = True) -> N
 
     with MdbxStorage(target, readonly=False) as storage:
         resolve(storage)
-        resolve_embeddings(storage)
+        resolve_embeddings_index(storage)
 
 
 def main(source: str, target: str, clean_database: bool = True) -> None:

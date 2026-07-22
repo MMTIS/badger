@@ -7,7 +7,6 @@ so a test reads like a tiny NeTEx file plus an assertion on what a transformer m
 
 import io
 import unittest
-from pathlib import Path
 from typing import Any, Callable, Iterable, TypeVar
 
 from lxml import etree
@@ -16,7 +15,7 @@ from domain.netex.model import Codespace
 from storage.lxml.core.insert import get_interesting_classes, insert_database
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
 from storage.mdbx.core.implementation import MdbxStorage
-from storage.mdbx.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
 
 T = TypeVar("T")
 
@@ -42,7 +41,7 @@ def load_netex(db: MdbxStorage, frames_xml: str) -> None:
     xml = _SKELETON.replace("__FRAMES__", frames_xml)
     insert_database(db, get_interesting_classes(), io.BytesIO(xml.encode("utf-8")))
     resolve(db)
-    resolve_embeddings(db)
+    resolve_embeddings_index(db)
 
 
 def run(generator_fn: Callable[..., Iterable[T]], db: MdbxStorage) -> list[T]:

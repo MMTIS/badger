@@ -5,7 +5,7 @@ from pathlib import Path
 from storage.lxml.core.implementation import XmlStorage
 from storage.lxml.core.insert import get_interesting_classes, insert_database
 from storage.mdbx.core.implementation import MdbxStorage
-from storage.mdbx.core.references import resolve, resolve_embeddings
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
 from utils.aux_logging import log_all, prepare_logger
 from domain.netex.services.profiles import SWISS_CLASSES
 
@@ -63,7 +63,7 @@ def swiss_to_db(source: Path, target: Path, clean_database: bool = True) -> None
             insert_database(storage, interesting_classes, sub_file)
 
         resolve(storage)
-        resolve_embeddings(storage)
+        resolve_embeddings_index(storage)
 
 
 def main(source: str, target: str, clean_database: bool = True) -> None:
