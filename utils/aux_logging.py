@@ -8,7 +8,6 @@ from configuration import NOSOFTLOGGING, processing_data, log_dict
 import os
 import sys
 
-
 # Basic ideas:
 # - There might still remain print statements, that are just send to the screen
 # - we still wrap them to make sure, we can deactivate it
@@ -42,9 +41,7 @@ def prepare_logger(log_level: int, log_file_name: str) -> logging.Logger:
         ch.setLevel(logging.DEBUG)
 
         # create formatter
-        formatter = logging.Formatter(
-            "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-        )
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
         # add formatter to ch
         ch.setFormatter(formatter)
@@ -68,6 +65,13 @@ def prepare_logger(log_level: int, log_file_name: str) -> logging.Logger:
 def log_all(log_level: int, message: str) -> None:
     mylogger = logging.getLogger("script_runner")
     mylogger.log(log_level, message)
+    log_flush()
+
+
+# log exception
+def log_exception(e: Exception) -> None:
+    mylogger = logging.getLogger("script_runner")
+    mylogger.exception(e)
     log_flush()
 
 

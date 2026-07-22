@@ -1,11 +1,14 @@
 from io import BytesIO
+from pathlib import Path
 
 from utils.aux_logging import *
-from netexio.dbaccess import open_netex_file
+from storage.lxml.core.implementation import XmlStorage
+
 from isal import igzip_threaded
 import os
 import xml.etree.ElementTree as ET
 import zipfile
+
 
 def modify_xml_content(root, file_path, outfile=None):
     # Define the namespace
@@ -24,11 +27,13 @@ def modify_xml_content(root, file_path, outfile=None):
             if match is not None:
                 ref.attrib['nameOfRefClass'] = 'UicOperatingPeriod'
 
-def modify_xml_file(file_name, output_filename):
-    print(file_name)
-    for f, real_filename in open_netex_file(file_name):
+
+def modify_xml_file(file_path, output_filename):
+    xml_storage = XmlStorage(file_path)
+
+    for f, real_filename in xml_storage.open_netex_file():
         et = ET.parse(f)
-        modify_xml_content(et.getroot(), file_name)
+        modify_xml_content(et.getroot(), file_path.name)
 
         # Comes from xml.py
         if output_filename.endswith(".gz"):
@@ -51,12 +56,20 @@ def modify_xml_file(file_name, output_filename):
                 et.write(out)
 
 
-def main(infile: str, outfile: str) -> None:
+def netex_uicoperatingperiod_correction(infile: Path, outfile: Path):
     try:
         os.remove(outfile)
     except FileNotFoundError:
         pass
-    modify_xml_file(infile, outfile)
+    modify_xml_file(infile, str(outfile))
+
+
+def main(infile: str, outfile: str) -> None:
+    # checks the input
+    inpath = Path(infile)
+    outpath = Path(outfile)
+    # calling correction
+    netex_uicoperatingperiod_correction(inpath, outpath)
 
 
 if __name__ == '__main__':

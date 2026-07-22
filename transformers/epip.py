@@ -2,18 +2,24 @@ import logging
 import sys
 import warnings
 from datetime import datetime, date, timedelta
-from functools import partial
-from multiprocessing import Pool
-from typing import List, Set, Any, TypeVar, Generator, cast
+
+# from multiprocessing import Pool
+from typing import List, Set, Any, TypeVar, Generator, cast, Optional
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY
+from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
+from domain.netex.indexes.byid import getIndex
+from domain.netex.services.refs import getRef, getFakeRef
+from domain.netex.services.ids import getId
+from domain.netex.services.recursive_attributes import recursive_attributes
+from storage.mdbx.core.implementation import MdbxStorage
+from transformers.projection import project_location_4326
 
 from utils.aux_logging import log_print, log_all, log_once
 from transformers.routesprofile import RoutesProfile
-from transformers.interchanges import interchange_rules_to_service_journey_interchanges
 from utils.utils import project, chain, GeneratorTester
 
 from xsdata.models.datatype import XmlDateTime, XmlDate
@@ -22,7 +28,8 @@ from transformers.callsprofile import CallsProfile
 
 from configuration import defaults
 
-from netex import (
+from domain.netex.model import (
+    ValidBetween,
     PublicationDelivery,
     ParticipantRef,
     MultilingualString,
@@ -30,6 +37,7 @@ from netex import (
     GeneralFrame,
     GeneralFrameMembersRelStructure,
     ServiceJourney,
+    Notice,
     StopPlace,
     CompositeFrame,
     FramesRelStructure,
@@ -78,7 +86,6 @@ from netex import (
     VersionFrameDefaultsStructure,
     SystemOfUnits,
     LocaleStructure,
-    Notice,
     NoticesInFrameRelStructure,
     TopographicPlacesInFrameRelStructure,
     TopographicPlace,
@@ -117,26 +124,23 @@ from netex import (
     OperatingDay,
     DayTypeRef,
     EntityStructure,
-    Locale,
+    NameOfClassOperatingPeriodRefStructureType, TextType
 )
 
-from netexio.database import Database
-
-from netexio.dbaccess import load_generator, load_local, recursive_attributes, fetch_references_classes_generator
-from utils.refs import getIndex, getRef, getId, getFakeRef
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
-from transformers.projection import project_location_4326
-from transformers.timetabled_passing_time import infer_id_and_order_and_apply
+
+# from transformers.projection import project_location_4326
+# from transformers.timetabled_passing_time import infer_id_and_order_and_apply
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
 
 
-def epip_line_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool):
+def epip_line_generator(db_read: MdbxStorage, txn_read: TXN, generator_defaults: dict[str, Any]):
     print(sys._getframe().f_code.co_name)
 
-    def process(line: Line):
+    def process(line: Line) -> Generator[Line, None, None]:
         line.branding_ref = None
         line.type_of_service_ref = None
         line.type_of_product_category_ref = None
@@ -154,79 +158,38 @@ def epip_line_generator(db_read: Database, db_write: Database, generator_default
                     line.additional_operators = TransportOrganisationRefsRelStructure(transport_organisation_ref=[line.authority_ref])
                 line.authority_ref = None
 
-        return line
+        yield line
 
-    def query(db_read: Database) -> Generator:
-        _load_generator = load_generator(db_read, Line)
-        for line in pool.imap_unordered(process, _load_generator, chunksize=100):
-            yield line
+    def query(db_read: MdbxStorage, txn_read: TXN) -> Generator[Line, None, None]:
+        for line in db_read.iter_only_objects(txn_read, Line):
+            yield from process(line)
 
-    db_write.insert_objects_on_queue(Line, query(db_read), True)
-
-
-def epip_line_memory(db_read: Database, db_write: Database, generator_defaults):
-    print(sys._getframe().f_code.co_name)
-    lines: List[Line] = load_local(db_read, Line)
-    for line in lines:
-        line: Line
-        line.branding_ref = None
-        line.type_of_service_ref = None
-        line.type_of_product_category_ref = None
-        if line.operator_ref and line.authority_ref:
-            if defaults['authority_reference']:
-                if line.additional_operators and line.additional_operators.transport_organisation_ref:
-                    line.additional_operators.transport_organisation_ref.append(line.operator_ref)
-                else:
-                    line.additional_operators = TransportOrganisationRefsRelStructure(transport_organisation_ref=[line.operator_ref])
-                line.operator_ref = None
-            else:
-                if line.additional_operators and line.additional_operators.transport_organisation_ref:
-                    line.additional_operators.transport_organisation_ref.append(line.authority_ref)
-                else:
-                    line.additional_operators = TransportOrganisationRefsRelStructure(transport_organisation_ref=[line.authority_ref])
-                line.authority_ref = None
-
-    db_write.insert_objects_on_queue(Line, lines, True)
+    yield from query(db_read, txn_read)
 
 
-def epip_scheduled_stop_point_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool):
-    print(sys._getframe().f_code.co_name)
-
-    def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, Any]):
+def epip_scheduled_stop_point_generator(db_read: MdbxStorage, txn_read: TXN, generator_defaults: dict[str, Any]):
+    def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, Any]) -> Generator[ScheduledStopPoint, None, None]:
         ssp.stop_areas = None
         ssp.key_list = None
         ssp.extensions = None
         if ssp.location is not None:
             project_location_4326(ssp.location)
-        return ssp
-
-    def query(db_read: Database) -> Generator:
-        _load_generator = load_generator(db_read, ScheduledStopPoint)
-        for ssp in pool.imap_unordered(partial(process, generator_defaults=generator_defaults), _load_generator, chunksize=100):
-            yield ssp
-
-    db_write.insert_objects_on_queue(ScheduledStopPoint, query(db_read), True)
-
-
-def epip_scheduled_stop_point_memory(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
-    print(sys._getframe().f_code.co_name)
-
-    scheduled_stop_points = load_local(db_read, ScheduledStopPoint)
-    ssp: ScheduledStopPoint
-    for ssp in scheduled_stop_points:
-        ssp.stop_areas = None
-        if ssp.location is not None:
-            project_location_4326(ssp.location)
         else:
-            print(f"ScheduledStopPoint {ssp.id} does not have a location.")
+            logging.info(f"ScheduledStopPoint {ssp.id} does not have a location.")
 
-    db_write.insert_objects_on_queue(ScheduledStopPoint, scheduled_stop_points, True)
+        yield ssp
+
+    def query(db_read: MdbxStorage, txn_read: TXN) -> Generator[ScheduledStopPoint, None, None]:
+        for ssp in db_read.iter_only_objects(txn_read, ScheduledStopPoint):
+            yield from process(ssp, generator_defaults)
+
+    yield from query(db_read, txn_read)
 
 
-def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defaults):
+def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     print(sys._getframe().f_code.co_name)
 
-    stop_places: dict[str, StopPlace] = getIndex(load_local(db_read, StopPlace))
+    stop_places: dict[str, StopPlace] = getIndex(db_read.iter_only_objects(txn, StopPlace))
 
     # Resolving a quay is very expensive. Either in the database it should be stored independently, or an index should be made available.
     quays: dict[str, Quay] = getIndex(
@@ -240,7 +203,7 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
     refs = set([])
     missing = []
 
-    stop_assignments: List[PassengerStopAssignment] = load_local(db_read, PassengerStopAssignment)
+    stop_assignments: List[PassengerStopAssignment] = list(db_read.iter_only_objects(txn, PassengerStopAssignment))
     retain_stop_assignments = []
     for stop_assignment in stop_assignments:
         if stop_assignment.taxi_stand_ref_or_quay_ref_or_quay is not None:  # and 'NL:Q:' in stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref:
@@ -281,10 +244,9 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
             retain_stop_assignments.append(stop_assignment)
 
     if len(retain_stop_assignments) > 0:
-        db_write.insert_objects_on_queue(PassengerStopAssignment, retain_stop_assignments, True)
+        yield from retain_stop_assignments
 
-    stop_places_list: List[StopPlace] = load_local(db_read, StopPlace)
-    retained_stop_places: List[StopPlace] = []
+    stop_places_list: List[StopPlace] = list(db_read.iter_only_objects(txn, StopPlace))
     for stop_place in stop_places_list:
         keep = False
         if stop_place.id in refs:
@@ -338,12 +300,11 @@ def epip_site_frame_memory(db_read: Database, db_write: Database, generator_defa
         if stop_place.centroid:
             project_location_4326(stop_place.centroid.location)
         """
-        retained_stop_places.append(stop_place)
-
-    db_write.insert_objects_on_queue(StopPlace, retained_stop_places, True)
+        yield stop_place
 
 
-def epip_timetabled_passing_times_memory(db_read: Database, db_write: Database, generator_defaults, dynamics=[]):
+"""
+def epip_timetabled_passing_times_memory(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults, dynamics=[]):
     print(sys._getframe().f_code.co_name)
 
     # TODO: Maybe do this on the fly, per servicejourney?
@@ -376,6 +337,7 @@ def epip_timetabled_passing_times_memory(db_read: Database, db_write: Database, 
         #     dynamic(sj)
 
     db_write.insert_objects_on_queue(ServiceJourney, service_journeys, False)
+"""
 
 
 # TODO: Potentially refactor this
@@ -396,10 +358,10 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
     id = hashlib.md5(';'.join(l_ssp).encode()).hexdigest()[0:8]
 
     for pis in piss:
-        pis.id = getId(StopPointInJourneyPattern, generator_defaults['codespace'], f"{id}-{pis.order}")
+        pis.id = getId(generator_defaults['codespace'], StopPointInJourneyPattern, f"{id}-{pis.order}")
 
     return ServiceJourneyPattern(
-        id=getId(ServiceJourneyPattern, generator_defaults['codespace'], id),
+        id=getId(generator_defaults['codespace'], ServiceJourneyPattern, id),
         version=sj.version,
         route_ref_or_route_view=RouteView(flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view),
         direction_type=sj.direction_type.value if sj.direction_type else None,  # https://github.com/NeTEx-CEN/NeTEx/issues/842
@@ -413,15 +375,15 @@ def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: d
 
 
 def service_journey_ac_to_day_type(
-    db_read: Database,
-    db_write: Database,
+    db_read: MdbxStorage,
+    txn: TXN,
     service_journey: ServiceJourney,
     availability_conditions_ids: Set[str],
     day_types_ids: Set[str],
     uic_operating_periods_ids: Set[str],
     day_type_assignments_ids: Set[str],
-) -> None:
-    acs = []
+) -> Generator[EntityStructure, None, None]:
+    acs: list[AvailabilityCondition] = []
 
     # TODO: Investigate if AvailabilityConditions are in fact used
     ac: ValidityConditionsRelStructure
@@ -429,7 +391,7 @@ def service_journey_ac_to_day_type(
         if isinstance(ac, ValidityConditionsRelStructure):
             for a in ac.choice:
                 if isinstance(a, AvailabilityConditionRef):
-                    this_ac = db_read.get_single(AvailabilityCondition, a.ref, a.version)
+                    this_ac = db_read.load_object_by_reference(txn, a)
                     acs.append(this_ac)
                 elif isinstance(a, AvailabilityCondition):
                     acs.append(a)
@@ -468,7 +430,7 @@ def service_journey_ac_to_day_type(
                 days_of_week=days_of_week,
             )
             uic_operating_periods_ids.add(uic_operating_period.id)
-            db_write.insert_one_object(uic_operating_period)
+            yield uic_operating_period
 
         else:
             uic_operating_period = UicOperatingPeriod(
@@ -482,7 +444,7 @@ def service_journey_ac_to_day_type(
                 days_of_week=days_of_week,
             )
             uic_operating_periods_ids.add(uic_operating_period.id)
-            db_write.insert_one_object(uic_operating_period)
+            yield uic_operating_period
 
         day_type = DayType(
             id=day_type_id,
@@ -491,7 +453,7 @@ def service_journey_ac_to_day_type(
             derived_from_version_ref_attribute=service_journey.version,
         )
         day_types_ids.add(day_type.id)
-        db_write.insert_one_object(day_type)
+        yield day_type
 
         day_type_assignment = DayTypeAssignment(
             id=acs[0].id.replace('AvailabilityCondition', 'DayTypeAssignment'),
@@ -505,15 +467,32 @@ def service_journey_ac_to_day_type(
             day_type_ref=cast(DayTypeRef, getRef(day_type)),
         )
         day_type_assignments_ids.add(day_type_assignment.id)
-        db_write.insert_one_object(day_type_assignment)
+        yield day_type_assignment
         day_type_ref = getRef(day_type)
     else:
         day_type_ref = getFakeRef(day_type_id, DayTypeRef, service_journey.version)  # TODO: Prevent fake ref
 
     service_journey.day_types = DayTypeRefsRelStructure(day_type_ref=[day_type_ref])
 
+# TODO: Avoid running this for ValidBetween and ServiceCalendar
+def get_validbetween(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> ValidBetween:
+    from_date: datetime = datetime.max
+    to_date: datetime = datetime.min
+    for uic in db_read.iter_only_objects(txn, UicOperatingPeriod):
+        dt = uic.from_operating_day_ref_or_from_date.to_datetime()
+        dt = dt.replace(tzinfo=None)
+        if from_date > dt:
+            from_date = dt
 
-def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any]):
+        dt = uic.to_operating_day_ref_or_to_date.to_datetime()
+        dt = dt.replace(tzinfo=None)
+        if to_date < dt:
+            to_date = dt
+
+    return ValidBetween(from_date=XmlDateTime.from_datetime(from_date), to_date=XmlDateTime.from_datetime(to_date))
+
+
+def get_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]):
     """
     if len(uic_operating_periods) == 0:
         # TODO: This should never happen, since EPIP specifies the use of UicOperatingPeriod
@@ -531,7 +510,7 @@ def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any])
                 if d > to_date:
                     to_date = d
 
-        return ServiceCalendar(id=getId(ServiceCalendar, generator_defaults['codespace'], "ServiceCalendar"),
+        return ServiceCalendar(id=getId(generator_defaults['codespace'], ServiceCalendar,  "ServiceCalendar"),
                                version=generator_defaults['version'],
                                from_date=XmlDate.from_date(from_date), to_date=XmlDate.from_date(to_date),
                                day_types=DayTypesRelStructure(day_type_ref_or_day_type=list(day_types.values())),
@@ -543,7 +522,7 @@ def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any])
 
     from_date: datetime = datetime.max
     to_date: datetime = datetime.min
-    for uic in load_generator(db_write, UicOperatingPeriod):
+    for uic in db_read.iter_only_objects(txn, UicOperatingPeriod):
         dt = uic.from_operating_day_ref_or_from_date.to_datetime()
         dt = dt.replace(tzinfo=None)
         if from_date > dt:
@@ -554,16 +533,16 @@ def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any])
         if to_date < dt:
             to_date = dt
 
-    day_types = GeneratorTester(load_generator(db_write, DayType))
-    uic_operating_periods = GeneratorTester(load_generator(db_write, UicOperatingPeriod))
-    day_type_assignments = GeneratorTester(load_generator(db_write, DayTypeAssignment))
+    day_types = GeneratorTester(db_read.iter_only_objects(txn, DayType))
+    uic_operating_periods = GeneratorTester(db_read.iter_only_objects(txn, UicOperatingPeriod))
+    day_type_assignments = GeneratorTester(db_read.iter_only_objects(txn, DayTypeAssignment))
 
     return ServiceCalendar(
-        id=getId(ServiceCalendar, generator_defaults['codespace'], "ServiceCalendar"),
+        id=getId(generator_defaults['codespace'], ServiceCalendar, "ServiceCalendar"),
         version=generator_defaults['version'],
         from_date=XmlDate.from_date(from_date.date()),
         to_date=XmlDate.from_date(to_date.date()),
-        day_types=DayTypesRelStructure(day_type_ref_or_day_type=day_types.generator()) if day_types.has_value() else None,
+        day_types=DayTypesRelStructure(day_type_ref_or_day_type_dummy=day_types.generator()) if day_types.has_value() else None,
         operating_periods=(
             OperatingPeriodsRelStructure(
                 uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period=uic_operating_periods.generator()
@@ -575,21 +554,22 @@ def get_service_calendar(db_write: Database, generator_defaults: dict[str, Any])
     )
 
 
-def epip_service_journey_generator(db_read: Database, db_write: Database, generator_defaults: dict[str, Any], pool: Pool, cache: bool) -> None:
-    print(sys._getframe().f_code.co_name)
+def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
+    # print(sys._getframe().f_code.co_name)
     # sjps: Dict[str, ServiceJourneyPattern] = {}
     sjp_ids: Set[str] = set()
     availability_conditions_ids: Set[str] = set()
     day_types_ids: Set[str] = set()
     uic_operating_periods_ids: Set[str] = set()
     day_type_assignments_ids: Set[str] = set()
+    # vehicle_types: dict[str, VehicleType] = dict()
 
     # availability_conditions: Dict[str, AvailabilityCondition] = {}
     # day_types: Dict[str, DayType] = {}
     # uic_operating_periods: List[UicOperatingPeriod] = []
     # day_type_assignments: List[DayTypeAssignment] = []
 
-    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: Database) -> None:
+    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: MdbxStorage, txn: TXN) -> None:
         sj_line_ref = None
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None and (
             isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineRef)
@@ -611,9 +591,7 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
                         print("RouteView: Other options to recover line not available")
 
             elif isinstance(service_journey_pattern.route_ref_or_route_view, RouteRef):
-                route: Route = db_read.get_single(
-                    Route, service_journey_pattern.route_ref_or_route_view.ref, service_journey_pattern.route_ref_or_route_view.version
-                )
+                route: Route = db_read.load_object_by_reference(txn, service_journey_pattern.route_ref_or_route_view)
                 service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=route.line_ref)
 
                 if service_journey_pattern.direction_type is None and route.direction_type is not None:
@@ -628,18 +606,20 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
 
-    def process(sj: ServiceJourney, db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> ServiceJourney:
+    def process(
+        sj: ServiceJourney, db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]
+    ) -> Generator[ServiceJourney | ServiceJourneyPattern | ServiceLink, None, None]:
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
-        service_journey_pattern: ServiceJourneyPattern = None
+        service_journey_pattern: Optional[ServiceJourneyPattern] = None
 
         if sj.passing_times:
             if sj.journey_pattern_ref.ref not in sjp_ids:
-                service_journey_pattern = db_read.get_single(ServiceJourneyPattern, sj.journey_pattern_ref.ref, sj.journey_pattern_ref.version)
+                service_journey_pattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
 
                 # Since we don't do it ourselves, we might want to check the poor input offered.
-                infer_id_and_order_and_apply(sj)
+                # infer_id_and_order_and_apply(sj)
 
         elif sj.calls:
             if sj.journey_pattern_ref:
@@ -652,15 +632,19 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
                 sj.journey_pattern_ref = getRef(service_journey_pattern)
 
             sj.passing_times = TimetabledPassingTimesRelStructure(
-                timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
+                 timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
             )
 
-        elif sj.time_demand_type_ref:
-            service_journey_pattern: ServiceJourneyPattern = db_read.get_single(
-                ServiceJourneyPattern, sj.journey_pattern_ref.ref, sj.journey_pattern_ref.version
-            )
-            time_demand_type: TimeDemandType = db_read.get_single(TimeDemandType, sj.time_demand_type_ref.ref, sj.time_demand_type_ref.version)
+        elif sj.journey_pattern_ref and sj.time_demand_type_ref:
+            service_journey_pattern: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
+            time_demand_type: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
             CallsProfile.getPassingTimesFromTimeDemandType(sj, service_journey_pattern, time_demand_type)
+
+        else:
+            log_all(
+                logging.ERROR,
+                f"No matching timing transformation found for journey: {sj}",
+            )
 
         # If we already know that this generated SJP already exists, we should not even add it.
         if sj.journey_pattern_ref.ref in sjp_ids:
@@ -676,33 +660,35 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
 
             if len(route_point_projection) > 0:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteRef):
-                    routes: list[Route] = load_local(
-                        db_read, Route, limit=1, filter_id=service_journey_pattern.route_ref_or_route_view.ref, cursor=True, cache=False
-                    )
-                    if len(routes) > 0:
-                        for sl in RoutesProfile.projectRouteToServiceLinks(
-                            db_read, service_journey_pattern, routes[0], route_point_projection, generator_defaults
-                        ):
-                            db_write.insert_one_object(sl)
+                    route: Route = db_read.load_object_by_reference(txn, service_journey_pattern.route_ref_or_route_view)
+                    for sl in RoutesProfile.projectRouteToServiceLinks(
+                        db_read, txn, service_journey_pattern, route, route_point_projection, generator_defaults
+                    ):
+                        yield sl
 
             service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern = [
                 pis
-                for pis in service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
+                for pis in (
+                    service_journey_pattern.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
+                )
                 if isinstance(pis, StopPointInJourneyPattern)
             ]
 
             # Ater the Routes to ServiceLinks!
-            recover_line_ref(sj, service_journey_pattern, db_read)
+            recover_line_ref(sj, service_journey_pattern, db_read, txn)
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
-            db_write.insert_one_object(service_journey_pattern)
+            # log_all(logging.INFO, f'{service_journey_pattern.id}')
+            yield service_journey_pattern
 
             # TODO: We might be able to avoid it if we work with prefix keys
             sjp_ids.add(service_journey_pattern.id)
 
         # service_journey_ac_to_day_type(sj, availability_conditions, day_types, uic_operating_periods, day_type_assignments)
-        service_journey_ac_to_day_type(db_read, db_write, sj, availability_conditions_ids, day_types_ids, uic_operating_periods_ids, day_type_assignments_ids)
+        yield from service_journey_ac_to_day_type(
+            db_read, txn, sj, availability_conditions_ids, day_types_ids, uic_operating_periods_ids, day_type_assignments_ids
+        )
 
         # TODO: AvailabilityCondition -> Uic
 
@@ -710,30 +696,39 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
         sj.time_demand_type_ref = None
         sj.key_list = None
         sj.private_code = None
-        sj.train_numbers = None
+        sj.train_numbers = None # Leonard, this must be removed
         sj.extensions = None
         sj.notice_assignments = None
         sj.calls = None
         sj.link_sequence_projection_ref_or_link_sequence_projection = None
         sj.journey_pattern_view = None
         sj.direction_type = None
+        # sj.vehicle_type_ref_or_train_ref = vehicle_types.get(sj.id, None) if sj.vehicle_type_ref_or_train_ref is None else None
 
         # TODO: prevent caching altogether?
         # db_read.clean_cache()
-        return sj
+        yield sj
 
-    def query(db_read: Database) -> Generator[ServiceJourney, None, None]:
-        _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
-        for sj in _load_generator:
-            yield process(sj, db_read, db_write, generator_defaults)
-        # for sj in pool.imap_unordered(partial(process, read_database=read_database, write_database=write_database, generator_defaults=generator_defaults), _load_generator, chunksize=100):
-        #     yield sj
+    def query(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
+        # for notice_assignment in db_read.iter_only_objects(txn, NoticeAssignment):
+        #    notice_assignment: NoticeAssignment
+        #    # Maybe implement this via the reference table directly?
+        #    if notice_assignment.noticed_object_ref.name_of_ref_class == NameOfClass.SERVICE_JOURNEY:
+        #        notice_assignments[notice_assignment.noticed_object_ref.ref] = notice_assignment.notice_ref
+
+        # for block in db_read.iter_only_objects(txn, Block):
+        #    for sjr in block.journeys.choice:
+        #        if isinstance(sjr, ServiceJourneyRef):
+        #            vehicle_types[sjr.ref] = block.vehicle_type_ref_or_train_ref
+
+        for sj in db_read.iter_only_objects(txn, ServiceJourney):
+            yield from process(sj, db_read, txn, generator_defaults)
 
     # TODO: At this point we should have a check to know if the ServiceJourneyPattern is geographically enabled, or not
 
     log_all(logging.INFO, "Indexing RoutePoint to ScheduledStopPoint ")
     route_point_projection = {}
-    for ssp in load_generator(db_read, ScheduledStopPoint):
+    for ssp in db_read.iter_only_objects(txn, ScheduledStopPoint):
         rp_to_ssp = list(RoutesProfile.route_point_projection(ssp))
         if len(rp_to_ssp) > 0:
             route_point_projection[getRef(ssp).ref] = rp_to_ssp[0]
@@ -742,13 +737,14 @@ def epip_service_journey_generator(db_read: Database, db_write: Database, genera
     # vailability_conditions = getIndex(load_local(db_read, AvailabilityCondition))
 
     log_all(logging.INFO, "Service journeys for now ")
-    db_write.insert_objects_on_queue(ServiceJourney, query(db_read), True)
+
+    yield from query(db_read, txn, generator_defaults)
 
 
-def epip_service_calendar(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[EntityStructure, None, None]:
     log_all(logging.INFO, "Calendar creation...")
 
-    service_calendars: List[ServiceCalendar] = load_local(db_read, ServiceCalendar)
+    service_calendars: List[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
     if False and len(service_calendars) > 0:
         # TODO: WORKAROUND
         log_once("problem with epip_service_calender")
@@ -757,58 +753,79 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
 
     else:
         day_types = getIndex(
-            list(
-                itertools.chain.from_iterable(
-                    [service_calendar.day_types.day_type_ref_or_day_type for service_calendar in service_calendars if service_calendar.day_types]
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [service_calendar.day_types.day_type_ref_or_day_type_dummy for service_calendar in service_calendars if service_calendar.day_types]
                 )
-            )
-            + load_local(db_read, DayType, embedding=True)
+                if isinstance(x, DayType)
+            ]
+            + list(
+                db_read.iter_only_objects(txn, DayType)
+            )  # TODO: we still need to also handle the DayType from embedding load_local(db_read, DayType, embedding=True)
         )
+
         uic_operating_periods = getIndex(
-            list(
-                itertools.chain.from_iterable(
+            [
+                x
+                for x in itertools.chain.from_iterable(
                     [
                         service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
                         for service_calendar in service_calendars
                         if service_calendar.operating_periods
                     ]
                 )
-            )
-            + load_local(db_read, UicOperatingPeriod, embedding=True)
-        )
-        day_type_assignments = list(
-            itertools.chain.from_iterable(
-                [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
-            )
-        ) + load_local(db_read, DayTypeAssignment, embedding=True)
-        operating_periods = getIndex(
-            list(
-                itertools.chain.from_iterable(
-                    [
-                        service_calendar.day_type_assignments.day_type_assignment
-                        for service_calendar in service_calendars
-                        if service_calendar.day_type_assignments
-                    ]
-                )
-            )
-            + load_local(db_read, OperatingPeriod, embedding=True)
-        )
-        operating_days = getIndex(
-            list(
-                itertools.chain.from_iterable(
-                    [
-                        service_calendar.day_type_assignments.day_type_assignment
-                        for service_calendar in service_calendars
-                        if service_calendar.day_type_assignments
-                    ]
-                )
-            )
-            + load_local(db_read, OperatingDay, embedding=True)
+                if isinstance(x, UicOperatingPeriod)
+            ]
+            + list(db_read.iter_only_objects(txn, UicOperatingPeriod))
+            # TODO: we still need to also handle the UicOperatingPeriod from embedding load_local(db_read, UicOperatingPeriod, embedding=True)
         )
 
-        result_day_type = []
-        result_day_type_assignments = []
-        result_uic_operating_periods = []
+        operating_periods = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_periods.uic_operating_period_ref_or_operating_period_ref_or_operating_period_or_uic_operating_period
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_periods
+                    ]
+                )
+                if isinstance(x, OperatingPeriod)
+            ]
+            + list(db_read.iter_only_objects(txn, OperatingPeriod))
+            # TODO: we still need to also handle the OperatingPeriod from embedding load_local(db_read, OperatingPeriod, embedding=True)
+        )
+
+        operating_days = getIndex(
+            [
+                x
+                for x in itertools.chain.from_iterable(
+                    [
+                        service_calendar.operating_days.operating_day_ref_or_operating_day
+                        for service_calendar in service_calendars
+                        if service_calendar.operating_days
+                    ]
+                )
+                if isinstance(x, OperatingDay)
+            ]
+            + list(db_read.iter_only_objects(txn, OperatingDay))
+            # TODO: we still need to also handle the OperatingDay from embedding load_local(db_read, OperatingDay, embedding=True)
+        )
+
+        day_type_assignments = [
+            x
+            for x in itertools.chain.from_iterable(
+                [service_calendar.day_type_assignments.day_type_assignment for service_calendar in service_calendars if service_calendar.day_type_assignments]
+            )
+            if isinstance(x, DayTypeAssignment)
+        ] + list(
+            db_read.iter_only_objects(txn, DayTypeAssignment)
+        )  # TODO: we still need to also handle the DayTypeAssignment from embedding load_local(db_read, DayTypeAssignment, embedding=True)
+
+        # result_day_type = []
+        # result_day_type_assignments = []
+        # result_uic_operating_periods = []
 
         for day_type_ref, my_day_type_assignments in itertools.groupby(day_type_assignments, key=lambda day_type_assignment: day_type_assignment.day_type_ref):
             t = list(my_day_type_assignments)
@@ -819,7 +836,8 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, UicOperatingPeriodRef)
                 or (
                     hasattr(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, 'name_of_ref_class')
-                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'UicOperatingPeriod'
+                    and dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructureType.UIC_OPERATING_PERIOD
                 )
             ]
             my_operating_periods: list[OperatingPeriod] = [
@@ -828,7 +846,8 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
                 if isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef)
                 and (
                     dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class is None
-                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class == 'OperatingPeriod'
+                    or dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.name_of_ref_class
+                    == NameOfClassOperatingPeriodRefStructureType.OPERATING_PERIOD
                 )
                 and (dta.is_available is None or dta.is_available)
             ]
@@ -918,19 +937,21 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
                     res_dta.day_type_ref = day_type_ref
                     res_dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(uic_operating_period, OperatingPeriodRef)
 
-                    result_day_type_assignments.append(res_dta)
-                    result_uic_operating_periods.append(uic_operating_period)
+                    # result_day_type_assignments.append(res_dta)
+                    yield res_dta
+                    # result_uic_operating_periods.append(uic_operating_period)
+                    yield uic_operating_period
                 else:
                     log_all(logging.WARNING, f"There are no operatingdays for DayType {my_day_type.id}")
 
             else:
-                result_day_type_assignments += t
-                result_uic_operating_periods += my_uic_operating_periods
-            result_day_type += [my_day_type]
+                yield from t
+                yield from my_uic_operating_periods
+            yield my_day_type
 
-        db_write.insert_objects_on_queue(DayType, result_day_type, empty=False)
-        db_write.insert_objects_on_queue(DayTypeAssignment, result_day_type_assignments, empty=False)
-        db_write.insert_objects_on_queue(UicOperatingPeriod, result_uic_operating_periods, empty=False)
+        # yield result_day_type
+        # yield result_day_type_assignments
+        # yield result_uic_operating_periods
 
         # service_calendar = get_service_calendar(db_write, generator_defaults)
         # db_write.insert_objects_on_queue([service_calendar], True, True)
@@ -940,10 +961,9 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
     # service_calendar = get_service_calendar(db_write, generator_defaults)
     # db_write.insert_objects_on_queue([service_calendar], True, True)
 
-    # availability_conditions = load_local(db_read, AvailabilityCondition)
+    # availability_conditions = [ac for _key, ac  in db_read.iter_objects(txn, AvailabilityCondition)]
     # servicecalendarepip = ServiceCalendarEPIPFrame(generator_defaults['codespace'])
-    # service_calendar = servicecalendarepip.availabilityConditionsToServiceCalendar(service_journeys,
-    #                                                                                availability_conditions)
+    # service_calendar = servicecalendarepip.availabilityConditionsToServiceCalendar(service_journeys, availability_conditions)
     # write_objects(write_con, [service_calendar], True, False)
 
     # timetabledpassingtimesprofile = TimetablePassingTimesProfile(generator_defaults['codespace'], generator_defaults['version'], service_journeys, service_journey_patterns, time_demand_types)
@@ -960,7 +980,7 @@ def epip_service_calendar(db_read: Database, db_write: Database, generator_defau
     # db_write.insert_objects_on_queue([service_calendar], True, cursor=True)
 
 
-def epip_remove_keylist_extensions(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]):
+def epip_remove_keylist_extensions(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]):
     def process(deserialised: Tid, keys: list[str]) -> Any:
         for obj, path in recursive_attributes(deserialised, []):
             for key in keys:
@@ -969,84 +989,84 @@ def epip_remove_keylist_extensions(db_read: Database, db_write: Database, genera
 
         return deserialised
 
-    def query1(db_read: Database) -> Generator[StopPlace, None, None]:
-        _load_generator = load_generator(db_read, StopPlace, embedding=False, cache=False)
-        for obj in _load_generator:
+    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[StopPlace, None, None]:
+        for obj in db_read.iter_only_objects(txn, StopPlace):
             yield process(obj, ['key_list', 'extensions'])
 
-    def query2(db_read: Database) -> Generator[ScheduledStopPoint, None, None]:
-        _load_generator = load_generator(db_read, ScheduledStopPoint, embedding=False, cache=False)
-        for obj in _load_generator:
+    def query2(db_read: MdbxStorage, txn: TXN) -> Generator[ScheduledStopPoint, None, None]:
+        for obj in db_read.iter_only_objects(txn, ScheduledStopPoint):
             yield process(obj, ['key_list', 'extensions'])
 
-    def query3(db_read: Database) -> Generator[ServiceJourneyPattern, None, None]:
-        _load_generator = load_generator(db_read, ServiceJourneyPattern, embedding=False, cache=False)
-        for obj in _load_generator:
+    def query3(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyPattern, None, None]:
+        for obj in db_read.iter_only_objects(txn, ServiceJourneyPattern):
             yield process(obj, ['key_list', 'extensions'])
 
-    def query4(db_read: Database) -> Generator[ServiceJourney, None, None]:
-        _load_generator = load_generator(db_read, ServiceJourney, embedding=False, cache=False)
-        for obj in _load_generator:
+    def query4(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
+        for obj in db_read.iter_only_objects(txn, ServiceJourney):
             yield process(obj, ['key_list', 'extensions'])
 
-    db_write.insert_objects_on_queue(StopPlace, query1(db_read))
-    db_write.insert_objects_on_queue(ScheduledStopPoint, query2(db_read))
-    db_write.insert_objects_on_queue(ServiceJourneyPattern, query3(db_read))
-    db_write.insert_objects_on_queue(ServiceJourney, query4(db_read))
+    yield from query1(db_read)
+    yield from query2(db_read)
+    yield from query3(db_read)
+    yield from query4(db_read)
 
 
 def export_epip_network_offer(
-    db_epip: Database,
+    db_epip: MdbxStorage,
+    txn: TXN,
     composite_frame_id: str = "EU_NETWORK_OFFER",
     type_of_frame_ref: TypeOfFrameRef = TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0'),
+    default_locale: LocaleStructure = LocaleStructure(default_language="nl", time_zone="Europe/Amsterdam")
 ) -> PublicationDelivery:
     # Maybe generalize this for other profiles too
-    default_locale: Locale | None = None
     default_codespace: Codespace | None = None
-    frame_defaults: VersionFrameDefaultsStructure
-    for frame_defaults in db_epip.get_metadata(None, None, VersionFrameDefaultsStructure):
-        if default_codespace is None and frame_defaults.default_codespace_ref:
-            default_codespace_ref = frame_defaults.default_codespace_ref
-            default_codespace = db_epip.get_single(Codespace, default_codespace_ref.ref, None)
-
-        if default_locale is None and frame_defaults.default_locale:
-            default_locale = frame_defaults.default_locale
+    # frame_defaults: VersionFrameDefaultsStructure
+    # TODO:
+    # for frame_defaults in db_epip.get_metadata(None, None, VersionFrameDefaultsStructure):
+    #    if default_codespace is None and frame_defaults.default_codespace_ref:
+    #        default_codespace_ref = frame_defaults.default_codespace_ref
+    #        default_codespace = db_epip.get_single(Codespace, default_codespace_ref.ref, None)
+    #
+    #    if default_locale is None and frame_defaults.default_locale:
+    #        default_locale = frame_defaults.default_locale
 
     if default_codespace is None:
         default_codespace = Codespace(id="OPENOV", xmlns="OPENOV")
 
-    codespace_ref_or_codespace = GeneratorTester(load_generator(db_epip, Codespace))
-    data_source = GeneratorTester(load_generator(db_epip, DataSource))
-    organisation_or_transport_organisation: list[Any] = load_local(db_epip, Authority) + load_local(db_epip, Operator)
-    value_set = GeneratorTester(load_generator(db_epip, ValueSet))
-    transport_administrative_zone = GeneratorTester(load_generator(db_epip, TransportAdministrativeZone))
+    codespace_ref_or_codespace = GeneratorTester(db_epip.iter_only_objects(txn, Codespace))
+    data_source = GeneratorTester(db_epip.iter_only_objects(txn, DataSource))
+    organisation_or_transport_organisation: list[Any] = list(db_epip.iter_only_objects(txn, Authority)) + list(db_epip.iter_only_objects(txn, Operator))
+    value_set = GeneratorTester(db_epip.iter_only_objects(txn, ValueSet))
+    transport_administrative_zone = GeneratorTester(db_epip.iter_only_objects(txn, TransportAdministrativeZone))
 
-    transport_type_dummy_type_or_train_type = GeneratorTester(load_generator(db_epip, VehicleType))
-    responsibility_set = GeneratorTester(load_generator(db_epip, ResponsibilitySet))
+    transport_type_dummy_type_or_train_type = GeneratorTester(db_epip.iter_only_objects(txn, VehicleType))
+    responsibility_set = GeneratorTester(db_epip.iter_only_objects(txn, ResponsibilitySet))
 
-    stop_place = GeneratorTester(load_generator(db_epip, StopPlace))
-    topographic_place = GeneratorTester(load_generator(db_epip, TopographicPlace))
+    stop_place = GeneratorTester(db_epip.iter_only_objects(txn, StopPlace))
+    topographic_place = GeneratorTester(db_epip.iter_only_objects(txn, TopographicPlace))
 
-    direction = GeneratorTester(load_generator(db_epip, Direction))
-    line = GeneratorTester(chain(load_generator(db_epip, Line), load_generator(db_epip, FlexibleLine)))
-    network = GeneratorTester(load_generator(db_epip, Network, 0))
-    # network = GeneratorTester(load_generator(db_epip, Network, 1))
-    destination_display = GeneratorTester(load_generator(db_epip, DestinationDisplay))
-    scheduled_stop_point = GeneratorTester(load_generator(db_epip, ScheduledStopPoint))
-    tariff_zone = GeneratorTester(load_generator(db_epip, TariffZone))
-    service_link = GeneratorTester(load_generator(db_epip, ServiceLink))
-    journey_pattern = GeneratorTester(load_generator(db_epip, ServiceJourneyPattern))
-    transfer = GeneratorTester(chain(load_generator(db_epip, Connection), load_generator(db_epip, SiteConnection), load_generator(db_epip, DefaultConnection)))
-    stop_assignment = GeneratorTester(load_generator(db_epip, PassengerStopAssignment))
-    notice = GeneratorTester(load_generator(db_epip, Notice))
+    direction = GeneratorTester(db_epip.iter_only_objects(txn, Direction))
+    line = GeneratorTester(chain(db_epip.iter_only_objects(txn, Line), db_epip.iter_only_objects(txn, FlexibleLine)))
+    network = GeneratorTester(db_epip.iter_only_objects(txn, Network, 0))
+    # network = GeneratorTester(db_epip.iter_only_objects(txn, Network, 1))
+    destination_display = GeneratorTester(db_epip.iter_only_objects(txn, DestinationDisplay))
+    scheduled_stop_point = GeneratorTester(db_epip.iter_only_objects(txn, ScheduledStopPoint))
+    tariff_zone = GeneratorTester(db_epip.iter_only_objects(txn, TariffZone))
+    service_link = GeneratorTester(db_epip.iter_only_objects(txn, ServiceLink))
+    journey_pattern = GeneratorTester(db_epip.iter_only_objects(txn, ServiceJourneyPattern))
+    transfer = GeneratorTester(
+        chain(db_epip.iter_only_objects(txn, Connection), db_epip.iter_only_objects(txn, SiteConnection), db_epip.iter_only_objects(txn, DefaultConnection))
+    )
+    stop_assignment = GeneratorTester(db_epip.iter_only_objects(txn, PassengerStopAssignment))
+    notice = GeneratorTester(db_epip.iter_only_objects(txn, Notice))
 
-    service_journey = GeneratorTester(load_generator(db_epip, ServiceJourney))
-    service_journey_interchange = GeneratorTester(load_generator(db_epip, ServiceJourneyInterchange))
+    service_journey = GeneratorTester(db_epip.iter_only_objects(txn, ServiceJourney))
+    service_journey_interchange = GeneratorTester(db_epip.iter_only_objects(txn, ServiceJourneyInterchange))
 
     # TODO: Refactor this to make the ServiceCalendar only at the last point
-    # service_calendar = GeneratorTester(load_generator(db_epip, ServiceCalendar, 1))
+    # service_calendar = GeneratorTester(db_epip.iter_only_objects(txn, ServiceCalendar, 1))
 
-    other_referenced_classes = [
+    other_referenced_classes: set[type[EntityStructure]] = {
         Authority,
         Connection,
         DayType,
@@ -1076,9 +1096,9 @@ def export_epip_network_offer(
         UicOperatingPeriod,
         ValueSet,
         VehicleType,
-    ]
+    }
 
-    other_referenced_objects = GeneratorTester(fetch_references_classes_generator(db_epip, other_referenced_classes))
+    other_referenced_objects = GeneratorTester(db_epip.fetch_all_references_by_class(txn, other_referenced_classes, True))
 
     if default_locale is None:
         all_locales = {org.locale for org in organisation_or_transport_organisation if org.locale is not None}
@@ -1096,13 +1116,14 @@ def export_epip_network_offer(
         version="ntx:1.1",
         publication_timestamp=XmlDateTime.now(),
         participant_ref=ParticipantRef(value=defaults["particpant_ref"]),
-        description=MultilingualString(value=defaults["xml_description"]),
+        description=MultilingualString(content=[TextType(value=defaults["xml_description"])]),
         data_objects=DataObjectsRelStructure(
             choice=[
                 CompositeFrame(
                     id=composite_frame_id,
                     version=version,
                     type_of_frame_ref=type_of_frame_ref,
+                    validity_conditions_or_valid_between=get_validbetween(db_epip, txn, {'codespace': default_codespace, 'version': version}),
                     frame_defaults=VersionFrameDefaultsStructure(
                         default_location_system="urn:ogc:def:crs:EPSG::4326", default_system_of_units=SystemOfUnits.SI_METRES, default_locale=default_locale
                     ),
@@ -1120,12 +1141,12 @@ def export_epip_network_offer(
                                 data_sources=DataSourcesInFrameRelStructure(data_source=data_source.generator()) if data_source.has_value() else None,
                                 types_of_value=TypesOfValueInFrameRelStructure(choice=value_set.generator()) if value_set.has_value() else None,
                                 organisations=(
-                                    OrganisationsInFrameRelStructure(organisation_or_transport_organisation=organisation_or_transport_organisation)
+                                    OrganisationsInFrameRelStructure(organisation_dummy_or_transport_organisation_dummy=organisation_or_transport_organisation)
                                     if len(organisation_or_transport_organisation) > 0
                                     else None
                                 ),
                                 vehicle_types=(
-                                    VehicleTypesInFrameRelStructure(transport_type_dummy_type_or_train_type=transport_type_dummy_type_or_train_type.generator())
+                                    VehicleTypesInFrameRelStructure(transport_type_dummy_or_train_dummy=transport_type_dummy_type_or_train_type.generator())
                                     if transport_type_dummy_type_or_train_type.has_value()
                                     else None
                                 ),
@@ -1157,7 +1178,7 @@ def export_epip_network_offer(
                                 version=version,
                                 type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_NETWORK', version_ref='1.0'),
                                 directions=DirectionsInFrameRelStructure(direction=direction.generator()) if direction.has_value() else None,
-                                lines=LinesInFrameRelStructure(line=line.generator()) if line.has_value() else None,
+                                lines=LinesInFrameRelStructure(line_dummy=line.generator()) if line.has_value() else None,
                                 network=list(network.generator())[0] if network.has_value() else None,
                                 # Warning; we must handle multiple stuff
                                 destination_displays=(
@@ -1172,16 +1193,20 @@ def export_epip_network_offer(
                                 ),
                                 service_links=ServiceLinksInFrameRelStructure(service_link=service_link.generator()) if service_link.has_value() else None,
                                 journey_patterns=(
-                                    JourneyPatternsInFrameRelStructure(journey_pattern=journey_pattern.generator()) if journey_pattern.has_value() else None
+                                    JourneyPatternsInFrameRelStructure(journey_pattern_dummy=journey_pattern.generator())
+                                    if journey_pattern.has_value()
+                                    else None
                                 ),
                                 connections=TransfersInFrameRelStructure(transfer=transfer.generator()) if transfer.has_value() else None,
                                 stop_assignments=(
-                                    StopAssignmentsInFrameRelStructure(stop_assignment_or_passenger_boarding_position_assignment=stop_assignment.generator())
+                                    StopAssignmentsInFrameRelStructure(
+                                        stop_assignment_or_passenger_boarding_position_assignment_dummy=stop_assignment.generator()
+                                    )
                                     if stop_assignment.has_value()
                                     else None
                                 ),
                                 notices=NoticesInFrameRelStructure(notice=notice.generator()) if notice.has_value() else None,
-                                tariff_zones=TariffZonesInFrameRelStructure(tariff_zone=tariff_zone.generator()) if tariff_zone.has_value() else None,
+                                tariff_zones=TariffZonesInFrameRelStructure(tariff_zone_dummy=tariff_zone.generator()) if tariff_zone.has_value() else None,
                             ),
                             TimetableFrame(
                                 id="EU_PI_TIMETABLE",
@@ -1207,7 +1232,9 @@ def export_epip_network_offer(
                                 id="EU_PI_CALENDAR",
                                 version=version,
                                 type_of_frame_ref=TypeOfFrameRef(ref='epip:EU_PI_CALENDAR', version_ref='1.0'),
-                                service_calendar=get_service_calendar(db_epip, {'codespace': default_codespace, 'version': version}),  # TODO: do differently
+                                service_calendar=get_service_calendar(
+                                    db_epip, txn, {'codespace': default_codespace, 'version': version}
+                                ),  # TODO: do differently
                             ),
                             GeneralFrame(
                                 id="OTHER_REFERENCED",
@@ -1228,19 +1255,18 @@ def export_epip_network_offer(
     return publication_delivery
 
 
-def epip_service_journey_interchange(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
     print(sys._getframe().f_code.co_name)
 
-    def query1(db_read: Database) -> Generator[ServiceJourneyInterchange, None, None]:
+    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange, None, None]:
         # _load_generator = load_generator(db_read, InterchangeRule)
         # for interchange_rule in _load_generator:
         #     interchange_rule: InterchangeRule
         #     service_journey_interchange: ServiceJourneyInterchange = project(interchange_rule, ServiceJourneyInterchange)
         #     yield service_journey_interchange
 
-        _load_generator = load_generator(db_read, JourneyMeeting)
         journey_meeting: JourneyMeeting
-        for journey_meeting in _load_generator:
+        for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
             # TODO: I want the from_journey ref having the "correct" name_of_ref_class
             service_journey_interchange: ServiceJourneyInterchange = project(
                 journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
@@ -1270,8 +1296,15 @@ def epip_service_journey_interchange(db_read: Database, db_write: Database, gene
 
         """
 
-    db_write.insert_objects_on_queue(ServiceJourneyInterchange, query1(db_read))
+    yield from query1(db_read, txn)
+
+def epip_service_journey_notices(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
+    print(sys._getframe().f_code.co_name)
 
 
-def epip_interchange_rule(db_read: Database, db_write: Database, generator_defaults: dict[str, Any]) -> None:
+"""
+from transformers.interchanges import interchange_rules_to_service_journey_interchanges
+
+def epip_interchange_rule(db_read: MdbxStorage, db_write: MdbxStorage, generator_defaults: dict[str, Any]) -> None:
     db_write.insert_objects_on_queue(ServiceJourneyInterchange, interchange_rules_to_service_journey_interchanges(db_read))
+"""

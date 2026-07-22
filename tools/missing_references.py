@@ -1,11 +1,9 @@
 import logging
 
-import cloudpickle
-
 from netexio.database import Database
 from netexio.pickleserializer import MyPickleSerializer
 from utils.aux_logging import prepare_logger, log_all
-
+import netexio.binaryserializer
 
 def main(source_database_file: str):
     with Database(source_database_file, MyPickleSerializer(compression=True), readonly=True) as source_db:
@@ -13,7 +11,7 @@ def main(source_database_file: str):
             cursor = txn.cursor(source_db.db_referencing)
             all_referenced_elements = set([])
             for key, value in cursor:
-                object_clazz, object_id, object_version, _embedding_path = cloudpickle.loads(value)
+                object_clazz, object_id, object_version, _embedding_path = netexio.binaryserializer.deserialize_relation(value)
                 needle = (object_clazz, object_id, object_version)
                 if needle in all_referenced_elements:
                     continue

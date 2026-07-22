@@ -103,8 +103,8 @@ def main(source_database_file: str, geojson_file: str):
             point = fromNeTEx(ssp.location)
             # stops.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [point.x, point.y]}, "properties": {"name": ssp.name.value}})
             if polygon.contains(point):
-                if 'NL' in ssp.id:
-                    lines += list(recursive_inwards_lookup(db_read, ScheduledStopPoint, ssp.id, ssp.version, resolved_ssp, resolved_sjp, resolved_timing_links, resolved_service_links, resolved_route_point, resolved_line, resolved_route, resolved_service_journey))
+                # if 'NL' in ssp.id:
+                lines += list(recursive_inwards_lookup(db_read, ScheduledStopPoint, ssp.id, ssp.version, resolved_ssp, resolved_sjp, resolved_timing_links, resolved_service_links, resolved_route_point, resolved_line, resolved_route, resolved_service_journey))
 
         ssps = set([])
         for line in lines:
@@ -124,12 +124,12 @@ def main(source_database_file: str, geojson_file: str):
 
         json.dump({ "type": "FeatureCollection", "features": stops }, open("/tmp/stops2.geojson", 'w'))
 
-        stops = []
-        for ssp in load_local(db_read, ScheduledStopPoint):
-            point = fromNeTEx(ssp.location)
-            stops.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [point.x, point.y]}, "properties": {"name": ssp.name.value}})
+        # stops = []
+        # for ssp in load_local(db_read, ScheduledStopPoint):
+        #     point = fromNeTEx(ssp.location)
+        #     stops.append({"type": "Feature", "geometry": {"type": "Point", "coordinates": [point.x, point.y]}, "properties": {"name": ssp.name.value}})
 
-        json.dump({"type": "FeatureCollection", "features": stops}, open("/tmp/stopsall.geojson", 'w'))
+        # json.dump({"type": "FeatureCollection", "features": stops}, open("/tmp/stopsall.geojson", 'w'))
 
 if __name__ == '__main__':
     import argparse

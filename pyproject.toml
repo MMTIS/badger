@@ -2,15 +2,17 @@
 name = "badger"
 version = "0.1.0"
 description = "A fast Python based timetable converter"
-authors = ["Stefan de Konink <stefan@konink.de>"]
+authors = [ { name =    "Stefan de Konink", email = "stefan@konink.de" } ]
 dependencies = [
     "chardet",
     "cloudpickle",
     "dateutils",
     "duckdb",
     "isal",
+    "libmdbx",
     "lmdb",
     "lz4",
+    "openpyxl",
     "numpy",
     "pandas",
     "pyproj",
@@ -23,12 +25,12 @@ dependencies = [
     "paramiko",
     "types-paramiko",
     "tqdm",
-    "xsdata[cli,soap,lxml]>=24.12",
+    "xsdata[cli,soap,lxml]==26.2",
 ]
 requires-python = ">=3.12"
 
 [tool.black]
-extend-exclude = "netex"
+extend-exclude = "domain/netex/model/*.py"
 preview = true
 line-length = 160
 skip-string-normalization = true
@@ -36,7 +38,11 @@ skip-string-normalization = true
 [tool.mypy]
 strict = true
 ignore_missing_imports = true
-exclude = ["netex"]
+exclude = ["domain/netex/model/*.py"]
 
 [tool.ruff]
-exclude = ["netex"]
+exclude = ["domain/netex/model/*.py"]
+
+[[tool.mypy.overrides]]
+module = ["domain.netex.model.*"]
+ignore_errors = true

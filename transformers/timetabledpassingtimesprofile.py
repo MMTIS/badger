@@ -1,7 +1,10 @@
 from typing import cast
 
+from domain.netex.indexes.byid import getIndex
+from domain.netex.services.ids import getId
+from domain.netex.services.refs import getRef
 from transformers.callsprofile import CallsProfile
-from netex import (
+from domain.netex.model import (
     ServiceJourney,
     ServiceJourneyPattern,
     StopPointInJourneyPattern,
@@ -15,9 +18,8 @@ from netex import (
     RouteView,
     JourneyPattern,
     TimingPointInJourneyPattern,
-    TimeDemandType,
+    TimeDemandType, TextType,
 )
-from utils.refs import getRef, getIndex, getId
 import sys
 import hashlib
 
@@ -43,7 +45,7 @@ class TimetablePassingTimesProfile:
     @staticmethod
     def mapCallToStopPointInJourneyPattern(call: Call, codespace: Codespace) -> StopPointInJourneyPattern:
         stop_point_in_journey_pattern = StopPointInJourneyPattern(
-            id=getId(StopPointInJourneyPattern, codespace, f"-XXX-{call.order}"),
+            id=getId(codespace, StopPointInJourneyPattern, f"-XXX-{call.order}"),
             version=call.version,
             order=call.order,
             derived_from_object_ref=call.id,
@@ -239,12 +241,12 @@ class TimetablePassingTimesProfile:
                         and service_journey_pattern is None
                     ):
                         service_journey_pattern = ServiceJourneyPattern(
-                            id=getId(ServiceJourneyPattern, codespace, spijp_hash),
+                            id=getId(codespace, ServiceJourneyPattern, spijp_hash),
                             version=sj.version,
                             route_ref_or_route_view=RouteView(
                                 flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
                             ),
-                            name=MultilingualString(value=spijp_hash),
+                            name=MultilingualString(content=[TextType(value=spijp_hash)]),
                             derived_from_object_ref=sj.id,
                             derived_from_version_ref_attribute=sj.version,
                             points_in_sequence=spijps,
@@ -339,12 +341,12 @@ class TimetablePassingTimesProfile:
                             and service_journey_pattern is None
                         ):
                             service_journey_pattern = ServiceJourneyPattern(
-                                id=getId(ServiceJourneyPattern, self.codespace, spijp_hash),
+                                id=getId(self.codespace, ServiceJourneyPattern, spijp_hash),
                                 version=sj.version,
                                 route_ref_or_route_view=RouteView(
                                     flexible_line_ref_or_line_ref_or_line_view=sj.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
                                 ),
-                                name=MultilingualString(value=spijp_hash),
+                                name=MultilingualString(content=[TextType(value=spijp_hash)]),
                                 derived_from_object_ref=sj.id,
                                 derived_from_version_ref_attribute=sj.version,
                                 points_in_sequence=spijps,

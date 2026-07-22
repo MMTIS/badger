@@ -1,0 +1,2 @@
+# Current set of scripts to run in sequence
+python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro

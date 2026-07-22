@@ -3,13 +3,32 @@ import hashlib
 from decimal import Decimal
 from typing import List, Dict, Generator
 
-from netex import Codespace, ServiceLink, RouteLink, RoutePoint, RoutePointRefStructure, TimingLink, PointRefStructure, \
-    TimingPoint, ScheduledStopPoint, TimingPointVersionStructure, ScheduledStopPointRefStructure, Route, \
-    PointProjection, ServiceJourneyPattern, StopPointInJourneyPattern, PosList, ServiceLinkRefStructure
-from netexio.database import Database
-from netexio.dbaccess import load_local
+from mdbx.mdbx import TXN
 
-from utils.refs import getId, getRef
+from domain.netex.model import (
+    Codespace,
+    ServiceLink,
+    RouteLink,
+    RoutePoint,
+    RoutePointRefStructure,
+    TimingLink,
+    PointRefStructure,
+    TimingPoint,
+    ScheduledStopPoint,
+    TimingPointVersionStructure,
+    ScheduledStopPointRefStructure,
+    Route,
+    PointProjection,
+    ServiceJourneyPattern,
+    StopPointInJourneyPattern,
+    PosList,
+    ServiceLinkRefStructure,
+    NameOfClassPointRefStructureType,
+)
+
+from domain.netex.services.ids import getId
+from domain.netex.services.refs import getRef
+from storage.mdbx.core.implementation import MdbxStorage
 from utils.utils import project
 
 
@@ -20,11 +39,13 @@ class RoutesProfile:
             for projection in ssp.projections.projection_ref_or_projection:
                 if isinstance(projection, PointProjection):
                     if projection.project_to_point_ref:
-                        if projection.project_to_point_ref.name_of_ref_class == 'RoutePoint':
+                        if projection.project_to_point_ref.name_of_ref_class == NameOfClassPointRefStructureType.ROUTE_POINT:
                             yield project(projection.project_to_point_ref, RoutePointRefStructure)
 
     @staticmethod
-    def projectRouteToServiceLinks(db: Database, sjp: ServiceJourneyPattern, route: Route, route_point_projection: Dict[str, RoutePointRefStructure], generator_defaults: dict) -> Generator[ServiceLink, None, ServiceJourneyPattern]:
+    def projectRouteToServiceLinks(
+        db: MdbxStorage, txn: TXN, sjp: ServiceJourneyPattern, route: Route, route_point_projection: Dict[str, RoutePointRefStructure], generator_defaults: dict
+    ) -> Generator[ServiceLink, None, ServiceJourneyPattern]:
         # Two variants:
         # 1. pointsInSequence has PointONRoute/OnwardRouteLinkRef;
         # 2. linksInSequence
@@ -33,11 +54,15 @@ class RoutesProfile:
         if route.points_in_sequence:
             links_in_sequence = [por.onward_route_link_ref for por in route.points_in_sequence.point_on_route if por.onward_route_link_ref]
             # TODO: #142
-            route_links_in_sequence: List[RouteLink] = [load_local(db, RouteLink, filter_id=lis.ref, cursor=True, limit=1, cache=False)[0] for lis in links_in_sequence]
+            route_links_in_sequence: List[RouteLink] = [db.load_object_by_reference(txn, lis) for lis in links_in_sequence]
             route_i = 0
 
             if sjp.points_in_sequence:
-                spijps = [spijp for spijp in sjp.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern if isinstance(spijp, StopPointInJourneyPattern)]
+                spijps = [
+                    spijp
+                    for spijp in sjp.points_in_sequence.point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern
+                    if isinstance(spijp, StopPointInJourneyPattern)
+                ]
                 for i in range(0, len(spijps) - 1):
                     from_ssp = spijps[i].scheduled_stop_point_ref
                     to_ssp = spijps[i + 1].scheduled_stop_point_ref
@@ -67,18 +92,31 @@ class RoutesProfile:
                         elif len(combined_route_links) == 1:
                             # This is magic, so ServiceLinks with the same SSPs and same LineString are not duplicated
                             m = hashlib.sha256()
-                            m.update(('\n'.join([from_ssp.ref, to_ssp.ref, ' '.join([str(x) for x in combined_route_links[0].line_string.pos_or_point_property_or_pos_list[0].value])])).encode('utf-8'))
+                            m.update(
+                                (
+                                    '\n'.join(
+                                        [
+                                            from_ssp.ref,
+                                            to_ssp.ref,
+                                            ' '.join([str(x) for x in combined_route_links[0].line_string.pos_or_point_property_or_pos_list[0].value]),
+                                        ]
+                                    )
+                                ).encode('utf-8')
+                            )
 
                             object_id = m.hexdigest()[0:8].upper()
                             combined_route_links[0].line_string.id = "LineString_" + object_id
 
-                            sl = ServiceLink(id=getId(ServiceLink, generator_defaults['codespace'], id=object_id),
-                                             version=route.version,
-                                             distance=combined_route_links[0].distance,
-                                             from_point_ref=project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
-                                             line_string=combined_route_links[0].line_string,
-                                             derived_from_object_ref=combined_route_links[0].id,
-                                             derived_from_version_ref_attribute=combined_route_links[0].version)
+                            sl = ServiceLink(
+                                id=getId(generator_defaults['codespace'], ServiceLink, id=object_id),
+                                version=route.version,
+                                distance=combined_route_links[0].distance,
+                                from_point_ref=project(from_ssp, ScheduledStopPointRefStructure),
+                                to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
+                                line_string=combined_route_links[0].line_string,
+                                derived_from_object_ref=combined_route_links[0].id,
+                                derived_from_version_ref_attribute=combined_route_links[0].version,
+                            )
                         else:
                             # TODO: pos to poslist, and assure single poslist
                             if isinstance(combined_route_links[0].line_string.pos_or_point_property_or_pos_list[0], PosList):
@@ -92,33 +130,49 @@ class RoutesProfile:
                                 distance: Decimal = Decimal(0)
 
                                 for k in range(1, len(combined_route_links)):
-                                    if (not isinstance(combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0], PosList)) or \
-                                            line_string.pos_or_point_property_or_pos_list[0].__class__ != combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0].__class__ or \
-                                            line_string.srs_name != combined_route_links[k].line_string.srs_name or \
-                                            line_string.srs_dimension != (combined_route_links[k].line_string.srs_dimension or 2) or \
-                                            len(combined_route_links[k].line_string.pos_or_point_property_or_pos_list) > 1:
+                                    if (
+                                        (not isinstance(combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0], PosList))
+                                        or line_string.pos_or_point_property_or_pos_list[0].__class__
+                                        != combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0].__class__
+                                        or line_string.srs_name != combined_route_links[k].line_string.srs_name
+                                        or line_string.srs_dimension != (combined_route_links[k].line_string.srs_dimension or 2)
+                                        or len(combined_route_links[k].line_string.pos_or_point_property_or_pos_list) > 1
+                                    ):
                                         break
-                                    elif line_string_value[-line_string.srs_dimension:0] != combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0].value[0:line_string.srs_dimension]:
+                                    elif (
+                                        line_string_value[-line_string.srs_dimension : 0]
+                                        != combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0].value[0 : line_string.srs_dimension]
+                                    ):
                                         break
                                     else:
-                                        line_string_value += combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0].value[line_string.srs_dimension:]
+                                        line_string_value += (
+                                            combined_route_links[k].line_string.pos_or_point_property_or_pos_list[0].value[line_string.srs_dimension :]
+                                        )
                                         distance += combined_route_links[k].distance
 
                                 # This is magic, so ServiceLinks with the same SSPs and same LineString are not duplicated
                                 m = hashlib.sha256()
-                                m.update(('\n'.join([from_ssp.ref, to_ssp.ref, ' '.join([str(x) for x in line_string.pos_or_point_property_or_pos_list[0].value])])).encode('utf-8'))
+                                m.update(
+                                    (
+                                        '\n'.join(
+                                            [from_ssp.ref, to_ssp.ref, ' '.join([str(x) for x in line_string.pos_or_point_property_or_pos_list[0].value])]
+                                        )
+                                    ).encode('utf-8')
+                                )
 
                                 object_id = m.hexdigest()[0:8].upper()
                                 line_string.id = "LineString_" + object_id
 
-                                sl = ServiceLink(id=getId(ServiceLink, generator_defaults['codespace'], id=object_id),
-                                                 version=route.version,
-                                                 distance=distance,
-                                                 from_point_ref=project(from_ssp, ScheduledStopPointRefStructure), to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
-                                                 line_string=line_string,
-                                                 derived_from_object_ref=route.id,
-                                                 derived_from_version_ref_attribute=route.version)
-
+                                sl = ServiceLink(
+                                    id=getId(generator_defaults['codespace'], ServiceLink, id=object_id),
+                                    version=route.version,
+                                    distance=distance,
+                                    from_point_ref=project(from_ssp, ScheduledStopPointRefStructure),
+                                    to_point_ref=project(to_ssp, ScheduledStopPointRefStructure),
+                                    line_string=line_string,
+                                    derived_from_object_ref=route.id,
+                                    derived_from_version_ref_attribute=route.version,
+                                )
 
                         if sl:
                             spijps[i].onward_service_link_ref = getRef(sl, ServiceLinkRefStructure)
@@ -152,7 +206,6 @@ class RoutesProfile:
 
         return route_link
 
-
     # TODO: The input for this function is using a TimingPointVersionStructure, because a TimingLink may refer to a
     # ScheduledStopPoint or a TimingPoint. We are using str matching now on id (and ref), in our ideal case we
     # would use references that take in account the class of the object as well. For this we would need to have a
@@ -161,7 +214,13 @@ class RoutesProfile:
     # TODO: Ideally we would like to use the ContainerStructures as dicts.
 
     @staticmethod
-    def projectLinksToRouteLinks(service_links: List[ServiceLink], timing_links: List[TimingLink], timing_points: List[TimingPointVersionStructure], route_points: List[RoutePoint], route_links: List[RouteLink]):
+    def projectLinksToRouteLinks(
+        service_links: List[ServiceLink],
+        timing_links: List[TimingLink],
+        timing_points: List[TimingPointVersionStructure],
+        route_points: List[RoutePoint],
+        route_links: List[RouteLink],
+    ):
         route_links_index: Dict[str, RouteLink] = {}
         route_point_refs: Dict[str, RoutePointRefStructure] = {}
 
@@ -199,4 +258,3 @@ class RoutesProfile:
 
         route_links.clear()
         route_links += route_links_index.values()
-

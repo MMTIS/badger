@@ -1,22 +1,9 @@
 from operator import attrgetter
 from itertools import groupby
-from typing import Optional, TypeVar, Any, cast, Iterable
-
-from netex import (
-    MultilingualString,
-    EntityInVersionStructure,
-    EntityStructure,
-    VersionOfObjectRefStructure,
-    Codespace,
-    Version,
-    CodespaceRefStructure,
-    DataSourceRefStructure,
-)
+from typing import Optional, TypeVar, Any, Iterable
 
 # TODO: This is required for globals to work, lets fix that later.
-from netex import *  # noqa: F403
-
-from utils.utils import get_object_name
+from domain.netex.model import *  # noqa: F403
 
 import datetime
 import re
@@ -26,49 +13,6 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
 Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
-
-def getRef(
-    obj: Tid, klass: type[VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure] | None = None
-) -> VersionOfObjectRefStructure | CodespaceRefStructure | DataSourceRefStructure:
-    assert obj is not None, "A reference must be made from an existing object."
-
-    if klass is None:
-        asobj = type(obj).__name__ + "Ref"  # Was: RefStructure
-        klass = cast(type[VersionOfObjectRefStructure], globals()[asobj])  # TODO: review
-
-    assert klass is not None, "Class is not none"
-
-    if hasattr(obj, "id"):
-        assert obj.id is not None, "Object does not have an id"
-        instance = klass(ref=obj.id)
-    elif hasattr(obj, "ref"):
-        assert obj.ref is not None, "Object does not have a ref"
-        instance = klass(ref=obj.ref)
-    else:
-        assert False, "Object does not have an id or ref"
-
-    if hasattr(instance, "order") and hasattr(obj, "order"):
-        instance.order = obj.order
-
-    name = type(obj).__name__
-    if hasattr(obj, "Meta") and hasattr(obj.Meta, "name"):
-        name = obj.Meta.name
-    elif name.endswith("RefStructure"):
-        name = name.replace("RefStructure", "Ref")
-
-    if hasattr(instance, "version"):
-        instance.version = getattr(obj, "version", None)
-
-    kname = klass.__name__
-    meta_kname = klass.__name__
-    meta = getattr(klass, "Meta", None)
-    if meta and hasattr(meta, "name"):
-        meta_kname = meta.name
-
-    if issubclass(klass, VersionOfObjectRefStructure) and not (kname.startswith(name) or meta_kname.startswith(name)):
-        if hasattr(instance, "name_of_ref_class"):
-            instance.name_of_ref_class = name
-    return instance
 
 
 def getFakeRefByClass(id: str, klass: type[Tref], version: str | None = None) -> Tref:
@@ -89,26 +33,13 @@ def getClassFromRefClass(ref: Tref) -> Any:
     return globals()[klass]
 
 
-def getFakeRef(id: str, klass: type[Tref], version: str | None, version_ref: str | None = None) -> Tref:
-    assert id is not None, "A reference must start with a valid id"
-    return klass(
-        ref=id,
-        version=version if version_ref is None else None,
-        version_ref=version_ref,
-    )
-
 
 def getIdByRef(obj: object, codespace: Codespace, ref: str) -> str:
     name = getattr(getattr(type(obj), "Meta", None), "name", type(obj).__name__)
     return "{}:{}:{}".format(codespace.xmlns, name, str(ref).replace(":", "-"))
 
 
-def getIndex(objects: Iterable[Tid], attr: str | None = None) -> dict[object, Tid]:
-    if not attr:
-        return {x.id: x for x in objects}
 
-    f = attrgetter(attr)  # TODO: change with our own attrgetter that understands lists
-    return {f(x): x for x in objects}
 
 
 def getIndexByGroup(objects: Iterable[T], attr: str) -> dict[object, list[T]]:
@@ -124,10 +55,6 @@ def setIdVersion(obj: Tidversion, codespace: Codespace, id: str, version: Option
     else:
         obj.version = "any"
 
-
-def getId(clazz: type[Tid], codespace: Codespace, id: str) -> str:
-    name = get_object_name(clazz)
-    return "{}:{}:{}".format(codespace.xmlns, name, str(id).replace(":", "-"))
 
 
 def getVersionOfObjectRef(obj: Tid) -> VersionOfObjectRefStructure:
@@ -156,18 +83,4 @@ def getBitString2(
     return out
 
 
-def getOptionalString(name: str | None, default: str | None = None) -> MultilingualString | None:
-    if name is not None:
-        return MultilingualString(value=name)
-    elif default is not None:
-        return MultilingualString(value=default)
 
-    return None
-
-
-def getRequiredString(name: str | None, default: str) -> MultilingualString:
-    if name is not None:
-        return MultilingualString(value=name)
-
-    assert default is not None
-    return MultilingualString(value=default)
