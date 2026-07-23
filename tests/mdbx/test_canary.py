@@ -4,6 +4,11 @@ from mdbx.mdbx import MDBXCanary
 
 
 class TestCanary(MdbxStorageTestCase):
+    """
+    py-mdbx currently calls mdbx_canary_get() instead of mdbx_canary_put().
+
+    Remove @expectedFailure once upstream https://github.com/wtdcode/mdbx-py/pull/19 is merged.
+    """
 
     @unittest.expectedFailure
     def test_canary_put(self) -> None:
