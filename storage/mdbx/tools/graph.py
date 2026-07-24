@@ -1,28 +1,29 @@
 import logging
-from typing import Generator
+from storage.interface import Serializer
 
 from mdbx.mdbx import TXN
 
-from domain.netex.services.model_typing import Tid
 from utils.aux_logging import log_all
 from storage.mdbx.core.implementation import (
     MdbxStorage,
     DB_ID_IDX,
-    DB_REFERENCE_OUTWARD, DB_ID_IDX_FLAGS, DB_REFERENCE_OUTWARD_FLAGS,
+    DB_REFERENCE_OUTWARD,
+    DB_ID_IDX_FLAGS,
+    DB_REFERENCE_OUTWARD_FLAGS,
 )
 
+from domain.netex.model import EntityStructure
 from collections import defaultdict
+from typing import Iterable, Generator
 
-from collections import defaultdict, deque
-from typing import Dict, Set, List, Iterable, Any, Tuple
 
 # --- 1) graph bouwen (nodes uit DB_ID_IDX, edges uit DB_REFERENCE_OUTWARD) ---
-def build_graph(txn: TXN) -> Dict[bytes, Set[bytes]]:
+def build_graph(txn: TXN) -> dict[bytes, set[bytes]]:
     """
     Build adjacency list G where G[u] is the set of v such that u -> v (u references v).
     - include_referenced_nodes: if True, zorg dat ook target nodes van edges in de map verschijnen.
     """
-    graph: Dict[bytes, Set[bytes]] = defaultdict(set)
+    graph: dict[bytes, set[bytes]] = defaultdict(set)
 
     db_ids = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
     cursor = txn.cursor(db_ids)
@@ -45,15 +46,15 @@ def build_graph(txn: TXN) -> Dict[bytes, Set[bytes]]:
 # -------------------------
 # 2) Tarjan SCC (deterministisch)
 # -------------------------
-def strongly_connected_components(graph: Dict[bytes, Set[bytes]]) -> List[List[bytes]]:
+def strongly_connected_components(graph: dict[bytes, set[bytes]]) -> list[list[bytes]]:
     index = 0
-    indices: Dict[bytes, int] = {}
-    lowlink: Dict[bytes, int] = {}
-    onstack: Set[bytes] = set()
-    stack: List[bytes] = []
-    result: List[List[bytes]] = []
+    indices: dict[bytes, int] = {}
+    lowlink: dict[bytes, int] = {}
+    onstack: set[bytes] = set()
+    stack: list[bytes] = []
+    result: list[list[bytes]] = []
 
-    def strongconnect(v: bytes):
+    def strongconnect(v: bytes) -> None:
         nonlocal index
         indices[v] = index
         lowlink[v] = index
@@ -67,7 +68,7 @@ def strongly_connected_components(graph: Dict[bytes, Set[bytes]]) -> List[List[b
             elif w in onstack:
                 lowlink[v] = min(lowlink[v], indices[w])
         if lowlink[v] == indices[v]:
-            comp: List[bytes] = []
+            comp: list[bytes] = []
             while True:
                 w = stack.pop()
                 onstack.remove(w)
@@ -81,16 +82,17 @@ def strongly_connected_components(graph: Dict[bytes, Set[bytes]]) -> List[List[b
             strongconnect(v)
     return result
 
+
 # -------------------------
 # 3) Condenseer naar SCC-DAG
 # -------------------------
-def build_scc_graph(graph: Dict[bytes, Set[bytes]], sccs: List[List[bytes]]) -> Tuple[Dict[int, Set[int]], Dict[bytes, int]]:
-    node_to_scc: Dict[bytes, int] = {}
+def build_scc_graph(graph: dict[bytes, set[bytes]], sccs: list[list[bytes]]) -> tuple[dict[int, set[int]], dict[bytes, int]]:
+    node_to_scc: dict[bytes, int] = {}
     for i, comp in enumerate(sccs):
         for node in comp:
             node_to_scc[node] = i
 
-    dag: Dict[int, Set[int]] = defaultdict(set)
+    dag: dict[int, set[int]] = defaultdict(set)
     for u, vs in graph.items():
         cu = node_to_scc[u]
         for v in vs:
@@ -104,10 +106,11 @@ def build_scc_graph(graph: Dict[bytes, Set[bytes]], sccs: List[List[bytes]]) -> 
         dag.setdefault(i, set())
     return dag, node_to_scc
 
+
 # -------------------------
 # Helpers: binnen-SCC ordering
 # -------------------------
-def sort_scc_by_internal_indegree(members: Iterable[bytes], graph: Dict[bytes, Set[bytes]], storage) -> List[bytes]:
+def sort_scc_by_internal_indegree(members: Iterable[bytes], graph: dict[bytes, set[bytes]]) -> list[bytes]:
     members_set = set(members)
     indeg = {n: 0 for n in members_set}
     for u in members_set:
@@ -115,46 +118,49 @@ def sort_scc_by_internal_indegree(members: Iterable[bytes], graph: Dict[bytes, S
             if v in members_set:
                 indeg[v] += 1
     # eerst hoge interne indegree (veel anderen verwijzen naar deze), dan type, dan key
-    return sorted(members_set, key=lambda n: (-indeg[n], storage.serializer.full_key_to_idx(n)[0], n))
+    return sorted(members_set, key=lambda n: (-indeg[n], Serializer.full_key_to_clazz(n), n))
 
-def greedy_minimize_forward_within_scc(members: Iterable[bytes], graph: Dict[bytes, Set[bytes]], storage, max_size: int = 500) -> List[bytes]:
+
+def greedy_minimize_forward_within_scc(members: Iterable[bytes], graph: dict[bytes, set[bytes]], max_size: int = 500) -> list[bytes]:
     members = list(members)
     if len(members) > max_size:
-        return sort_scc_by_internal_indegree(members, graph, storage)
+        return sort_scc_by_internal_indegree(members, graph)
 
     remaining = set(members)
-    order: List[bytes] = []
+    order: list[bytes] = []
     out_inside = {n: set(v for v in graph.get(n, ()) if v in remaining) for n in remaining}
 
     while remaining:
         best = None
         best_key = None
         for n in remaining:
-            score = len(out_inside[n])                          # minder is beter
-            cls_idx = storage.serializer.full_key_to_idx(n)[0]
+            score = len(out_inside[n])  # minder is beter
+            cls_idx = Serializer.full_key_to_clazz(n)
             key = (score, cls_idx, n)
-            if best is None or key < best_key:
+            if best is None or best_key is None or key < best_key:
                 best = n
                 best_key = key
 
-        order.append(best)
-        remaining.remove(best)
-        # verwijder 'best' uit outgoing-sets van anderen
-        for u in remaining:
-            if best in out_inside[u]:
-                out_inside[u].remove(best)
+        if best:
+            order.append(best)
+            remaining.remove(best)
+            # verwijder 'best' uit outgoing-sets van anderen
+            for u in remaining:
+                if best in out_inside[u]:
+                    out_inside[u].remove(best)
     return order
+
 
 # -------------------------
 # 4) Main: order_graph met Kahn op reversed DAG + class-based batching
 # -------------------------
-def order_graph(graph: Dict[bytes, Set[bytes]], storage, scc_lookahead_threshold: int = 500) -> List[bytes]:
+def order_graph(graph: dict[bytes, set[bytes]], scc_lookahead_threshold: int = 500) -> list[bytes]:
     # SCCs en SCC-DAG
     sccs = strongly_connected_components(graph)
     dag, node_to_scc = build_scc_graph(graph, sccs)
 
     # Precompute preds (predecessors in original DAG) -- handig om indeg_rev updates te doen
-    preds: Dict[int, Set[int]] = defaultdict(set)
+    preds: dict[int, set[int]] = defaultdict(set)
     for u, vs in dag.items():
         for v in vs:
             preds[v].add(u)
@@ -162,34 +168,29 @@ def order_graph(graph: Dict[bytes, Set[bytes]], storage, scc_lookahead_threshold
         preds.setdefault(i, set())
 
     # indeg_rev = outdegree(original dag)  (we run Kahn on reversed DAG)
-    indeg_rev: Dict[int, int] = {i: len(dag[i]) for i in range(len(sccs))}
+    indeg_rev: dict[int, int] = {i: len(dag[i]) for i in range(len(sccs))}
 
     # Precompute per-SCC metadata and internal ordering
     scc_meta = {}
     for i, members in enumerate(sccs):
         # compute min class_idx as representative priority
-        class_idxs = [storage.serializer.full_key_to_idx(n)[0] for n in members]
+        class_idxs = [Serializer.full_key_to_clazz(n) for n in members]
         min_class = min(class_idxs) if class_idxs else 0
         size = len(members)
         if size == 1:
             # singleton: deterministic single-member list (still sort by class_idx,key for stability)
-            ordered_members = sorted(members, key=lambda n: (storage.serializer.full_key_to_idx(n)[0], n))
+            ordered_members = sorted(members, key=lambda n: (Serializer.full_key_to_clazz(n), n))
         else:
             if size <= scc_lookahead_threshold:
-                ordered_members = greedy_minimize_forward_within_scc(members, graph, storage, max_size=scc_lookahead_threshold)
+                ordered_members = greedy_minimize_forward_within_scc(members, graph, max_size=scc_lookahead_threshold)
             else:
-                ordered_members = sort_scc_by_internal_indegree(members, graph, storage)
-        scc_meta[i] = {
-            "members": members,
-            "ordered_members": ordered_members,
-            "min_class": min_class,
-            "size": size
-        }
+                ordered_members = sort_scc_by_internal_indegree(members, graph)
+        scc_meta[i] = {"members": members, "ordered_members": ordered_members, "min_class": min_class, "size": size}
 
     # initial available SCCs (those met indeg_rev == 0) -> sinks in original DAG
-    available: Set[int] = {i for i, d in indeg_rev.items() if d == 0}
+    available: set[int] = {i for i, d in indeg_rev.items() if d == 0}
 
-    result: List[bytes] = []
+    result: list[bytes] = []
     # process while available
     while available:
         # determine current minimal class among available SCCs
@@ -222,10 +223,11 @@ def order_graph(graph: Dict[bytes, Set[bytes]], storage, scc_lookahead_threshold
 
     return result
 
+
 # -------------------------
 # 5) Diagnostiek: forward refs tellen (optioneel)
 # -------------------------
-def count_forward_refs(order: List[bytes], graph: Dict[bytes, Set[bytes]]) -> int:
+def count_forward_refs(order: list[bytes], graph: dict[bytes, set[bytes]]) -> int:
     pos = {node: i for i, node in enumerate(order)}
     cnt = 0
     for u, vs in graph.items():
@@ -239,7 +241,8 @@ def count_forward_refs(order: List[bytes], graph: Dict[bytes, Set[bytes]]) -> in
                 cnt += 1
     return cnt
 
-def list_forward_examples(order: List[bytes], graph: Dict[bytes, Set[bytes]], limit: int = 20) -> List[Tuple[bytes, bytes]]:
+
+def list_forward_examples(order: list[bytes], graph: dict[bytes, set[bytes]], limit: int = 20) -> list[tuple[bytes, bytes]]:
     pos = {node: i for i, node in enumerate(order)}
     out = []
     for u, vs in graph.items():
@@ -254,11 +257,12 @@ def list_forward_examples(order: List[bytes], graph: Dict[bytes, Set[bytes]], li
                     return out
     return out
 
+
 # --- 7) streaming export generator ---
-def export_objects(txn: TXN, storage: MdbxStorage) -> Iterable[Any]:
+def export_objects(txn: TXN, storage: MdbxStorage) -> Generator[EntityStructure, None, None]:
     log_all(logging.INFO, "[export_objects] building export order...")
     graph = build_graph(txn)
-    order = order_graph(graph, storage)
+    order = order_graph(graph)
     total_forwards = count_forward_refs(order, graph)
     total = len(order)
     log_all(logging.INFO, f"[export_objects] exporting {total} objects ({total_forwards} forward references)")
@@ -266,6 +270,7 @@ def export_objects(txn: TXN, storage: MdbxStorage) -> Iterable[Any]:
     for i, full_key in enumerate(order, start=1):
         if i % 100_000 == 0:
             log_all(logging.INFO, f"[export_objects] {i}/{total} objects exported...")
-        yield storage.load_object_by_full_key(txn, full_key)
+        obj = storage.load_object_by_full_key(txn, full_key)
+        if obj:
+            yield obj
     log_all(logging.INFO, f"[export_objects] {total} objects exported")
-

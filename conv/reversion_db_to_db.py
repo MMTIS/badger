@@ -9,27 +9,31 @@ from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import recursive_attributes
 from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_all, prepare_logger
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
+
 
 def reversion_object(deserialized: EntityStructure, version: str | None) -> EntityStructure:
     if version is None:
         return deserialized
 
-    if deserialized.__class__ == Line:
-        pass
     for obj, path in recursive_attributes(deserialized, []):
         if hasattr(obj, "version"):
             obj.version = version
-        if hasattr(obj, "data_source_ref"):
-            obj.data_source_ref = None
-        if hasattr(obj, "responsibility_set_ref"):
-            obj.responsibility_set_ref = None
+        if hasattr(obj, "data_source_ref_attribute"):
+            obj.data_source_ref_attribute = None
+        if hasattr(obj, "responsibility_set_ref_attribute"):
+            obj.responsibility_set_ref_attribute = None
+        if hasattr(obj, "derived_from_version_ref_attribute"):
+            obj.derived_from_version_ref_attribute = None
 
     if hasattr(deserialized, "version"):
         deserialized.version = version
-    if hasattr(deserialized, "data_source_ref"):
-        deserialized.data_source_ref = None
-    if hasattr(deserialized, "responsibility_set_ref"):
-        deserialized.responsibility_set_ref = None
+    if hasattr(deserialized, "data_source_ref_attribute"):
+        deserialized.data_source_ref_attribute = None
+    if hasattr(deserialized, "responsibility_set_ref_attribute"):
+        deserialized.responsibility_set_ref_attribute = None
+    if hasattr(deserialized, "derived_from_version_ref_attribute"):
+        deserialized.derived_from_version_ref_attribute = None
 
     return deserialized
 
@@ -55,6 +59,9 @@ def reversion_db_to_db(source_database_files: set[Path], target_database_file: P
                     with source_db.env.ro_transaction() as txn_read:
                         target_db.insert_any_object_on_queue(txn_write, reversion_update(source_db, txn_read, version))
             txn_write.commit()
+
+        resolve(target_db)
+        resolve_embeddings_index(target_db)
 
 def main(source: list[str], target: str, version: int) -> None:
     source_paths: set[Path] = set()

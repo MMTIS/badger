@@ -2,7 +2,6 @@ import logging
 import sys
 import warnings
 from datetime import datetime, date, timedelta
-from functools import partial
 
 # from multiprocessing import Pool
 from typing import List, Set, Any, TypeVar, Generator, cast, Optional
@@ -12,11 +11,11 @@ from dateutil.rrule import rrule, DAILY
 from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
-from domain.netex import Block
 from domain.netex.indexes.byid import getIndex
 from domain.netex.services.recursive_attributes import recursive_attributes
 from domain.netex.services.refs import getRef, getFakeRef
 from domain.netex.services.ids import getId
+from domain.netex.services.recursive_attributes import recursive_attributes
 from storage.mdbx.core.implementation import MdbxStorage
 from transformers.projection import project_location_4326
 
@@ -31,6 +30,7 @@ from transformers.callsprofile import CallsProfile
 from configuration import defaults
 
 from domain.netex.model import (
+    ValidBetween,
     PublicationDelivery,
     ParticipantRef,
     MultilingualString,
@@ -39,7 +39,6 @@ from domain.netex.model import (
     GeneralFrameMembersRelStructure,
     ServiceJourney,
     Notice,
-    NoticeAssignment,
     StopPlace,
     CompositeFrame,
     FramesRelStructure,
@@ -88,7 +87,6 @@ from domain.netex.model import (
     VersionFrameDefaultsStructure,
     SystemOfUnits,
     LocaleStructure,
-    Notice,
     NoticesInFrameRelStructure,
     TopographicPlacesInFrameRelStructure,
     TopographicPlace,
@@ -128,15 +126,14 @@ from domain.netex.model import (
     OperatingDay,
     DayTypeRef,
     EntityStructure,
-    Locale,
-    NameOfClassOperatingPeriodRefStructureType, TextType, ServiceJourneyRef
+    NameOfClassOperatingPeriodRefStructureType, TextType
 )
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
 from transformers.timetabledpassingtimesprofile import TimetablePassingTimesProfile
 
 # from transformers.projection import project_location_4326
-from transformers.timetabled_passing_time import infer_id_and_order_and_apply
+# from transformers.timetabled_passing_time import infer_id_and_order_and_apply
 
 T = TypeVar("T")
 Tid = TypeVar("Tid", bound=EntityStructure)
@@ -479,6 +476,23 @@ def service_journey_ac_to_day_type(
 
     service_journey.day_types = DayTypeRefsRelStructure(day_type_ref=[day_type_ref])
 
+# TODO: Avoid running this for ValidBetween and ServiceCalendar
+def get_validbetween(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> ValidBetween:
+    from_date: datetime = datetime.max
+    to_date: datetime = datetime.min
+    for uic in db_read.iter_only_objects(txn, UicOperatingPeriod):
+        dt = uic.from_operating_day_ref_or_from_date.to_datetime()
+        dt = dt.replace(tzinfo=None)
+        if from_date > dt:
+            from_date = dt
+
+        dt = uic.to_operating_day_ref_or_to_date.to_datetime()
+        dt = dt.replace(tzinfo=None)
+        if to_date < dt:
+            to_date = dt
+
+    return ValidBetween(from_date=XmlDateTime.from_datetime(from_date), to_date=XmlDateTime.from_datetime(to_date))
+
 
 def get_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]):
     """
@@ -550,8 +564,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
     day_types_ids: Set[str] = set()
     uic_operating_periods_ids: Set[str] = set()
     day_type_assignments_ids: Set[str] = set()
-    notice_assignments: dict[str, Notice] = dict()
-    vehicle_types: dict[str, VehicleType] = dict()
+    # vehicle_types: dict[str, VehicleType] = dict()
 
     # availability_conditions: Dict[str, AvailabilityCondition] = {}
     # day_types: Dict[str, DayType] = {}
@@ -674,7 +687,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
-            log_all(logging.INFO, f'{service_journey_pattern.id}')
+            # log_all(logging.INFO, f'{service_journey_pattern.id}')
             yield service_journey_pattern
 
             # TODO: We might be able to avoid it if we work with prefix keys
@@ -698,7 +711,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         sj.link_sequence_projection_ref_or_link_sequence_projection = None
         sj.journey_pattern_view = None
         sj.direction_type = None
-        sj.vehicle_type_ref_or_train_ref = vehicle_types.get(sj.id, None) if sj.vehicle_type_ref_or_train_ref is None else None
+        # sj.vehicle_type_ref_or_train_ref = vehicle_types.get(sj.id, None) if sj.vehicle_type_ref_or_train_ref is None else None
 
         # TODO: prevent caching altogether?
         # db_read.clean_cache()
@@ -711,10 +724,10 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         #    if notice_assignment.noticed_object_ref.name_of_ref_class == NameOfClass.SERVICE_JOURNEY:
         #        notice_assignments[notice_assignment.noticed_object_ref.ref] = notice_assignment.notice_ref
 
-        for block in db_read.iter_only_objects(txn, Block):
-            for sjr in block.journeys.choice:
-                if isinstance(sjr, ServiceJourneyRef):
-                    vehicle_types[sjr.ref] = block.vehicle_type_ref_or_train_ref
+        # for block in db_read.iter_only_objects(txn, Block):
+        #    for sjr in block.journeys.choice:
+        #        if isinstance(sjr, ServiceJourneyRef):
+        #            vehicle_types[sjr.ref] = block.vehicle_type_ref_or_train_ref
 
         for sj in db_read.iter_only_objects(txn, ServiceJourney):
             yield from process(sj, db_read, txn, generator_defaults)
@@ -1015,7 +1028,7 @@ def export_epip_network_offer(
 ) -> PublicationDelivery:
     # Maybe generalize this for other profiles too
     default_codespace: Codespace | None = None
-    frame_defaults: VersionFrameDefaultsStructure
+    # frame_defaults: VersionFrameDefaultsStructure
     # TODO:
     # for frame_defaults in db_epip.get_metadata(None, None, VersionFrameDefaultsStructure):
     #    if default_codespace is None and frame_defaults.default_codespace_ref:
@@ -1118,6 +1131,7 @@ def export_epip_network_offer(
                     id=composite_frame_id,
                     version=version,
                     type_of_frame_ref=type_of_frame_ref,
+                    validity_conditions_or_valid_between=get_validbetween(db_epip, txn, {'codespace': default_codespace, 'version': version}),
                     frame_defaults=VersionFrameDefaultsStructure(
                         default_location_system="urn:ogc:def:crs:EPSG::4326", default_system_of_units=SystemOfUnits.SI_METRES, default_locale=default_locale
                     ),

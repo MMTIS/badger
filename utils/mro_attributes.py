@@ -1,5 +1,6 @@
 import dataclasses
 import decimal
+import functools
 from dataclasses import Field
 from enum import Enum
 from typing import Any
@@ -22,17 +23,33 @@ def hasdefault(field: dataclasses.Field[typing.Any]) -> typing.Any:
     return field.default
 
 
+@functools.lru_cache(maxsize=None)
+def resolved_field_types(clazz: typing.Hashable) -> dict[str, typing.Any]:
+    """Field name -> evaluated annotation for a dataclass.
+
+    dataclasses store the literal annotation in Field.type: a typing object on
+    older Pythons, a plain string under deferred annotations (Python >= 3.14).
+    get_type_hints evaluates both to actual types, walking the MRO.
+    """
+    try:
+        return typing.get_type_hints(clazz)
+    except Exception:
+        return {field.name: field.type for field in dataclasses.fields(clazz) if not isinstance(field.type, str)}  # type: ignore[arg-type]
+
+
 def unembed(
-    fields: dict[str, dataclasses.Field[typing.Any]],
-) -> typing.Iterable[tuple[str, dataclasses.Field[typing.Any]]]:
+    clazz: typing.Any,
+) -> typing.Iterable[tuple[str, dataclasses.Field[typing.Any], typing.Any]]:
+    hints = resolved_field_types(clazz)
     all_references = []
     all_classes = []
 
-    for name, field in fields.items():
-        if isinstance(field.type, str):
+    for name, field in clazz.__dataclass_fields__.items():
+        field_type = hints.get(name, field.type)
+        if isinstance(field_type, str):
             continue
 
-        resolved_class = resolve_class(field.type)
+        resolved_class = resolve_class(field_type)
         if not resolved_class or not isinstance(resolved_class, type):
             continue
 
@@ -44,25 +61,28 @@ def unembed(
         if resolved_class_name.endswith("Ref"):
             all_references.append(resolved_class_name[:-3])
 
-        all_classes.append((name, field, resolved_class_name))
+        all_classes.append((name, field, field_type, resolved_class_name))
 
-    for name, field, resolved_class_name in all_classes:
+    for name, field, field_type, resolved_class_name in all_classes:
         if resolved_class_name not in all_references:
-            yield name, field
+            yield name, field, field_type
 
 
 def resolve_class(clazz: typing.Type[typing.Any]) -> typing.Type[typing.Any] | None:
-    clazz_resolved = clazz
+    # get_origin/get_args understand typing.Optional/Union/List as well as the
+    # PEP 604 `None | X` unions the generated model uses.
+    origin = typing.get_origin(clazz)
+    if origin is None:
+        return clazz
 
-    if hasattr(clazz, "_name"):
-        if clazz._name == "Optional":
-            clazz_resolved = [x for x in clazz.__args__ if x is not None.__class__][0]
-        elif clazz._name == "List":
-            return None  # TODO: handle list elements
-        else:
-            clazz_resolved = [x for x in clazz.__args__ if x is not None.__class__][0]
+    if origin is list:
+        return None  # TODO: handle list elements
 
-    return clazz_resolved
+    args: list[typing.Type[typing.Any]] = [x for x in typing.get_args(clazz) if x is not type(None)]
+    if not args:
+        return None
+
+    return args[0]
 
 
 IGNORE_ATTRIBUTES = ["name_of_class_attribute"]
@@ -72,17 +92,17 @@ def list_attributes(
     clazz: T, parent_name: str | None = None
 ) -> typing.Iterable[tuple[str, tuple[type[Any], bool] | None, Any, Field[Any]]]:
     if hasattr(clazz, "__dataclass_fields__"):
-        for name, field in unembed(clazz.__dataclass_fields__):
-            if name in IGNORE_ATTRIBUTES or isinstance(field.type, str):
+        for name, field, field_type in unembed(clazz):
+            if name in IGNORE_ATTRIBUTES:
                 continue
 
             if parent_name:
                 full_name = parent_name + "." + name
-                yield full_name, get_type(field.type, full_name), hasdefault(
+                yield full_name, get_type(field_type, full_name), hasdefault(
                     field
                 ), field
             else:
-                yield name, get_type(field.type, name), hasdefault(field), field
+                yield name, get_type(field_type, name), hasdefault(field), field
 
 
 def likely_type(obj: Field[typing.Any]) -> typing.Any:

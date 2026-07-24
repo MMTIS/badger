@@ -19,6 +19,17 @@ sh scripts/setup.sh
 ```
 *For Microsoft Windows users, see the commands in the [shell file](scripts/setup.sh).*
 
+### Testing
+
+```sh
+uv run python -m unittest discover -s tests -t .
+```
+
+This runs the test suite in `tests/`; it only uses temporary databases created on the fly.
+
+The NeTEx model must have been generated before the tests can import `domain.netex.model`
+(`sh scripts/generate-schema.sh`).
+
 ### Update schemas
 ```sh
 sh scripts/generate-schema.sh

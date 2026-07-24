@@ -10,7 +10,6 @@ domain/netex/model/**
 **/.DS_Store
 
 *.jar
-uv.lock
 local_configuration.py
 tools/results.xlsx
 tools/~$results.xlsx

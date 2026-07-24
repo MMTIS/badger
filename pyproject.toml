@@ -34,6 +34,11 @@ dependencies = [
 ]
 requires-python = ">=3.12"
 
+    "xsdata[cli,soap,lxml]==26.2",
+]
+requires-python = ">=3.12"
+
+
 [project.scripts]
 badger-script-runner = "tools.script_runner:cli"
 badger-gtfs-viewer = "tools.gtfs_map_visualisation:cli"
@@ -42,6 +47,12 @@ badger-gui = "gui.main:main"
 # Only package the specified packages
 [tool.setuptools.packages.find]
 include = ["conv*", "tools*", "utils*"]
+[dependency-groups]
+dev = [
+    "mypy",
+    "black",
+    "ruff",
+]
 
 [tool.black]
 extend-exclude = "domain/netex/model/*.py"

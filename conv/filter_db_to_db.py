@@ -13,11 +13,13 @@ from domain.netex.model import (
     Line,
     PassengerStopAssignment,
     ScheduledStopPoint,
+    ServiceJourney,
     EntityStructure,
     DayTypeAssignment,
     DayType,
     UicOperatingPeriod,
     NoticeAssignment,
+    AllPublicTransportModesEnumeration
 )
 # from domain.netex.services.recursive_attributes import recursive_attributes
 # from old.netexio.dbaccess import recursive_resolve
@@ -37,7 +39,7 @@ Tid = TypeVar("Tid", bound=EntityStructure)
 import re
 from collections.abc import Callable
 from typing import Any
-from storage.mdbx.core.references import resolve, resolve_embeddings, resolve_embeddings_index
+from storage.mdbx.core.references import resolve, resolve_embeddings_index
 
 _TOKEN_RE = re.compile(r"([^.[]+)|\[(\d*|\*)\]")
 
@@ -132,6 +134,17 @@ def attribute_filter(
             full_key = key + this_class_idx.ljust(4, b'\x00')
             yield full_key, obj
 
+def custom_filter(
+        db_read: MdbxStorage,
+        txn):
+
+    for key, obj in db_read.iter_objects(txn, Line):
+        obj: Line
+        if obj.authority_ref and obj.authority_ref.ref == 'NL:DOVA:Authority:LMB' and obj.transport_mode == AllPublicTransportModesEnumeration.BUS:
+            this_class_idx = db_read.class_idx[obj.__class__]
+            full_key = key + this_class_idx.ljust(4, b'\x00')
+            yield full_key, obj
+
 def filter_db_to_db(source_database_file: Path, target_database_file: Path, filter_function: callable, inward_classes: set[type[EntityStructure]], conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]]) -> None:
     with MdbxStorage(source_database_file, readonly=False) as db_write:
         # Assure we have a inward index.
@@ -217,7 +230,7 @@ def main(source: str, target: str, object_type: str, attributes: list[str], inwa
                 return
 
             inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment}
-            conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {(Route, ServiceJourneyPattern), (PassengerStopAssignment, ScheduledStopPoint)}
+            conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {(Route, Line), (Line, Route), (ServiceJourneyPattern, Route), (Route, ServiceJourneyPattern), (ServiceJourneyPattern, ServiceJourney), (ServiceJourney, ServiceJourneyPattern), (PassengerStopAssignment, ScheduledStopPoint)}
             for inwards_object_type in inwards_object_types:
                 idx = db_read.class_name_idx.get(inwards_object_type, None)
                 if not idx:
@@ -230,6 +243,11 @@ def main(source: str, target: str, object_type: str, attributes: list[str], inwa
         print(inward_classes)
         if attributes[0] == 'id':
             filter_db_to_db(source_path, Path(target), partial(id_filter, clazz=clazz, object_filters=set(attributes[1:])), inward_classes, conditional_inward_classes)
+
+        elif attributes[0] == 'custom':
+            # TODO, fix argument
+            filter_db_to_db(source_path, Path(target), partial(custom_filter), inward_classes, conditional_inward_classes)
+
         elif attributes is not None:
             getter = safe_attrgetter(attributes[0], set())
             filter_db_to_db(source_path, Path(target), partial(attribute_filter, clazz=clazz, getter=getter, allowed_values=set(attributes[1:])), inward_classes, conditional_inward_classes)

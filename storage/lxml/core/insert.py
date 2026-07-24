@@ -12,7 +12,7 @@ from xsdata.formats.dataclass.parsers.config import ParserConfig
 from xsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
 
 from domain.netex import model as netex
-from domain.netex.model import VersionFrameDefaultsStructure
+from domain.netex.model import VersionFrameDefaultsStructure, EntityStructure
 from domain.netex.services.model_typing import Tid
 from domain.utils import get_object_name
 from storage.lxml.core.time import class_contains_xml_time, recursive_replace
@@ -85,7 +85,7 @@ def insert_database(
     storage: MdbxStorage, classes: tuple[list[str], list[str], list[Any]], f: IO[Any] | None = None, type_of_frame_filter: list[str] | None = None
 ) -> None:
 
-    myserializer: MyXmlSerializer = MyXmlSerializer([])
+    myserializer: MyXmlSerializer = MyXmlSerializer(set())
     xml_context = XmlContext()
     parser_config = ParserConfig(fail_on_unknown_properties=False)
     parser = XmlParser(context=xml_context, config=parser_config, handler=LxmlEventHandler)
@@ -101,7 +101,7 @@ def insert_database(
     )
 
     obj_clazz: type | None = None
-    obj_list: list[Tid] = []  # We use this for buffering
+    obj_list: list[EntityStructure] = []  # We use this for buffering
 
     all_with_id = set([get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "id")])
     all_with_version = set([get_local_name(x[1]) for x in clsmembers if hasattr(x[1], "version")])
@@ -145,8 +145,8 @@ def insert_database(
     current_responsibility_set_ref = None
     current_location_system = None
     current_zoneinfo: ZoneInfo | None = None
-    last_id_stack = []
-    last_version_stack = []
+    last_id_stack: list[tuple[str, str]] = []
+    last_version_stack: list[str] = []
     skip_frame = False
 
     location_srsName = None
