@@ -430,8 +430,11 @@ class MdbxStorage:
         full_keys: list[bytes],
         inward_classes: set[type[EntityStructure]] = {NoticeAssignment, DayTypeAssignment},
         conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {(PassengerStopAssignment, ScheduledStopPoint)},
-        visited: set[bytes] = set(),
+        visited: set[bytes] | None = None,
     ) -> Generator[EntityStructure, None, None]:
+
+        if visited is None:
+            visited = set()
 
         stack = list(full_keys)
 
@@ -464,6 +467,9 @@ class MdbxStorage:
                         for referenced_full_key in self.load_references_by_clazz_full_key(txn, full_key, False):
                             # TODO: We could move the visited check here? we could also make our stack a set?
                             stack.append(referenced_full_key)
+
+            if not to_visit_inwards:
+                continue
 
             for referencing_full_key, referenced_full_key in self._load_references_inwards_by_fullkeys_index(txn, to_visit_inwards):
                 # print("by_fullkeys", referenced_full_key)
