@@ -56,15 +56,14 @@ class BaseLineKeyCodec(KeyCodec):
         result[offset] = SEPARATOR
         return bytes(result)
 
-    # TODO
     @staticmethod
-    def prefix(id: str, version: str | None, clazz_idx: bytes | None, include_clazz: bool = False) -> bytes:
+    def encode_prefix(id: str, version: str | None = None, clazz_idx: bytes | None = None) -> bytes:
         if not version:
             id_bytes = id.encode()
             return id_bytes + SEPARATOR_BYTES
 
         if not clazz_idx:
-            return BaseLineKeyCodec._encode_id_version(id, version)
+            return BaseLineKeyCodec._encode_id_version(id, version) + SEPARATOR_BYTES
 
         return BaseLineKeyCodec.encode_key_idx(id, version, clazz_idx)
 

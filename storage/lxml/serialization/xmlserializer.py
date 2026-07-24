@@ -1,4 +1,4 @@
-from typing import TypeVar, Any, cast
+from typing import Any, cast
 
 from xsdata.formats.dataclass.context import XmlContext
 from xsdata.formats.dataclass.parsers import XmlParser
@@ -10,11 +10,9 @@ from xsdata.formats.dataclass.serializers.config import SerializerConfig
 from lxml import etree
 
 from domain.netex.model import EntityStructure
+from domain.netex.services.model_typing import Tid
 from domain.utils import get_object_name
 from storage.interface import Serializer
-
-T = TypeVar("T")
-Tid = TypeVar("Tid", bound=EntityStructure)
 
 
 class MyXmlSerializer(Serializer):
@@ -25,7 +23,7 @@ class MyXmlSerializer(Serializer):
         "gml": "http://www.opengis.net/gml/3.2",
     }
 
-    def __init__(self, classes: set[Tid]) -> None:
+    def __init__(self, classes: set[type[EntityStructure]]) -> None:
         Serializer.__init__(self, classes)
         context = XmlContext()
         config = ParserConfig(fail_on_unknown_properties=False)
@@ -36,15 +34,22 @@ class MyXmlSerializer(Serializer):
         serializer_config.ignore_default_attributes = True
         self.serializer = XmlSerializer(config=serializer_config)
 
-    @staticmethod
-    def encode_key(id: str | None, version: str | None, clazz: type[T]) -> bytes:
-        return ((id or '') + "-" + (version or 'any')).encode("utf-8")
+    def split_key(self, key: bytes) -> list[bytes]:
+        return b"\n".split(key)
 
-    @staticmethod
-    def encode_key_by_key(key: bytes, clazz: type[T]) -> bytes:
+    def encode_key_idx(self, id: str, version: str | None, _clazz_idx: bytes) -> bytes:
+        return ((id or '') + "\n" + (version or 'any')).encode("utf-8")
+
+    def encode_prefix(self, id: str, version: str | None = None, _clazz_idx: bytes | None = None) -> bytes:
+        if not version:
+            return (id + "\n").encode("utf-8")
+
+        return ((id or '') + "\n" + (version or 'any')).encode("utf-8")
+
+    def encode_key_by_key(self, key: bytes, clazz: type[EntityStructure]) -> bytes:
         return get_object_name(clazz).encode('utf-8') + b'-' + key
 
-    def marshall(self, obj: Any, clazz: type[T], pretty_print: bool = False) -> str:
+    def marshall(self, obj: Any, clazz: type[EntityStructure], pretty_print: bool = False) -> str:
         self.serializer.config.pretty_print = pretty_print
         if isinstance(obj, str):
             return obj
@@ -55,7 +60,7 @@ class MyXmlSerializer(Serializer):
         else:
             return self.serializer.render(obj, self.ns_map).replace("\n", "")
 
-    def unmarshall(self, obj: Any, clazz: type[T]) -> T:
+    def unmarshall(self, obj: Any, clazz: type[Tid]) -> Tid:
         if isinstance(obj, etree._Element):
             return self.parser.parse(obj, clazz)
 

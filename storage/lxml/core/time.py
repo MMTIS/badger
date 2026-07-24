@@ -39,12 +39,13 @@ class XmlDateTimeZoned(XmlDateTime):
         instance.zoneinfo = zoneinfo
         return instance
 
-def is_xml_time_type(t: type) -> bool:
+
+def is_xml_time_type(t: type[Any] | str | Any) -> bool:
     """Checks for the type XmlTime is, including Optional[XmlTime]."""
     return t is XmlTime or (get_origin(t) is Union and XmlTime in get_args(t))
 
 
-def is_xml_date_time_type(t: type) -> bool:
+def is_xml_date_time_type(t: type[Any] | str | Any) -> bool:
     """Checks for the type XmlTime is, including Optional[XmlTime]."""
     return t is XmlTime or (get_origin(t) is Union and XmlTime in get_args(t))
 

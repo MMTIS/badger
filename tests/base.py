@@ -6,6 +6,7 @@ from typing import TypeVar
 from xsdata.models.datatype import XmlDateTime
 
 from domain.netex.model import Line, LineRef, MultilingualString, Route, RouteRef, ServiceJourneyPattern, TextType
+from domain.netex.services.model_typing import Tid
 
 from storage.mdbx.core.implementation import MdbxStorage
 from tests.netex_harness import load_netex, to_xml
@@ -33,12 +34,12 @@ class MdbxStorageTestCase(unittest.TestCase):
         """
         load_netex(self.storage, frames_xml)
 
-    def read_objects(self, clazz: type[T]) -> list[T]:
+    def read_objects(self, clazz: type[Tid]) -> list[Tid]:
         """Return all stored objects of ``clazz``."""
         with self.storage.env.ro_transaction() as txn:
             return list(self.storage.iter_only_objects(txn, clazz))
 
-    def export_netex(self):
+    def export_netex(self) -> str:
         with self.storage.env.ro_transaction() as txn:
             publication_delivery = export_to_general_frame(self.storage, txn)
             publication_delivery.publication_timestamp = XmlDateTime.from_string("2026-01-01T00:00:00")

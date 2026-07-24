@@ -1,9 +1,19 @@
 from functools import lru_cache
 from typing import Any, Generator, Hashable, Optional
+from collections.abc import Collection
 
 from domain.netex import model as netex
-from domain.netex.model import LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface, EntityStructure, DataManagedObject
-from domain.netex.services.model_typing import Tid, Tref
+from domain.netex.model import (
+    LocationStructure2,
+    SimplePointVersionStructure,
+    LineString,
+    Polygon,
+    MultiSurface,
+    VersionOfObjectRefStructure,
+    EntityStructure,
+    DataManagedObject,
+)
+from domain.netex.services.model_typing import Tid
 from domain.netex.services.utils import get_boring_classes
 from storage.interface import Serializer
 
@@ -36,7 +46,7 @@ netex.set_ref_types = frozenset(  # type: ignore
 # netex.set_all = frozenset(netex.__all__)  # type: ignore # This is the true performance step
 
 # TODO: dit gaat fout omdat we nu geen netex meer heten, maar domain.netex.model
-netex.set_all = frozenset(
+netex.set_all = frozenset(  # type: ignore
     {name: cls for name, cls in inspect.getmembers(netex, inspect.isclass)}
 )  # if cls.__module__ == domain.netex.model.__name__})  # type: ignore[attr-defined]
 
@@ -173,7 +183,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                     yield result
 
 
-def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
+def only_reference_objects(deserialized: EntityStructure) -> Generator[VersionOfObjectRefStructure, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     for obj, path in recursive_attributes(deserialized, []):
@@ -195,8 +205,11 @@ def only_reference_objects(deserialized: Tid) -> Generator[Tref, None, None]:
 
 
 def embedding_obj_iter(
-    serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]], ignore: Optional[set[type[Tid]]]
-) -> Generator[tuple[Optional[bytes], Tid, list[int]], None, None]:
+    serializer: Serializer,
+    deserialized: Tid,
+    interesting_classes: Optional[Collection[type[EntityStructure]]] = None,
+    ignore: Optional[Collection[type[EntityStructure]]] = None,
+) -> Generator[tuple[bytes, Any, tuple[int, ...]], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     if not interesting_classes:
@@ -210,8 +223,11 @@ def embedding_obj_iter(
 
 
 def only_embedding(
-    serializer: Serializer, deserialized: Tid, interesting_classes: Optional[set[type[Tid]]], ignore: Optional[set[type[Tid]]] = None
-) -> Generator[bytes, None, None]:
+    serializer: Serializer,
+    deserialized: EntityStructure,
+    interesting_classes: Optional[Collection[type[EntityStructure]]] = None,
+    ignore: Optional[Collection[type[EntityStructure]]] = None,
+) -> Generator[tuple[bytes, EntityStructure], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
     if not interesting_classes:

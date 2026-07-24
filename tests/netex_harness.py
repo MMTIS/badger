@@ -52,7 +52,7 @@ def run(generator_fn: Callable[..., Iterable[T]], db: MdbxStorage) -> list[T]:
 
 def to_xml(obj: Any) -> str:
     """Serialise a NeTEx object to an XML string (handy for readable assertions)."""
-    return MyXmlSerializer([]).marshall(obj, type(obj), True)
+    return MyXmlSerializer(set()).marshall(obj, type(obj), True)
 
 
 def to_xml_all(objs: Iterable[Any]) -> str:

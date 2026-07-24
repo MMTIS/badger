@@ -3,6 +3,7 @@ from typing import Any, Iterable, Generator
 
 from domain.utils import get_object_name
 from domain.netex.model import EntityStructure
+from domain.netex.services.model_typing import Tid
 
 
 class Storage:
@@ -29,7 +30,7 @@ class Serializer:
     name_object: dict[str, type[EntityStructure]]
     class_idx: dict[type[EntityStructure], bytes]
 
-    def __init__(self, classes: list[type[EntityStructure]]) -> None:
+    def __init__(self, classes: set[type[EntityStructure]]) -> None:
         self.name_object = {get_object_name(x): x for x in classes}
 
     def set_class_idx(self, class_idx: dict[type, bytes]) -> None:
@@ -51,10 +52,13 @@ class Serializer:
         return self.encode_key_idx(obj.id, version, self.class_idx[obj.__class__])
 
     @abstractmethod
+    def encode_prefix(self, id: str, version: str | None = None, class_idx: bytes | None = None) -> bytes: ...
+
+    @abstractmethod
     def marshall(self, obj: Any, clazz: type[EntityStructure]) -> Any: ...
 
     @abstractmethod
-    def unmarshall(self, obj: Any, clazz: type[EntityStructure]) -> EntityStructure: ...
+    def unmarshall(self, obj: Any, clazz: type[Tid]) -> Tid: ...
 
     @staticmethod
     def full_key_to_clazz_idx(full_key: bytes) -> tuple[bytes, bytes]:
