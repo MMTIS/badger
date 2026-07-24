@@ -5,7 +5,7 @@
 reg_test.py
 
 Execute each line of a given input file as a command (with parameters) and
-record the command, its return code, and the last 5000 characters of the
+record the command, its return code, and the last 2000 characters of the
 combined output (stdout+stderr) into an Excel file (.xlsx). Cell values are
 sanitized to remove illegal characters so no exceptions are raised by openpyxl.
 
@@ -37,7 +37,7 @@ except ImportError as e:
 
 # Constants
 EXCEL_CELL_MAX_CHARS = 32767
-OUTPUT_TAIL_CHARS = 5000  # keep only last 5000 characters of output
+OUTPUT_TAIL_CHARS = 2000  # keep only last 2000 characters of output
 
 
 def read_commands(path: str, encoding: Optional[str] = None) -> List[str]:
@@ -154,7 +154,7 @@ def excel_tail_text(s: str, tail_len: int) -> str:
     # Last tail_len characters
     if tail_len is not None and tail_len >= 0 and len(s) > tail_len:
         s = s[-tail_len:]
-    # Excel absolute max safeguard (tail_len is 5000 < 32767, but keep this for safety)
+    # Excel absolute max safeguard (tail_len is 2000 < 32767, but keep this for safety)
     if len(s) > EXCEL_CELL_MAX_CHARS:
         s = s[-EXCEL_CELL_MAX_CHARS:]
     return s
@@ -177,7 +177,7 @@ def init_workbook() -> Workbook:
     wb = Workbook()
     ws = wb.active
     ws.title = "Results"
-    headers = ["Script (with parameters)", "Return code", "Output (last 5000 chars)"]
+    headers = ["Script (with parameters)", "Return code", "Output (last 2000 chars)"]
     ws.append(headers)
     # Styling headers
     bold = Font(bold=True)
@@ -194,7 +194,7 @@ def init_workbook() -> Workbook:
 def append_result(ws, command: str, return_code: int, output: str) -> None:
     """
     Append a single sanitized result row to the worksheet.
-    Output column contains only the last 5000 characters.
+    Output column contains only the last 2000 characters.
     """
     # Sanitize command and output to avoid illegal characters
     safe_cmd = excel_safe_text(command)
@@ -216,7 +216,7 @@ def ensure_parent_dir(path: str) -> None:
 
 def parse_args(argv: List[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Execute commands from a file and collect results in an Excel workbook (output column stores only the last 5000 characters)."
+        description="Execute commands from a file and collect results in an Excel workbook (output column stores only the last 2000 characters)."
     )
     parser.add_argument("input_file", help="Path to the text file containing commands (one per line).")
     parser.add_argument("output_excel", help="Path to the output Excel file (.xlsx).")
@@ -253,7 +253,7 @@ def main(argv: List[str]) -> int:
     for idx, cmd in enumerate(commands, start=1):
         print(f"\n\n=============================================================\n[{idx}/{total}] Running: {cmd}")
         rc, out = run_command(cmd, shell=args.shell, timeout=args.timeout, text_encoding=args.encoding)
-        # Append sanitized results (output limited to last 5000 chars)
+        # Append sanitized results (output limited to last 2000 chars)
         print(f'Returned {rc}.\n')
         print(f"\n\n-------------------------------------------------------------\n\n")
         print(out)

@@ -2,11 +2,11 @@ from decimal import Decimal
 from typing import Generator
 
 import duckdb
-
 from domain.gtfs.transform.datetime import noonTimeToNeTEx
 from domain.gtfs.transform.daytype import get_service_id_dt
 from domain.gtfs.transform.directiontype import directionToNeTEx
 from domain.gtfs.transform.limitationstatus import wheelchairToNeTEx
+from domain.gtfs.transform.line import get_route_id
 from domain.gtfs.transform.luggagecarriage import bicyclesToNeTEx
 from domain.gtfs.transform.string import getOptionalString
 from domain.netex.model import (

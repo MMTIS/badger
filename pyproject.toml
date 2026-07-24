@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "badger"
 version = "0.1.0"
@@ -25,10 +29,24 @@ dependencies = [
     "paramiko",
     "types-paramiko",
     "tqdm",
+    "xsdata[cli,soap,lxml]>=25.7",
+    "pandas-stubs~=2.3.3",
+]
+requires-python = ">=3.12"
+
     "xsdata[cli,soap,lxml]==26.2",
 ]
 requires-python = ">=3.12"
 
+
+[project.scripts]
+badger-script-runner = "tools.script_runner:cli"
+badger-gtfs-viewer = "tools.gtfs_map_visualisation:cli"
+badger-gui = "gui.main:main"
+
+# Only package the specified packages
+[tool.setuptools.packages.find]
+include = ["conv*", "tools*", "utils*"]
 [dependency-groups]
 dev = [
     "mypy",

@@ -12,6 +12,7 @@ from mdbx.mdbx import TXN
 
 import utils.netex_monkeypatching  # noqa: F401
 from domain.netex.indexes.byid import getIndex
+from domain.netex.services.recursive_attributes import recursive_attributes
 from domain.netex.services.refs import getRef, getFakeRef
 from domain.netex.services.ids import getId
 from domain.netex.services.recursive_attributes import recursive_attributes
@@ -94,6 +95,7 @@ from domain.netex.model import (
     ValidityConditionsRelStructure,
     AvailabilityCondition,
     JourneyMeeting,
+    InterchangeRule,
     TariffZone,
     TariffZonesInFrameRelStructure,
     ZonesInFrameRelStructure,
@@ -597,8 +599,10 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                 if service_journey_pattern.direction_type is None and route.direction_type is not None:
                     service_journey_pattern.direction_type = route.direction_type.value
 
-                if service_journey_pattern.direction_ref_or_direction_view is None:
-                    service_journey_pattern.direction_ref_or_direction_view = route.direction_ref
+                # if Direction does not exist, then we should not invent it here. We should rely on Direction_Type then.
+                # Otherwise, we would need to add it to the database 2026-01-16
+                # if service_journey_pattern.direction_ref_or_direction_view is None:
+                #    service_journey_pattern.direction_ref_or_direction_view = route.direction_ref
 
                 if service_journey_pattern.distance is None:
                     route.distance = service_journey_pattern.distance
@@ -623,11 +627,13 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 
         elif sj.calls:
             if sj.journey_pattern_ref:
+                # we found a journey_pattern_ref and are therefore happy
                 pass
                 # service_journey_pattern: ServiceJourneyPattern = db_read.get_single(ServiceJourneyPattern,
                 #                                                            sj.journey_pattern_ref.ref,
                 #                                                            sj.journey_pattern_ref.version)
             else:
+                # we generate a ServiceJourneyPattern from the calls
                 service_journey_pattern = service_journey_pattern_from_calls(sj, generator_defaults)
                 sj.journey_pattern_ref = getRef(service_journey_pattern)
 
@@ -636,11 +642,13 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
             )
 
         elif sj.journey_pattern_ref and sj.time_demand_type_ref:
+            #generate PassingTimes from the ServiceJourneyPattern and the TimeDemandType
             service_journey_pattern: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
             time_demand_type: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
             CallsProfile.getPassingTimesFromTimeDemandType(sj, service_journey_pattern, time_demand_type)
 
         else:
+            # works for EPIP without TimeDemandType so, only warning and we set the service_journey_pattern to the sj ones
             log_all(
                 logging.ERROR,
                 f"No matching timing transformation found for journey: {sj}",
@@ -649,7 +657,6 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         # If we already know that this generated SJP already exists, we should not even add it.
         if sj.journey_pattern_ref.ref in sjp_ids:
             pass
-
         elif service_journey_pattern is None:
             log_all(logging.ERROR, f'No service journey pattern for journey: {sj} {sj.journey_pattern_ref}')
 
@@ -674,8 +681,9 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                 if isinstance(pis, StopPointInJourneyPattern)
             ]
 
-            # Ater the Routes to ServiceLinks!
+            # After the Routes to ServiceLinks!
             recover_line_ref(sj, service_journey_pattern, db_read, txn)
+
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
@@ -1255,24 +1263,30 @@ def export_epip_network_offer(
     return publication_delivery
 
 
-def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
+def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange | InterchangeRule | JourneyMeeting, None, None]:
     print(sys._getframe().f_code.co_name)
 
-    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange, None, None]:
+    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange | InterchangeRule | JourneyMeeting, None, None]:
         # _load_generator = load_generator(db_read, InterchangeRule)
         # for interchange_rule in _load_generator:
         #     interchange_rule: InterchangeRule
         #     service_journey_interchange: ServiceJourneyInterchange = project(interchange_rule, ServiceJourneyInterchange)
         #     yield service_journey_interchange
 
-        journey_meeting: JourneyMeeting
-        for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
-            # TODO: I want the from_journey ref having the "correct" name_of_ref_class
-            service_journey_interchange: ServiceJourneyInterchange = project(
-                journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
-            )
-            yield service_journey_interchange
+        # journey_meeting: JourneyMeeting
+        # for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
+        #    #TODO MG: Suggest just returing JourneyMeetings
+        #    # TODO: I want the from_journey ref having the "correct" name_of_ref_class
+        #    service_journey_interchange: ServiceJourneyInterchange = project(
+        #        journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
+        #    )
+        #    yield journey_meeting
 
+        # interchange_rule: InterchangeRule
+        # for interchange_rule in db_read.iter_only_objects(txn, InterchangeRule):
+        #     yield interchange_rule
+        #TODO interchange_rule and journey_meeting should be handled at some point.
+        yield from db_read.iter_only_objects(txn, ServiceJourneyInterchange)
         """
         _load_generator = load_generator(db_read, InterchangeRule)
         for interchange_rule in _load_generator:

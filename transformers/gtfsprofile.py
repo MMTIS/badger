@@ -15,6 +15,7 @@ from utils.utils import to_seconds
 from domain.netex.model import (
     Line,
     MultilingualString,
+    TextType,
     InfoLinksRelStructure,
     ScheduledStopPoint,
     StopPlace,
@@ -55,6 +56,7 @@ from domain.netex.model import (
     VersionOfObjectRefStructure,
     LevelRef,
     Level, AllPublicTransportModesEnumeration,
+    FlexibleLineView,
 )
 
 import operator as operator_f
@@ -65,6 +67,10 @@ T = TypeVar("T")
 
 gtfs_id_lookup = {}  # TODO: better way?
 
+def advanced_round(coord:float, length:int) -> str | float:
+    if coord is None:
+        return ''
+    return round(coord, 7)
 
 class GtfsProfile:
     empty_stop_time = {
@@ -129,15 +135,27 @@ class GtfsProfile:
 
     @staticmethod
     def getOptionalMultilingualString(multilingual_string: MultilingualString | List[MultilingualString] | None) -> str | None:
+        mstring  : MultilingualString =None
         if isinstance(multilingual_string, List):
             if len(multilingual_string) > 0:
-                multilingual_string = multilingual_string[0]
+                mstring = multilingual_string[0]
             else:
-                multilingual_string = None
-
-        if multilingual_string is not None:
-            return str(multilingual_string.content[0])
-
+                mstring = None
+        else:
+            mstring=multilingual_string
+        if mstring is not None:
+            if isinstance(mstring.content, List):
+                if len(mstring.content)== 0:
+                    log_once(logging.ERROR,"gtfsprofile",  f'Got empty multilingualstring: {mstring}')
+                    return None
+                if isinstance(mstring.content[0], str):
+                    return mstring.content[0]  # needed for 5t_ciri
+                if isinstance(mstring.content[0], TextType):
+                    return mstring.content[0].value # needed for fr_mobigo_jura
+                else:
+                    #very strange if we end here
+                    log_once(logging.ERROR,"gtfsprofile", f'Problem with multilingual string: {mstring}')
+            return mstring.content
         return None
 
     @staticmethod
@@ -541,8 +559,8 @@ class GtfsProfile:
                 or GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.short_name)
             ),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(scheduled_stop_point.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(scheduled_stop_point.tariff_zones),
             'stop_url': scheduled_stop_point.url or '',
             'location_type': 0,
@@ -554,6 +572,8 @@ class GtfsProfile:
         }
 
         return stop
+
+
 
     @staticmethod
     def projectStopEntranceToStop(stop_entrance: StopPlaceEntrance, parent: StopPlace, transformer: Transformer | None = None) -> dict[str, Any]:
@@ -575,8 +595,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_entrance.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_entrance.name) or GtfsProfile.getOptionalMultilingualString(stop_entrance.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_entrance.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(stop_entrance.tariff_zones),
             'stop_url': stop_entrance.url or '',
             'location_type': 2,
@@ -656,7 +676,8 @@ class GtfsProfile:
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None:
             if isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, LineRefStructure):
                 return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
-
+            elif isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineView) and isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref, LineRefStructure) :
+                return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref
         elif service_journey_pattern is not None:
             if service_journey.journey_pattern_ref.ref == service_journey_pattern.id:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteView):
@@ -789,8 +810,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_area.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_area.name) or GtfsProfile.getOptionalMultilingualString(stop_area.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_area.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': '',
             'stop_url': '',
             'location_type': 1,  # Station
@@ -825,8 +846,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_place.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_place.name) or GtfsProfile.getOptionalMultilingualString(stop_place.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_place.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': '',
             'stop_url': '',
             'location_type': 1,  # Station
@@ -854,8 +875,8 @@ class GtfsProfile:
             'stop_code': GtfsProfile.getOptionalPrivateCode(stop_place.public_code),
             'stop_name': GtfsProfile.getOptionalMultilingualString(stop_place.name) or GtfsProfile.getOptionalMultilingualString(stop_place.short_name),
             'stop_desc': GtfsProfile.getOptionalMultilingualString(stop_place.description),
-            'stop_lat': round(latitude, 7),
-            'stop_lon': round(longitude, 7),
+            'stop_lat': advanced_round(latitude, 7),
+            'stop_lon': advanced_round(longitude, 7),
             'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(stop_place.tariff_zones),
             'stop_url': stop_place.url or '',
             'location_type': 1,  # Station
@@ -886,8 +907,8 @@ class GtfsProfile:
                     'stop_code': GtfsProfile.getOptionalPrivateCode(quay.public_code),
                     'stop_name': GtfsProfile.getOptionalMultilingualString(quay.name) or GtfsProfile.getOptionalMultilingualString(quay.short_name),
                     'stop_desc': GtfsProfile.getOptionalMultilingualString(quay.description),
-                    'stop_lat': round(latitude, 7),
-                    'stop_lon': round(longitude, 7),
+                    'stop_lat': advanced_round(latitude, 7),
+                    'stop_lon': advanced_round(longitude, 7),
                     'zone_id': GtfsProfile.getTariffZoneFromScheduledStopPoint(quay.tariff_zones),
                     'stop_url': quay.url or '',
                     'location_type': 0,  # Platform
@@ -922,8 +943,8 @@ class GtfsProfile:
 
                 shape_point = {
                     'shape_id': GtfsProfile.getOriginalGtfsId(route, 'shape_id'),
-                    'shape_pt_lat': round(latitude, 7),
-                    'shape_pt_lon': round(longitude, 7),
+                    'shape_pt_lat': advanced_round(latitude, 7),
+                    'shape_pt_lon': advanced_round(longitude, 7),
                     'shape_pt_sequence': sequence,
                     'shape_dist_traveled': (d := distance) if distance > 0 else '',
                 }
@@ -950,8 +971,8 @@ class GtfsProfile:
 
             shape_point = {
                 'shape_id': GtfsProfile.getOriginalGtfsId(route, 'shape_id'),
-                'shape_pt_lat': round(latitude, 7),
-                'shape_pt_lon': round(longitude, 7),
+                'shape_pt_lat': advanced_round(latitude, 7),
+                'shape_pt_lon': advanced_round(longitude, 7),
                 'shape_pt_sequence': sequence,
                 'shape_dist_traveled': (d := distance) if distance > 0 else '',
             }
@@ -982,8 +1003,8 @@ class GtfsProfile:
 
                 shape_point = {
                     'shape_id': GtfsProfile.getOriginalGtfsId(service_journey_pattern, 'shape_id'),
-                    'shape_pt_lat': round(latitude, 7),
-                    'shape_pt_lon': round(longitude, 7),
+                    'shape_pt_lat': advanced_round(latitude, 7),
+                    'shape_pt_lon': advanced_round(longitude, 7),
                     'shape_pt_sequence': sequence,
                     'shape_dist_traveled': (d := distance) if distance > 0 else '',
                 }
@@ -1010,8 +1031,8 @@ class GtfsProfile:
 
             shape_point = {
                 'shape_id': GtfsProfile.getOriginalGtfsId(service_journey_pattern, 'shape_id'),
-                'shape_pt_lat': round(latitude, 7),
-                'shape_pt_lon': round(longitude, 7),
+                'shape_pt_lat': advanced_round(latitude, 7),
+                'shape_pt_lon': advanced_round(longitude, 7),
                 'shape_pt_sequence': sequence,
                 'shape_dist_traveled': (d := distance) if distance > 0 else '',
             }

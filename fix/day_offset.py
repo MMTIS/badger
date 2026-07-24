@@ -166,7 +166,7 @@ def main(source_database_file: str) -> None:
                     changed |= fix_passing_times(service_journey)
 
                     if changed:
-                        yield changed
+                        yield service_journey
 
             source_db.insert_any_object_on_queue(txn_write, all_sj())
             txn_write.commit()
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     import argparse
     import traceback
 
-    parser = argparse.ArgumentParser(description="Check an MDBX for missing references")
+    parser = argparse.ArgumentParser(description="Check an MDBX for not correctly set DayOffsets. It will transform 25:00 to 01:00 with DayOffset=1.")
     parser.add_argument("source", type=str, help="mdbx file to use as input.")
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()

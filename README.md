@@ -108,3 +108,54 @@ For writing towards XML we create generators that would be called exactly when t
 
 ### Tools
 Badger comes with some tools. Those are described [here](./tools/README.md)
+
+### Installable Badger CLI Scripts
+
+Badger provides the ability to install badger CLI scripts on your computer. This simplifies the usage of Badger from the command line, as you are not restricted to the project directory anymore.
+
+#### Installation
+
+Badger scripts are installed with the following command:
+```
+uv pip install -e .
+```
+This generates executable scripts for Linux/Mac and Windows in subdirectories of `.venv`.
+
+After installation, the following environment variables shall be set accordingly:
+
+| Environment Variable | Value                                                                                                                                                                        |
+|----------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `PYTHONPATH`           | Add the badger root path, where you checked out the badger repository.                                                                                                       |
+| `PATH`                 | Add the path to the installed scripts to the `PATH` variable. On Linux, Mac, this may be like `~/badger/.venv/bin:$PATH`, on Windows like `C:\path\to\batcher\.venv\Scripts` |
+| `BADGER_DATA`          | You may set the data directory for Badger.                                                                                                                                   |
+
+On Linux or Mac, this can be achieved by adding something like this to your `.zshrc` or `.bashrc` file:
+```
+BADGER_HOME=~/path/to/badger
+export PYTHONPATH="$BADGER_HOME:$PYTHONPATH"
+export PATH="$BADGER_HOME/.venv/bin:$PATH"
+export BADGER_DATA_DIR="~/data/badger"
+```
+
+On Windows, you may set according variables in the system settings. In particular, add `C:\path\to\batcher\.venv\Scripts` to the `PATH` environment variable.
+
+#### List of Badger CLI Scripts
+
+The following badger scripts are available so far:
+
+| Script                 | for Module                     |
+|------------------------|--------------------------------|
+| `badger-script-runner` | `tools.script_runner`          |
+| `badger-gtfs-viewer`   | `tools.gtfs_map_visualisation` |
+| `badger-gui`           | `gui.main`                     |
+
+#### Sample Usage
+
+The following command:
+```
+uv run python -m tools.script_runner ~/repos/MMTIS/badger/tools/tool_scripts/script_regression_basic.txt badger.log swissmikro
+```
+Can be replaced by:
+```
+badger-script-runner ~/repos/MMTIS/badger/tools/tool_scripts/script_regression.txt badger.log swissmikro
+```
