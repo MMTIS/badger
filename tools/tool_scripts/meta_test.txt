@@ -1,2 +1,9 @@
-# Current set of scripts to run in sequence
-python -m tools.script_runner ./tools/tool_scripts/script_regression_basic.txt mylog.log swissmikro
+
+# Problem OperatorRef
+
+
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_bolzano.log sta_bolzano
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt sta_trentino.log sta_trentino
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lux.log lux
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_ter.log fr_sncf_ter
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt fr_sncf_gtfs.log fr_sncf_gtfs
