@@ -2,7 +2,7 @@
     {
     "block": "blablacar-prod",
     "url":"https://transport.data.gouv.fr/datasets/blablacar-bus-horaires-theoriques-et-temps-reel-du-reseau-europeen",
-    "download_url":"https://github.com/user-attachments/files/18202184/blablacar.zip",
+    "download_url":"https://drive.google.com/uc?export=download&id=1VXd01yQl2Mb67C9bkrx0P8sqNIL532_o",
     "description":"Blablacar data",
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
@@ -50,7 +50,7 @@
         {"script": "#tools.netex_stats", "args": "%%dir%%/epip_netex_fernbusse.xml.zip"},
         {"script": "tools.xml_validator", "args": "%%dir%%/epip_netex_fernbusse.xml.zip domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/gtfs_fernbusse.zip %%dir%%/13-%%block%%-map.html 1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/gtfs_fernbusse.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
         {"script": "#tools.ftp_upload", "args": "%%dir%%/epip_netex_fernbusse.xml.zip sbb_ftp"}
 
         ]

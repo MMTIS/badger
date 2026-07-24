@@ -1,10 +1,12 @@
 import logging
 import ssl
 import os
+import sys
 import time
 import json
 import shutil
 import importlib
+import unittest
 from typing import Any, Optional, Union, List
 
 from utils.aux_logging import (
@@ -20,6 +22,7 @@ import urllib.request
 from datetime import datetime
 import re
 import hashlib
+
 
 
 def custom_hash(value: str) -> str:
@@ -57,24 +60,6 @@ def estimate_size_lmdb(file_name: str) -> int:
     raise
     return 0
 
-
-def parse_command_line_arguments(input_string: str) -> list[str]:
-    arguments = re.findall(r"\[.*?\]|\S+", input_string)
-    result = []
-    for argument in arguments:
-        if argument.startswith("[") and argument.endswith("]"):
-            # Argument is a list enclosed in square brackets
-            list_string = argument[1:-1].strip()
-            if list_string:
-                # Split the list string and add individual elements to the result
-                sublist = list_string.split()
-                result.append(sublist)
-        else:
-            # Argument is a single value
-            result.append(argument)
-    return result
-
-
 def create_list_from_string(input_string: str) -> list[str]:
     # Remove the square brackets from the string
     cleaned_string = input_string.strip("[]")
@@ -82,38 +67,17 @@ def create_list_from_string(input_string: str) -> list[str]:
     result_list = cleaned_string.split(" ")
     return result_list
 
-
-def check_string(input_string: str) -> bool:
-    if "[" in input_string and "]" in input_string:
-        return True
-    else:
-        return False
-
-
 def load_and_run(file_name: str, args_string: str) -> Any:
 
-    module_name = file_name.rstrip(".py")
+    module_name = file_name.removesuffix(".py")
     mod = importlib.import_module(module_name)
     main_function = getattr(mod, "main")
 
     if not callable(main_function):
         raise TypeError(f"{module_name} is not callable!")
 
-    args = parse_command_line_arguments(args_string)
-    args1: list[Any] = []
-    for arg in args:
-        result: Any
-        result = arg
-        if check_string(arg):
-            print(".")
-            result = arg
-        elif arg == "True":
-            result = True
-        elif arg == "False":
-            result = False
-        args1.append(result)
-    print(f'the arguments {args1}')
-    result = main_function(*args1)
+    (args, kwargs) = ArgumentStringParser.parse(args_string)
+    result = main_function(*args, **kwargs)
     return result
 
 
@@ -478,7 +442,104 @@ def main(
         exit(1)
 
 
-if __name__ == "__main__":
+class ArgumentStringParser:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def parse(argument_string: str) -> tuple[list[Any], dict[str, Any]]:
+        arguments = re.findall(r"\[.*?]|\S+", argument_string)
+        args = ArgumentStringParser._get_args(arguments)
+        kwargs = ArgumentStringParser._get_kwargs(arguments)
+        return args, kwargs
+
+    @staticmethod
+    def _resolve_list_expression(value: str) -> None | list[str] | str:
+        """
+            Resolves list expression expressed as list of space separated values enclosed in square brackets.
+        """
+        if value.startswith("[") and value.endswith("]"):
+            # Argument is a list enclosed in square brackets
+            list_string = value[1:-1].strip()
+            if list_string:
+                # Split the list string and add individual elements to the result
+                return list_string.split()
+
+        # Argument is a single value
+        return value
+
+    @staticmethod
+    def _get_args(expressions: list[str]) -> list[Any]:
+        """
+            Gets positional args from list of argument expressions.
+        """
+        args = []
+        for expr in expressions:
+            if ArgumentStringParser._is_kwarg(expr):
+                break
+            if expr == "True":
+                args.append(True)
+                break
+            elif expr == "False":
+                args.append(False)
+                break
+            args.append(ArgumentStringParser._resolve_list_expression(expr))
+        return args
+
+    @staticmethod
+    def _get_kwargs(expressions: list[str]) -> dict[str, Any]:
+        """
+            Gets key-value arguments from list of argument expressions.
+        """
+        kwargs = {}
+        for assignment in expressions:
+            if not ArgumentStringParser._is_kwarg(assignment):
+                continue
+            key_value = assignment.split("=", maxsplit=1)
+            kwargs[key_value[0]] = key_value[1]
+
+        return kwargs
+
+    @staticmethod
+    def _is_kwarg(expression: str) -> bool:
+        return "=" in expression
+
+class ArgumentStringParserTest(unittest.TestCase):
+    logger = logging.getLogger(__name__)
+
+    def _parse(self, argument_string) -> tuple[list[Any], dict[str, Any]]:
+        self.logger.debug("argument_string: %s", argument_string)
+        (args, kwargs) = ArgumentStringParser.parse(argument_string)
+        self.logger.debug("-> args: %s", args)
+        self.logger.debug("-> kwargs: %s", kwargs)
+        self.assertIsNotNone(self)
+        self.assertIsNotNone(kwargs)
+        return args, kwargs
+
+    def test_positional_WHEN_parse_EXPECT_args(self):
+        (args, kwargs) = self._parse("arg1 arg2 [arg3a,arg3b]")
+        self.assertEqual(3, len(args))
+        self.assertEqual(0,len(kwargs))
+
+    def test_key_value_WHEN_parse_EXPECT_kwargs(self):
+        (args, kwargs) = self._parse("arg1=value1 arg2=value2 arg3=[arg3a,arg3b]")
+        self.assertEqual(0, len(args))
+        self.assertEqual(3, len(kwargs.keys()))
+
+    def test_mixed_WHEN_parse_EXPECT_args_and_kwargs(self):
+        (args, kwargs) = self._parse("arg1 arg2 arg3=value")
+        self.assertEqual(2, len(args))
+        self.assertEqual(1, len(kwargs))
+
+def configure_logging(debug: bool = True) -> None:
+    logging.basicConfig(
+        level=logging.DEBUG if debug else logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+        force=True,  # ensure reconfiguration even if something set a handler already
+    )
+
+def cli(argv=None):
     import argparse
     import traceback
 
@@ -501,7 +562,7 @@ if __name__ == "__main__":
         help="The log level (use logging constants)",
     )
     args = parser.parse_args()
-    mylogger = prepare_logger(logging.INFO, args.log_file)
+    prepare_logger(logging.INFO, args.log_file)
     try:
         main(
             args.script_file,
@@ -514,3 +575,12 @@ if __name__ == "__main__":
         )
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+
+if __name__ == "__main__":
+    if len(sys.argv) == 1:
+        # No arguments -> run tests in this module
+        # Using argv=[sys.argv[0]] avoids unittest trying to parse any args
+        configure_logging(debug=True)
+        unittest.main(argv=[sys.argv[0]])
+    else:
+        cli()

@@ -86,10 +86,14 @@ if __name__ == "__main__":
 
     argument_parser = argparse.ArgumentParser(description="Validates each file in a folder (xsd and xml)")
     argument_parser.add_argument("folder", type=str, help="The folder containing the xml files to validate")
-    # argument_parser.add_argument('xmlschema', type=str, help='The schema file to use as a basis for validation')
-    xmlschema = "./netex-xsd/xsd/NeTEx_publication.xsd"
+    argument_parser.add_argument('--xmlschema', type=str, required=False, help='The schema file to use as a basis for validation')
+
     argument_parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = argument_parser.parse_args()
+    xmlschema=args.xmlschema
+    if xmlschema is None:
+        xmlschema = "./domain/netex/schema/xsd/NeTEx_publication.xsd"
+
     # Fetching the data based on command-line arguments
     mylogger = prepare_logger(logging.INFO, args.log_file)
     try:

@@ -27,36 +27,61 @@ def modify_xml_content(root, file_path, outfile=None):
             if match is not None:
                 ref.attrib['nameOfRefClass'] = 'UicOperatingPeriod'
 
+def _serialize_etree_to_bytes(tree):
+    buf = BytesIO()
+    tree.write(buf, encoding="utf-8", xml_declaration=True)
+    return buf.getvalue()
 
-def modify_xml_file(file_path, output_filename):
+def modify_xml_file(file_path, output_filename_str):
+    file_path = Path(file_path)
+    output_filename = Path(output_filename_str)
+
     xml_storage = XmlStorage(file_path)
 
+    out_sfx = output_filename.suffix.lower()
+    out_is_zip = out_sfx == ".zip"
+    out_is_gz = out_sfx == ".gz"
+
+    xml_storage = XmlStorage(file_path)
+    filecounter = 0
     for f, real_filename in xml_storage.open_netex_file():
         et = ET.parse(f)
         modify_xml_content(et.getroot(), file_path.name)
-
+        # Saving file
+        filecounter = filecounter + 1
         # Comes from xml.py
-        if output_filename.endswith(".gz"):
+        if output_filename_str.endswith(".gz"):
             with igzip_threaded.open(  # type: ignore
-                output_filename,
-                "wb",
-                compresslevel=3,
-                threads=3,
-                block_size=2 * 10**8,
+                    output_filename,
+                    "wb",
+                    compresslevel=3,
+                    threads=3,
+                    block_size=2 * 10 ** 8,
             ) as out:
                 et.write(out)
-        elif output_filename.endswith(".zip"):
+        elif output_filename_str.endswith(".zip"):
             with zipfile.ZipFile(output_filename, "a", zipfile.ZIP_DEFLATED) as zf:
                 buffer = BytesIO()
                 et.write(buffer, encoding='utf-8', xml_declaration=True)
                 xml_bytes = buffer.getvalue()
-                zf.writestr(real_filename, xml_bytes)
+                if "<ZipInfo" in real_filename:
+                    zf.writestr(f"file_{filecounter}.xml", xml_bytes)
+                else:
+                    zf.writestr(real_filename, xml_bytes)
         else:
             with open(output_filename, "wb") as out:
                 et.write(out)
 
 
+def ensure_same_extension(input_path: str, output_path: str) -> None:
+    if Path(input_path).suffix != Path(output_path).suffix:
+         raise ValueError(f"File extensions differ: {input_path} ({Path(input_path).suffix!r}) != "
+                        f"{output_path} ({Path(output_path).suffix!r})")
+
+
 def netex_uicoperatingperiod_correction(infile: Path, outfile: Path):
+    ensure_same_extension(str(infile), str(outfile))
+
     try:
         os.remove(outfile)
     except FileNotFoundError:
@@ -75,7 +100,7 @@ def main(infile: str, outfile: str) -> None:
 if __name__ == '__main__':
     import argparse
 
-    log_all(logging.INFO, f"Start processing UicOperatingPeriod problem")
+    log_all(logging.INFO, f"Start processing UicOperatingPeriod problem. This code adds NameOfClass for the usage of UicOperatingPeriod in OperatingPeriods.")
 
     argument_parser = argparse.ArgumentParser(description='Processing UicOperatingPeriodRef')
     argument_parser.add_argument('input', help='NeTEx file with problematic UicOperatingPeriodRef')
