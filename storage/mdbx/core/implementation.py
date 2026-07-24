@@ -363,6 +363,9 @@ class MdbxStorage:
                         db_inward.put(txn, reference_key, referencing_key)
 
     def _load_references_inwards_by_fullkeys_index(self, txn: TXN, full_keys: set[bytes]) -> Generator[tuple[bytes, bytes], None, None]:
+        if not full_keys:
+            return
+
         db = txn.open_map(DB_REFERENCE_INWARD, flags=DB_REFERENCE_INWARD_FLAGS)
         cursor = txn.cursor(db)
 
