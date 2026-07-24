@@ -17,7 +17,7 @@ class CombinedSerializer(Serializer):
 
     def __init__(
         self,
-        classes: list[type[EntityStructure]],
+        classes: set[type[EntityStructure]],
         key_codec: type[KeyCodec] = BaseLineKeyCodec,
         object_serializer: ObjectSerializer = PipelineSerializer(object_serializer=CloudPickleSerializer(), codecs=[Lz4Codec()]),
     ):
@@ -27,6 +27,9 @@ class CombinedSerializer(Serializer):
 
     def encode_key_idx(self, id: str, version: str | None, clazz_idx: bytes) -> bytes:
         return self.key_codec.encode_key_idx(id, version, clazz_idx)
+
+    def encode_prefix(self, id: str, version: str | None = None, clazz_idx: bytes | None = None) -> bytes:
+        return self.key_codec.encode_prefix(id, version, clazz_idx)
 
     def split_key(self, key: bytes) -> list[bytes]:
         return self.key_codec.split_key(key)

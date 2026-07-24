@@ -5,7 +5,7 @@ from mdbx import MDBXCursorOp, MDBXDBFlags
 from domain.netex.indexes.inverse_class import collect_classes_index
 from utils.aux_logging import log_all
 from domain.netex.services.model_typing import Tid
-from domain.netex.model import EntityStructure, NameOfClass
+from domain.netex.model import EntityStructure, EntityInVersionStructure, NameOfClass
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
 from domain.utils import get_object_name
 from storage.interface import Serializer
@@ -22,12 +22,12 @@ from storage.mdbx.core.implementation import (
     DB_EMBEDDED_ID_IDX_FLAGS,
 )
 from mdbx.mdbx import TXN
-from typing import Optional, Generator
+from typing import Optional, Generator, Any, cast
 
 
 def resolve_embeddings_iterable(
     storage: MdbxStorage, txn: TXN, clazz: type[EntityStructure], interesting_classes: Optional[set[type[Tid]]] = None, ignore: Optional[set[type[Tid]]] = None
-) -> Generator[tuple[bytes, EntityStructure, tuple[Optional[bytes], EntityStructure, list[int]]], None, None]:
+) -> Generator[tuple[bytes, EntityStructure, tuple[bytes, Any, tuple[int, ...]]], None, None]:
     """
     In resolve_embeddings we are creating a lookup from an existing instance to the location an embedded object remains.
     Hence, it is not 'you can find this embedded object there' but 'this object has a relationship with that object'.
@@ -80,14 +80,14 @@ def resolve(storage: MdbxStorage) -> None:
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
-            references_to_fix: list[tuple] = []
+            references_to_fix: list[tuple[bytes, bytes | None, bool, bool]] = []
 
             for idx, value in it:
                 seen_count += 1
                 if seen_count % 1_000_000 == 0:
                     log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
-                parts: list[str] | None = None
-                prefix: str | None = None
+                parts: list[bytes]
+                prefix: bytes
                 resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
                 class_change = False
                 version_change = False
@@ -146,22 +146,22 @@ def resolve(storage: MdbxStorage) -> None:
             if len(references_to_fix) > 0:
                 referencing_class_idx, referencing_key = Serializer.full_key_to_clazz_idx(idx)
                 referencing_class = storage.idx_class[referencing_class_idx]
-                referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
+                referencing_obj: EntityStructure = storage.load_object(txn, referencing_class, referencing_key)
 
                 for resolved_idx, value, version_change, class_change in references_to_fix:
                     referenced_class_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
 
-                    for reference in only_reference_objects(storage.serializer, referencing_obj):
+                    for reference in only_reference_objects(referencing_obj):
                         if isinstance(reference.name_of_ref_class, str):
                             # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
                             # print(reference.name_of_ref_class, reference)
                             if reference.name_of_ref_class not in storage.serializer.name_object:
-                                reference.name_of_ref_class = 'DataManagedObject'
+                                reference.name_of_ref_class = NameOfClass.DATA_MANAGED_OBJECT
                             name_of_ref_class = reference.name_of_ref_class
 
-                        elif reference.name_of_ref_class.value not in storage.serializer.name_object:
+                        elif not reference.name_of_ref_class or (reference.name_of_ref_class.value not in storage.serializer.name_object):
                             # TODO: Add a warning.
-                            reference.name_of_ref_class = 'DataManagedObject'
+                            reference.name_of_ref_class = NameOfClass.DATA_MANAGED_OBJECT
 
                         else:
                             name_of_ref_class = reference.name_of_ref_class.value
@@ -177,7 +177,7 @@ def resolve(storage: MdbxStorage) -> None:
                                 )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key)
+                                referenced_obj: EntityInVersionStructure = cast(EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key))
                                 reference.version = referenced_obj.version
 
                 # TODO: buffer this write to ~10000 objects of the same type?
@@ -188,12 +188,12 @@ def resolve(storage: MdbxStorage) -> None:
         txn.commit()
 
 
-def resolve_embeddings_index(storage: MdbxStorage):
+def resolve_embeddings_index(storage: MdbxStorage) -> None:
     log_all(logging.INFO, "[resolve] resolving embeddings")
 
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
-    references_to_fix: list[tuple] = []
+    parts: list[bytes]
 
     # TODO: fix with keycodec
     separator = bytes([10])
@@ -225,20 +225,19 @@ def resolve_embeddings_index(storage: MdbxStorage):
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
                     full_key = idx + this_class_idx.ljust(4, b'\x00')
-                    obj: Tid = storage.serializer.unmarshall(value, clazz)
+                    obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
 
                     # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes
-                    for candidate, _obj in only_embedding(storage.serializer, obj, None):  # we zouden hier direct het path binnen het object ook kunnen opslaan
+                    for candidate, _obj in only_embedding(storage.serializer, obj):  # we zouden hier direct het path binnen het object ook kunnen opslaan
                         db_id_idx.put(txn, candidate, full_key)
 
         # TODO: If this works, deduplicate the code with the regular one
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
-            references_to_fix: list[tuple] = []
+            references_to_fix: list[tuple[bytes, bytes, bool, bool]] = []
 
             for idx, value in it:
-                parts: list[str] | None = None
-                prefix: str | None = None
+                prefix: bytes
                 resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
                 class_change = False
                 version_change = False
@@ -297,22 +296,22 @@ def resolve_embeddings_index(storage: MdbxStorage):
             if len(references_to_fix) > 0:
                 referencing_class_idx, referencing_key = Serializer.full_key_to_clazz_idx(idx)
                 referencing_class = storage.idx_class[referencing_class_idx]
-                referencing_obj: Tid = storage.load_object(txn, referencing_class, referencing_key)
+                referencing_obj: EntityStructure = storage.load_object(txn, referencing_class, referencing_key)
 
                 for resolved_idx, value, version_change, class_change in references_to_fix:
                     referenced_class_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
 
-                    for reference in only_reference_objects(storage.serializer, referencing_obj):
+                    for reference in only_reference_objects(referencing_obj):
                         if isinstance(reference.name_of_ref_class, str):
                             # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
                             # print(reference.name_of_ref_class, reference)
                             if reference.name_of_ref_class not in storage.serializer.name_object:
-                                reference.name_of_ref_class = 'DataManagedObject'
+                                reference.name_of_ref_class = NameOfClass.DATA_MANAGED_OBJECT
                             name_of_ref_class = reference.name_of_ref_class
 
-                        elif reference.name_of_ref_class.value not in storage.serializer.name_object:
+                        elif not reference.name_of_ref_class or (reference.name_of_ref_class.value not in storage.serializer.name_object):
                             # TODO: Add a warning.
-                            reference.name_of_ref_class = 'DataManagedObject'
+                            reference.name_of_ref_class = NameOfClass.DATA_MANAGED_OBJECT
 
                         else:
                             name_of_ref_class = reference.name_of_ref_class.value
@@ -328,7 +327,7 @@ def resolve_embeddings_index(storage: MdbxStorage):
                                 )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: Tid = storage.load_object(txn, referenced_clazz, referenced_key)
+                                referenced_obj: EntityInVersionStructure = cast(EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key))
                                 reference.version = referenced_obj.version
 
                 # TODO: buffer this write to ~10000 objects of the same type?

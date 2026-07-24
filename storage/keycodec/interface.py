@@ -8,4 +8,8 @@ class KeyCodec(ABC):
 
     @staticmethod
     @abstractmethod
+    def encode_prefix(id: str, version: str | None = None, clazz_idx: bytes | None = None) -> bytes: ...
+
+    @staticmethod
+    @abstractmethod
     def split_key(key: bytes) -> list[bytes]: ...

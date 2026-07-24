@@ -32,7 +32,9 @@ def export_to_general_frame(storage: MdbxStorage, txn: TXN, optimal: bool = True
 
     else:
         # This is the naive, but fast implementation. It groups the classes.
-        tables = dict(sorted(storage.db_names(txn).items(), key=lambda item: item[1].__name__))  # To ensure predictable order
+        tables: dict[bytes, type[EntityStructure]] = dict(
+            sorted(storage.db_names(txn).items(), key=lambda item: item[1].__name__)
+        )  # To ensure predictable order
         iterables = [(t for _, t in storage.iter_objects(txn, clazz)) for clazz in tables.values()]
         publication_delivery = PublicationDelivery(
             version="ntx:1.1",
