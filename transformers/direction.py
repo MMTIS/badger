@@ -19,7 +19,6 @@ def infer_directions_from_sjps_and_apply(db_read: MdbxStorage, txn: TXN, generat
         if sjp.direction_type is not None and sjp.direction_ref_or_direction_view is None:
             key = str(sjp.direction_type.value)
             direction: Direction | None = directions.get(key, None)
-            new_direction=None
             if direction is None:
                 direction = Direction(
                     id=getId(generator_defaults['codespace'], Direction, key),

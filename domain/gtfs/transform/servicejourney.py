@@ -234,7 +234,7 @@ def getServiceJourneys(con: duckdb.DuckDBPyConnection, codespace: Codespace, ver
             service_journey = ServiceJourney(
                 id=get_trip_id(codespace, trip_id),
                 version=version,
-                flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(get_route_id(codespace, route_id), LineRef, version),
+                flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view=getFakeRef(getId(codespace, Line, route_id), LineRef, version),
                 private_codes=PrivateCodes(private_code=[PrivateCode(value=trip_id, type_value="trip_id")]),
                 short_name=getOptionalString(trip_short_name),
                 day_types=DayTypeRefsRelStructure(day_type_ref=[getFakeRef(get_service_id_dt(codespace, service_id), DayTypeRef, version)]),
