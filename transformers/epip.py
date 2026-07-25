@@ -684,7 +684,6 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
             # After the Routes to ServiceLinks!
             recover_line_ref(sj, service_journey_pattern, db_read, txn)
 
-
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
             # log_all(logging.INFO, f'{service_journey_pattern.id}')
