@@ -323,8 +323,8 @@ class MdbxStorage:
             break
 
     def _load_references(self, txn: TXN, full_key: bytes) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
-        for full_key in self._load_references_by_fullkey(txn, full_key):
-            class_idx, reference_local_key = Serializer.full_key_to_clazz_idx(full_key)
+        for reference_full_key in self._load_references_by_fullkey(txn, full_key):
+            class_idx, reference_local_key = Serializer.full_key_to_clazz_idx(reference_full_key)
             yield self.idx_class[class_idx], reference_local_key
 
     def _load_references_inwards_by_fullkey(self, txn: TXN, full_key: bytes) -> Generator[bytes, None, None]:
@@ -363,6 +363,9 @@ class MdbxStorage:
                         db_inward.put(txn, reference_key, referencing_key)
 
     def _load_references_inwards_by_fullkeys_index(self, txn: TXN, full_keys: set[bytes]) -> Generator[tuple[bytes, bytes], None, None]:
+        if not full_keys:
+            return
+
         db = txn.open_map(DB_REFERENCE_INWARD, flags=DB_REFERENCE_INWARD_FLAGS)
         cursor = txn.cursor(db)
 
@@ -377,8 +380,8 @@ class MdbxStorage:
                 break
 
     def _load_references_inwards(self, txn: TXN, full_key: bytes) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
-        for full_key in self._load_references_inwards_by_fullkey(txn, full_key):
-            class_idx, referencing_local_key = Serializer.full_key_to_clazz_idx(full_key)
+        for referencing_full_key in self._load_references_inwards_by_fullkey(txn, full_key):
+            class_idx, referencing_local_key = Serializer.full_key_to_clazz_idx(referencing_full_key)
             yield self.idx_class[class_idx], referencing_local_key
 
     def load_references_by_clazz_full_key(self, txn: TXN, full_key: bytes, inwards: bool) -> Generator[bytes, None, None]:
@@ -428,10 +431,18 @@ class MdbxStorage:
         self,
         txn: TXN,
         full_keys: list[bytes],
-        inward_classes: set[type[EntityStructure]] = {NoticeAssignment, DayTypeAssignment},
-        conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {(PassengerStopAssignment, ScheduledStopPoint)},
-        visited: set[bytes] = set(),
+        inward_classes: set[type[EntityStructure]] | None = None,
+        conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] | None = None,
+        visited: set[bytes] | None = None,
     ) -> Generator[EntityStructure, None, None]:
+        if visited is None:
+            visited = set()
+
+        if inward_classes is None:
+            inward_classes = {NoticeAssignment, DayTypeAssignment}
+
+        if conditional_inward_classes is None:
+            conditional_inward_classes = {(PassengerStopAssignment, ScheduledStopPoint)}
 
         stack = list(full_keys)
 
@@ -454,7 +465,6 @@ class MdbxStorage:
                     full_key = identifier
                     obj = self.load_object_by_full_key(txn, full_key)
                     if obj:
-                        # print(obj.id)
                         yield obj
 
                         this_clazz_idx, key = Serializer.full_key_to_clazz_idx(full_key)
