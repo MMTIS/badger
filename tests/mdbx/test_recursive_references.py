@@ -9,7 +9,7 @@ from domain.netex.model import (
     TextType,
 )
 
-from storage.mdbx.core.references import resolve, resolve_embeddings_index
+from storage.mdbx.core.references import resolve
 
 from tests.base import MdbxStorageTestCase
 
@@ -23,11 +23,6 @@ class TestRecursiveReferences(MdbxStorageTestCase):
             txn_write.commit()
 
         resolve(self.storage)
-        resolve_embeddings_index(self.storage)
-
-        with self.storage.env.rw_transaction() as txn_write:
-            self.storage._index_references_inwards(txn_write, force=True)
-            txn_write.commit()
 
         with self.storage.env.ro_transaction() as txn_read:
             result = self.storage.load_object_by_id_version(txn_read, "sjp1", ServiceJourneyPattern, "1")
