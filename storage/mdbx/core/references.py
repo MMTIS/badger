@@ -1,6 +1,6 @@
 import logging
 
-from mdbx import MDBXCursorOp, MDBXDBFlags
+from mdbx import MDBXDBFlags
 
 from domain.netex.indexes.inverse_class import collect_classes_index
 from utils.aux_logging import log_all
@@ -73,10 +73,13 @@ def resolve(storage: MdbxStorage) -> None:
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
+
+        if db_unresolved.get_stat(txn).ms_entries == 0:
+            return
+
         db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
-
-        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
@@ -104,6 +107,8 @@ def resolve(storage: MdbxStorage) -> None:
                         if check_key.startswith(prefix):
                             class_change = check_idx
                             resolved_idx = check_idx
+
+                        # In all cases, found or not equal to prefix
                         break
 
                     if not resolved_idx:
@@ -137,7 +142,8 @@ def resolve(storage: MdbxStorage) -> None:
                     # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
 
                     db_reference_forward.put(txn, idx, resolved_idx)
-                    unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
+                    # db_unresolved.delete(txn, idx, value) OR:
+                    it.cur.delete()  # The reason here, the it, has a duplicated cursor
 
                 # else:
                 #    print("unresolved", value, idx)
@@ -177,7 +183,9 @@ def resolve(storage: MdbxStorage) -> None:
                                 )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: EntityInVersionStructure = cast(EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key))
+                                referenced_obj: EntityInVersionStructure = cast(
+                                    EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key)
+                                )
                                 reference.version = referenced_obj.version
 
                 # TODO: buffer this write to ~10000 objects of the same type?
@@ -203,17 +211,22 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
+
+        if db_unresolved.get_stat(txn).ms_entries == 0:
+            return
+
         db_id_idx = txn.create_map(DB_EMBEDDED_ID_IDX, flags=DB_EMBEDDED_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
-        for idx, value in unresolved_cursor.iter():
+        for full_key, value in unresolved_cursor.iter():
+            obj = storage.load_object_by_full_key(txn, full_key=full_key)
+            print("embedding", obj.id, obj.__class__, value)
             # print(idx, value)
             parts = storage.serializer.split_key(value)
-            unresolved_pairs.setdefault(value, set()).add(idx)
+            unresolved_pairs.setdefault(value, set()).add(full_key)
             missing_classes.add(storage.idx_class[parts[-1]])
-
-        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 
         used_classes_in_database = set(storage.db_names(txn).values())
         index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
@@ -254,6 +267,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                         if check_key.startswith(prefix):
                             class_change = check_idx
                             resolved_idx = check_idx
+
+                        # In all cases, found or not equal to prefix
                         break
 
                     if not resolved_idx:
@@ -287,7 +302,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                     # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
 
                     db_reference_forward.put(txn, idx, resolved_idx)
-                    unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
+                    it.cur.delete()
 
                 # else:
                 #    print("unresolved", value, idx)
@@ -327,7 +342,9 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                                 )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
                                 referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: EntityInVersionStructure = cast(EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key))
+                                referenced_obj: EntityInVersionStructure = cast(
+                                    EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key)
+                                )
                                 reference.version = referenced_obj.version
 
                 # TODO: buffer this write to ~10000 objects of the same type?
