@@ -573,8 +573,6 @@ class GtfsProfile:
 
         return stop
 
-
-
     @staticmethod
     def projectStopEntranceToStop(stop_entrance: StopPlaceEntrance, parent: StopPlace, transformer: Transformer | None = None) -> dict[str, Any]:
         # TODO: parent_station could be obtained from StopPlace or StopArea
