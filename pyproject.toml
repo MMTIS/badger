@@ -9,7 +9,7 @@ dependencies = [
     "dateutils",
     "duckdb",
     "isal",
-    "libmdbx",
+    "libmdbx>=0.3.2",
     "lmdb",
     "lz4",
     "openpyxl",

@@ -97,7 +97,7 @@ requires-dist = [
     { name = "duckdb" },
     { name = "folium" },
     { name = "isal" },
-    { name = "libmdbx" },
+    { name = "libmdbx", specifier = ">=0.3.2" },
     { name = "lmdb" },
     { name = "lz4" },
     { name = "mapbox-vector-tile" },
@@ -598,20 +598,20 @@ wheels = [
 
 [[package]]
 name = "libmdbx"
-version = "0.3.1"
+version = "0.3.2"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/e5/db/4eea6e406db237a0827b338d90c7a5b51b3839a11a0573cb6d894e38be92/libmdbx-0.3.1.tar.gz", hash = "sha256:32257a66ec824094bfb9de764baf870a73d2fa8cb1e7a12caeb317fa204e12e6", size = 876416 }
+sdist = { url = "https://files.pythonhosted.org/packages/96/d6/1c2f043b29bfaf2c8fdada91dfd5134e7bfacb52df2bebaf877756e7d800/libmdbx-0.3.2.tar.gz", hash = "sha256:7b38f8104bfd982777fa2ca00f99b4f7cc88e7bab31ce853b480f81420427045", size = 897694 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/37/ab/6e1beebbfc37fba60b0dc0cc9b30260fe6b266a95a93908b2363f88e05ea/libmdbx-0.3.1-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:6590165d1f5026143cfdaa0e86174930474b08b4fc97457b19b99c2e9eacde71", size = 499062 },
-    { url = "https://files.pythonhosted.org/packages/f8/cb/98d1ba312a064cbd1241370938f36144ee6c20eea38992da2fb852b86823/libmdbx-0.3.1-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:053c85a7501744dcd0a556f8b32e7ecce4a7000cb3725cfd2f41124000e5ee12", size = 500359 },
-    { url = "https://files.pythonhosted.org/packages/fc/0f/91b448f98ff1158000d6326448dd24b179a108097a4b392d2a4f8a5bf51e/libmdbx-0.3.1-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:1f41c70f674e70e5f2972522bb6fd4fa42b87b13deaa2a4c4a69c85b3ea27256", size = 1337016 },
-    { url = "https://files.pythonhosted.org/packages/be/4f/b5483423aa924330f602e76e7863529733a804fde0cfe7dbdf3549878ba4/libmdbx-0.3.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:9a92c4210ea3f9ef3f3ed4fe392b78072f77b1804462f203fb4afdbe4af63dcf", size = 1374589 },
-    { url = "https://files.pythonhosted.org/packages/f2/c6/1dd96c96c010b56deeb8a64f2fa6f9aa2d3bf89f3891a201fff13ee0a22a/libmdbx-0.3.1-cp312-cp312-win_amd64.whl", hash = "sha256:e758e7770679bb86af72de731fa976d6f87bf65fa725c74de9de99e59b665588", size = 270639 },
-    { url = "https://files.pythonhosted.org/packages/cb/c8/2da18b9bf3d8f44557c397f39ff091c5d9aefa71659abff6009d54e8e123/libmdbx-0.3.1-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:9b5e619a0f3a98e8a37f9530e85fadbd9288c7c06998dc45d670a6f26513233e", size = 499065 },
-    { url = "https://files.pythonhosted.org/packages/09/b7/0a56b7c53f827ff8b2fc439c6dab50b2c8a2ea82939cedafd66597afb567/libmdbx-0.3.1-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:d00c11189467963a48cc9bf50d5fb3dcfa8916c3797f626c105bd49a93a284cb", size = 500343 },
-    { url = "https://files.pythonhosted.org/packages/9b/f2/42818b2a19a4a955a411f1f5704790300347cae5b59451aea7262a6d61c5/libmdbx-0.3.1-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:2fde303c0c69bac94876677447b7fbed5271861180d664681b9f46fcd79b8208", size = 1337024 },
-    { url = "https://files.pythonhosted.org/packages/0a/45/03e19b671b4b2417a00a2cd300e02097eb1d664dcee7614e1d8aca23fb0a/libmdbx-0.3.1-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b4087655f750efabec5c3fc7abf80a4c32314b0078d857fb4e7c3efe02c72fd0", size = 1374588 },
-    { url = "https://files.pythonhosted.org/packages/3c/3a/067f96d85431e705936102b278afd2c50e788b4002f0a2658bb5f7179919/libmdbx-0.3.1-cp313-cp313-win_amd64.whl", hash = "sha256:1d0408b6dd578a0db52a6e3c6d01ef5757abbdf46fa9f162d881a7fde8b6deff", size = 270639 },
+    { url = "https://files.pythonhosted.org/packages/3a/73/7549f8d241d9af4202d9dad5ac2ba07ecad5715137957608da4e8cbecc8c/libmdbx-0.3.2-cp312-cp312-macosx_13_0_arm64.whl", hash = "sha256:f5d76a170a442070fd91ed6c9f0d7238e5dcc41f953a1a82b8720aaab62cbe61", size = 503706 },
+    { url = "https://files.pythonhosted.org/packages/5f/1c/a5ad9a1d2d6ea4ae2050647f86d3c70a4974891223d3b18621993b6c36cb/libmdbx-0.3.2-cp312-cp312-macosx_13_0_x86_64.whl", hash = "sha256:fbbae0b643f85b0ea0d62a19bbca523dbaf6ae8106e3f75adcfe2faaa09a20ca", size = 501962 },
+    { url = "https://files.pythonhosted.org/packages/e5/fd/ad51a2202d9015ff4d5c49e8acb1d8be244d12ea4af748c675bb2dba7836/libmdbx-0.3.2-cp312-cp312-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:a97097ed2df1e7c0877620ec89a5b5fc85f1259f30e272f4ebc54601e55e8d1a", size = 1362388 },
+    { url = "https://files.pythonhosted.org/packages/16/16/12325799363e71e5e4978473399cbe18f5e1b82cbc83c8a140027c617b3b/libmdbx-0.3.2-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:ab742692f8f8fd7e794b4d3a90429fce294809c493b7dea9c6039d1f140503f1", size = 1390026 },
+    { url = "https://files.pythonhosted.org/packages/64/5a/2edc1f42e918a57a781e534f17e404f0eb7a472202a0bd8f657dbd3a4fa8/libmdbx-0.3.2-cp312-cp312-win_amd64.whl", hash = "sha256:bda8003dc8495d6bea2458174fc5c2f4e9cebafd45e78707f46f749e5c75f274", size = 279811 },
+    { url = "https://files.pythonhosted.org/packages/3a/a6/60e97cf4426a511edda3d10237d260b8f9a766f1e70d39cc15706ebf97ff/libmdbx-0.3.2-cp313-cp313-macosx_13_0_arm64.whl", hash = "sha256:ec6b3ba9b7954926568807075253c3dfb0b56bb593887aa6a219cade9c2cd2b9", size = 503710 },
+    { url = "https://files.pythonhosted.org/packages/22/aa/3b8f34f933dd203a3ca5041be4b7a3d0560e500c99eb2e92b56b61070e86/libmdbx-0.3.2-cp313-cp313-macosx_13_0_x86_64.whl", hash = "sha256:ade851d3bd6db91ba8988572f198c9e6f8fa33b42c85fe5feb4699ccae648772", size = 501956 },
+    { url = "https://files.pythonhosted.org/packages/cc/ad/d3c68676f29e1a32b06cf4c9b03c92a981587fdaeb2cc0ca8e4d7a0ff88a/libmdbx-0.3.2-cp313-cp313-manylinux_2_17_i686.manylinux2014_i686.whl", hash = "sha256:4fc7856ec26346e6a18be9359d2416913cabeebc16ed19f986c484442f001be1", size = 1362396 },
+    { url = "https://files.pythonhosted.org/packages/9b/81/51520251ecca2ecac705d0909c3bde65df3754af04ada34248d6d36c62a8/libmdbx-0.3.2-cp313-cp313-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:85e228c27e944bc9654702e4c62fd1c658e652df58772ed61b1ec6f5c31d4fad", size = 1390033 },
+    { url = "https://files.pythonhosted.org/packages/a0/ce/f5750f5cf75fd414aeabc4b91a4027dedde14c9e4869ee992b5919b82f1d/libmdbx-0.3.2-cp313-cp313-win_amd64.whl", hash = "sha256:c7af6ec03e45efff2e3d2cff03ad20151e8cf6bf2a58ba76ac89032dbd82e1a2", size = 279811 },
 ]
 
 [[package]]
