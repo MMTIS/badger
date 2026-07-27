@@ -70,7 +70,7 @@ def _dc_field_names(cls: Hashable) -> tuple[str, ...]:
     # return tuple(f.name for f in fields(cls))
 
 
-def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tuple[int, ...]], None, None]:
+def recursive_attributes(obj: Tid, depth: list[int], embeddings=False) -> Generator[tuple[Any, tuple[int, ...]], None, None]:
     # We skip data_source_ref_attribute and  responsibility_set_ref_attribute later in the pipeline
     # data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
     # if data_source_ref_attribute:
@@ -99,9 +99,9 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
                 if hasattr(
                     v, "__dataclass_fields__"
                 ):  # and v.__class__.__name__ in netex.set_all or isinstance(v, StrictContainmentAggregationStructure):  # type: ignore
-                    # if hasattr(v, "id"):
-                    #    yield v, tuple(mydepth)
-                    yield from recursive_attributes(v, mydepth)
+                    if embeddings and hasattr(v, "id"):
+                        yield v, tuple(mydepth)
+                    yield from recursive_attributes(v, mydepth, embeddings)
                 elif v.__class__ in (list, tuple):
                     mydepth.append(0)
                     for j, x in enumerate(v):
@@ -110,9 +110,9 @@ def recursive_attributes(obj: Tid, depth: list[int]) -> Generator[tuple[Any, tup
                             if x.__class__ in netex.set_ref_types:  # type: ignore
                                 yield x, tuple(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
                             elif hasattr(x, "__dataclass_fields__"):  # and x.__class__.__name__ in netex.set_all:  # type: ignore
-                                if hasattr(x, "id"):
+                                if embeddings and hasattr(x, "id"):
                                     yield x, tuple(mydepth)
-                                yield from recursive_attributes(x, mydepth)
+                                yield from recursive_attributes(x, mydepth, embeddings)
                     mydepth.pop()
     mydepth.pop()
 
@@ -122,7 +122,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     already_done: set[tuple[type[EntityStructure], str, str | None]] = set()
     # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
 
-    for obj, path in recursive_attributes(deserialized, []):
+    for obj, _path in recursive_attributes(deserialized, [], embeddings=False):
         if hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
             # if obj.version_ref is not None and obj.version is None:
@@ -186,7 +186,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
 def only_reference_objects(deserialized: EntityStructure) -> Generator[VersionOfObjectRefStructure, None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
 
-    for obj, path in recursive_attributes(deserialized, []):
+    for obj, _path in recursive_attributes(deserialized, [], embeddings=False):
         if hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
             # if obj.version_ref is not None and obj.version is None:
@@ -215,7 +215,7 @@ def embedding_obj_iter(
     if not interesting_classes:
         interesting_classes = serializer.class_idx.keys()
 
-    for obj, path in recursive_attributes(deserialized, []):
+    for obj, path in recursive_attributes(deserialized, [], embeddings=True):
         if obj.__class__.__name__ in serializer.name_object:  # TODO: The object should not even enter here
             if hasattr(obj, "id") and obj.id is not None:
                 if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
@@ -233,7 +233,7 @@ def only_embedding(
     if not interesting_classes:
         interesting_classes = serializer.class_idx.keys()
 
-    for obj, path in recursive_attributes(deserialized, []):
+    for obj, _path in recursive_attributes(deserialized, [], embeddings=True):
         if hasattr(obj, "id") and obj.id is not None:
             if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
                 yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj
