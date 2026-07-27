@@ -1,4 +1,3 @@
-import unittest
 from tests.base import MdbxStorageTestCase
 from mdbx.mdbx import MDBXCanary
 
@@ -10,7 +9,6 @@ class TestCanary(MdbxStorageTestCase):
     Remove @expectedFailure once upstream https://github.com/wtdcode/mdbx-py/pull/19 is merged.
     """
 
-    @unittest.expectedFailure
     def test_canary_put(self) -> None:
         with self.storage.env.rw_transaction() as txn:
             canary = MDBXCanary()
