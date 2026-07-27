@@ -171,15 +171,16 @@
 {
 "block":"mobigo-list",
 "worked":"2026-01-24",
+"url": "https://transport.data.gouv.fr/datasets/reseau-de-transport-interurbain-mobigo-en-bourgogne-franche-comte",
 "description":"List of some mobigo data to fetch and transform",
 "download_urls":[
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT89",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT71",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT25",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT70",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT21",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT89",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT71",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT25",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT70",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT21",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
 ],
 "scripts": [
  {"script": "process_url_list", "args": "gtfs2epip"}
