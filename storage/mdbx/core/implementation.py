@@ -267,11 +267,11 @@ class MdbxStorage:
             db_id_idx.put(txn, my_id, full_key)
 
     # Deprecate this one
-    def insert_objects_on_queue(self, klass: type[EntityStructure], objects: Iterable[EntityStructure], empty: bool = False) -> None:
+    def insert_objects_on_queue(self, clazz: type[EntityStructure], objects: Iterable[EntityStructure], empty: bool = False) -> None:
         if self.readonly:
             raise
 
-        this_class_idx = self.class_idx[klass]
+        this_class_idx = self.class_idx[clazz]
 
         with self.env.rw_transaction() as txn:
             db = txn.create_map(name=this_class_idx)
@@ -305,7 +305,7 @@ class MdbxStorage:
                     else:
                         db_unresolved.put(txn, full_key, unresolved_value)
 
-                value = self.serializer.marshall(obj, klass)
+                value = self.serializer.marshall(obj, clazz)
                 db.put(txn, key, value)
                 db_id_idx.put(txn, my_id, full_key)
 

@@ -3,7 +3,7 @@ from itertools import groupby
 from typing import Optional, TypeVar, Any, Iterable
 
 # TODO: This is required for globals to work, lets fix that later.
-from domain.netex.model import *  # noqa: F403
+from domain.netex.model import VersionOfObjectRefStructure, Version, Codespace, EntityInVersionStructure, EntityStructure, NameOfClass
 
 import datetime
 import re
@@ -14,11 +14,10 @@ Tidversion = TypeVar("Tidversion", bound=EntityInVersionStructure)
 Tref = TypeVar("Tref", bound=VersionOfObjectRefStructure)
 
 
-
-def getFakeRefByClass(id: str, klass: type[Tref], version: str | None = None) -> Tref:
-    asobj = type(klass).__name__ + "Ref"  # Was: RefStructure
-    klass = globals()[asobj]
-    instance = klass(ref=id)
+def getFakeRefByClass(id: str, clazz: type[Tref], version: str | None = None) -> Tref:
+    asobj = type(clazz).__name__ + "Ref"  # Was: RefStructure
+    clazz = globals()[asobj]
+    instance = clazz(ref=id)
     if version is not None:
         instance.version = version
     return instance
@@ -26,20 +25,16 @@ def getFakeRefByClass(id: str, klass: type[Tref], version: str | None = None) ->
 
 def getClassFromRefClass(ref: Tref) -> Any:
     if ref.name_of_ref_class is not None:
-        klass = ref.name_of_ref_class
+        clazz_name = ref.name_of_ref_class.value
     else:
-        klass = re.sub(r"LineRef(Structure)?", "Line", type(ref).__name__)  # TODO: review
+        clazz_name = re.sub(r"LineRef(Structure)?", "Line", type(ref).__name__)  # TODO: review
 
-    return globals()[klass]
-
+    return globals()[clazz_name]
 
 
 def getIdByRef(obj: object, codespace: Codespace, ref: str) -> str:
     name = getattr(getattr(type(obj), "Meta", None), "name", type(obj).__name__)
     return "{}:{}:{}".format(codespace.xmlns, name, str(ref).replace(":", "-"))
-
-
-
 
 
 def getIndexByGroup(objects: Iterable[T], attr: str) -> dict[object, list[T]]:
@@ -56,10 +51,9 @@ def setIdVersion(obj: Tidversion, codespace: Codespace, id: str, version: Option
         obj.version = "any"
 
 
-
 def getVersionOfObjectRef(obj: Tid) -> VersionOfObjectRefStructure:
     assert obj.id is not None, "Object without id"
-    return VersionOfObjectRefStructure(name_of_ref_class=type(obj).__name__, ref=obj.id)
+    return VersionOfObjectRefStructure(name_of_ref_class=NameOfClass(type(obj).__name__), ref=obj.id)
 
 
 def getBitString2(
@@ -81,6 +75,3 @@ def getBitString2(
         f += datetime.timedelta(days=1)
 
     return out
-
-
-
