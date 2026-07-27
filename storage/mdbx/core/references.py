@@ -221,9 +221,6 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for full_key, value in unresolved_cursor.iter():
-            obj = storage.load_object_by_full_key(txn, full_key=full_key)
-            print("embedding", obj.id, obj.__class__, value)
-            # print(idx, value)
             parts = storage.serializer.split_key(value)
             unresolved_pairs.setdefault(value, set()).add(full_key)
             missing_classes.add(storage.idx_class[parts[-1]])

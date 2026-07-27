@@ -4,7 +4,7 @@ from typing import Generator
 
 from mdbx.mdbx import TXN
 
-from domain.netex import EntityStructure, Line
+from domain.netex import EntityStructure
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import recursive_attributes
 from storage.mdbx.core.implementation import MdbxStorage
@@ -16,7 +16,7 @@ def reversion_object(deserialized: EntityStructure, version: str | None) -> Enti
     if version is None:
         return deserialized
 
-    for obj, path in recursive_attributes(deserialized, []):
+    for obj, _path in recursive_attributes(deserialized, [], embeddings=True):
         if hasattr(obj, "version"):
             obj.version = version
         if hasattr(obj, "data_source_ref_attribute"):
@@ -37,6 +37,7 @@ def reversion_object(deserialized: EntityStructure, version: str | None) -> Enti
 
     return deserialized
 
+
 def reversion_update(db: MdbxStorage, txn: TXN, version: int | None) -> Generator[Tid, None, None]:
     # Within this function we are reading and writing towards the target database.
     # This effectively means that if we would need to resize for whatever reason,
@@ -48,6 +49,7 @@ def reversion_update(db: MdbxStorage, txn: TXN, version: int | None) -> Generato
         obj: Tid
         for _key, obj in db.iter_objects(txn, clazz):
             yield reversion_object(obj, version)
+
 
 def reversion_db_to_db(source_database_files: set[Path], target_database_file: Path, version: int | None) -> None:
     version = str(version) if version else None
@@ -62,6 +64,7 @@ def reversion_db_to_db(source_database_files: set[Path], target_database_file: P
 
         resolve(target_db)
         resolve_embeddings_index(target_db)
+
 
 def main(source: list[str], target: str, version: int) -> None:
     source_paths: set[Path] = set()
