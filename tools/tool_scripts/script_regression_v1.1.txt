@@ -571,8 +571,8 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/03-import.mdbx"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.xml.zip"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.zip] %%dir%%/03-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.mdbx "},
