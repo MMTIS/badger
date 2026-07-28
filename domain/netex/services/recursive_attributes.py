@@ -70,7 +70,7 @@ def _dc_field_names(cls: Hashable) -> tuple[str, ...]:
     # return tuple(f.name for f in fields(cls))
 
 
-def recursive_attributes(obj: Tid, depth: list[int], embeddings=False) -> Generator[tuple[Any, tuple[int, ...]], None, None]:
+def recursive_attributes(obj: Tid, depth: list[int], embeddings: bool = False) -> Generator[tuple[Any, tuple[int, ...]], None, None]:
     # We skip data_source_ref_attribute and  responsibility_set_ref_attribute later in the pipeline
     # data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
     # if data_source_ref_attribute:
