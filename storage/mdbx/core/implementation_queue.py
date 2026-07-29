@@ -7,8 +7,7 @@ from utils.aux_logging import log_all
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED, \
-    DB_ID_IDX_FLAGS
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED, DB_ID_IDX_FLAGS
 
 
 class MdbxStorageQueue(MdbxStorage):
@@ -18,10 +17,10 @@ class MdbxStorageQueue(MdbxStorage):
         super().__init__(path, readonly=True)
         self.queue = queue
 
-    def insert_objects_on_queue(self, klass: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
-        log_all(logging.DEBUG, f"[queue] insert_objects_on_queue {klass}")
+    def insert_objects_on_queue(self, clazz: type[Tid], objects: Iterable[Tid], empty: bool = False) -> None:
+        log_all(logging.DEBUG, f"[queue] insert_objects_on_queue {clazz}")
 
-        this_class_idx = self.class_idx[klass]
+        this_clazz_idx = self.clazz_idx[clazz]
 
         with self.env.ro_transaction() as txn:
             db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
@@ -30,9 +29,9 @@ class MdbxStorageQueue(MdbxStorage):
                 # Each insert will receive a unique key, therefore they must be grouped together
                 updates: list[tuple[bytes, Any, Any]] = []
 
-                partial_key = int.from_bytes(this_class_idx, 'little') << 32
-                for referenced_class_idx, ref, version in only_references(obj, self.serializer):
-                    unresolved_value = self.serializer.encode_key(ref, version, referenced_class_idx, include_clazz=True)
+                partial_key = int.from_bytes(this_clazz_idx, 'little') << 32
+                for referenced_clazz_idx, ref, version in only_references(obj, self.serializer):
+                    unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz_idx)
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         updates.append(
@@ -51,10 +50,10 @@ class MdbxStorageQueue(MdbxStorage):
                             )
                         )
 
-                value = self.serializer.marshall(obj, klass)
+                value = self.serializer.marshall(obj, clazz)
                 updates.append(
                     (
-                        this_class_idx,
+                        this_clazz_idx,
                         None,
                         value,
                     )
@@ -62,7 +61,7 @@ class MdbxStorageQueue(MdbxStorage):
                 updates.append(
                     (
                         DB_ID_IDX,
-                        self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__, include_clazz=True),
+                        self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__),
                         partial_key,
                     )
                 )

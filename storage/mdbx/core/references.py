@@ -1,6 +1,6 @@
 import logging
 
-from mdbx import MDBXCursorOp, MDBXDBFlags
+from mdbx import MDBXDBFlags
 
 from domain.netex.indexes.inverse_class import collect_classes_index
 from utils.aux_logging import log_all
@@ -73,10 +73,13 @@ def resolve(storage: MdbxStorage) -> None:
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
+
+        if db_unresolved.get_stat(txn).ms_entries == 0:
+            return
+
         db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
-
-        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
@@ -104,6 +107,8 @@ def resolve(storage: MdbxStorage) -> None:
                         if check_key.startswith(prefix):
                             class_change = check_idx
                             resolved_idx = check_idx
+
+                        # In all cases, found or not equal to prefix
                         break
 
                     if not resolved_idx:
@@ -137,19 +142,20 @@ def resolve(storage: MdbxStorage) -> None:
                     # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
 
                     db_reference_forward.put(txn, idx, resolved_idx)
-                    unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
+                    # db_unresolved.delete(txn, idx, value) OR:
+                    it.cur.delete()  # The reason here, the it, has a duplicated cursor
 
                 # else:
                 #    print("unresolved", value, idx)
 
             # In this situation the original reference was incomplete
             if len(references_to_fix) > 0:
-                referencing_class_idx, referencing_key = Serializer.full_key_to_clazz_idx(idx)
-                referencing_class = storage.idx_class[referencing_class_idx]
-                referencing_obj: EntityStructure = storage.load_object(txn, referencing_class, referencing_key)
+                referencing_clazz_idx, referencing_idx = Serializer.full_key_to_clazz_idx(idx)
+                referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
+                referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
 
                 for resolved_idx, value, version_change, class_change in references_to_fix:
-                    referenced_class_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
+                    referenced_clazz_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
 
                     for reference in only_reference_objects(referencing_obj):
                         if isinstance(reference.name_of_ref_class, str):
@@ -171,18 +177,20 @@ def resolve(storage: MdbxStorage) -> None:
                         )
                         if value == cmp_value:
                             if class_change:
-                                referenced_class = storage.idx_class[referenced_class_idx]
+                                referenced_class = storage.idx_clazz[referenced_clazz_idx]
                                 reference.name_of_ref_class = NameOfClass(
                                     get_object_name(referenced_class)
                                 )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
-                                referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: EntityInVersionStructure = cast(EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key))
+                                referenced_clazz = storage.idx_clazz[referenced_clazz_idx]
+                                referenced_obj: EntityInVersionStructure = cast(
+                                    EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key)
+                                )
                                 reference.version = referenced_obj.version
 
                 # TODO: buffer this write to ~10000 objects of the same type?
-                db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
-                db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+                db = txn.open_map(referencing_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+                db.put(txn, referencing_idx, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
         log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
         txn.commit()
@@ -203,28 +211,30 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
+        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
+
+        if db_unresolved.get_stat(txn).ms_entries == 0:
+            return
+
         db_id_idx = txn.create_map(DB_EMBEDDED_ID_IDX, flags=DB_EMBEDDED_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
-        for idx, value in unresolved_cursor.iter():
-            # print(idx, value)
+        for full_key, value in unresolved_cursor.iter():
             parts = storage.serializer.split_key(value)
-            unresolved_pairs.setdefault(value, set()).add(idx)
-            missing_classes.add(storage.idx_class[parts[-1]])
-
-        log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
+            unresolved_pairs.setdefault(value, set()).add(full_key)
+            missing_classes.add(storage.idx_clazz[parts[-1]])
 
         used_classes_in_database = set(storage.db_names(txn).values())
         index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
         clazzes: set[type] = set().union(*index.values())
 
         for clazz in clazzes:
-            this_class_idx = storage.class_idx[clazz]
-            db = txn.open_map(this_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+            this_clazz_idx = storage.clazz_idx[clazz]
+            db = txn.open_map(this_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
-                    full_key = idx + this_class_idx.ljust(4, b'\x00')
+                    full_key = idx + this_clazz_idx.ljust(4, b'\x00')
                     obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
 
                     # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes
@@ -254,6 +264,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                         if check_key.startswith(prefix):
                             class_change = check_idx
                             resolved_idx = check_idx
+
+                        # In all cases, found or not equal to prefix
                         break
 
                     if not resolved_idx:
@@ -287,19 +299,19 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                     # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
 
                     db_reference_forward.put(txn, idx, resolved_idx)
-                    unresolved_cursor.delete(MDBXCursorOp.MDBX_PREV)
+                    it.cur.delete()
 
                 # else:
                 #    print("unresolved", value, idx)
 
             # In this situation the original reference was incomplete
             if len(references_to_fix) > 0:
-                referencing_class_idx, referencing_key = Serializer.full_key_to_clazz_idx(idx)
-                referencing_class = storage.idx_class[referencing_class_idx]
-                referencing_obj: EntityStructure = storage.load_object(txn, referencing_class, referencing_key)
+                referencing_clazz_idx, referencing_idx = Serializer.full_key_to_clazz_idx(idx)
+                referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
+                referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
 
                 for resolved_idx, value, version_change, class_change in references_to_fix:
-                    referenced_class_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
+                    referenced_clazz_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
 
                     for reference in only_reference_objects(referencing_obj):
                         if isinstance(reference.name_of_ref_class, str):
@@ -321,18 +333,20 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                         )
                         if value == cmp_value:
                             if class_change:
-                                referenced_class = storage.idx_class[referenced_class_idx]
+                                referenced_class = storage.idx_clazz[referenced_clazz_idx]
                                 reference.name_of_ref_class = NameOfClass(
                                     get_object_name(referenced_class)
                                 )  # I am very afraid how this might be handled in terms of comparisons later.
                             if version_change:
-                                referenced_clazz = storage.idx_class[referenced_class_idx]
-                                referenced_obj: EntityInVersionStructure = cast(EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key))
+                                referenced_clazz = storage.idx_clazz[referenced_clazz_idx]
+                                referenced_obj: EntityInVersionStructure = cast(
+                                    EntityInVersionStructure, storage.load_object(txn, referenced_clazz, referenced_key)
+                                )
                                 reference.version = referenced_obj.version
 
                 # TODO: buffer this write to ~10000 objects of the same type?
-                db = txn.open_map(referencing_class_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
-                db.put(txn, referencing_key, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+                db = txn.open_map(referencing_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+                db.put(txn, referencing_idx, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
 
         log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 

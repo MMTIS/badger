@@ -1,12 +1,9 @@
 import logging
-from collections import defaultdict
-from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import TypeVar, Any, Iterator, Generator
-from operator import attrgetter
+from typing import Any, Generator, Callable
+from mdbx.mdbx import TXN
 
-from domain.netex import ResponsibilitySet
 from domain.netex.model import (
     Route,
     ServiceJourneyPattern,
@@ -16,14 +13,13 @@ from domain.netex.model import (
     ServiceJourney,
     EntityStructure,
     DayTypeAssignment,
-    DayType,
-    UicOperatingPeriod,
     NoticeAssignment,
-    AllPublicTransportModesEnumeration
+    AllPublicTransportModesEnumeration,
 )
+
 # from domain.netex.services.recursive_attributes import recursive_attributes
 # from old.netexio.dbaccess import recursive_resolve
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX
+from storage.mdbx.core.implementation import MdbxStorage
 
 # from netexio.attributes import update_attr
 # from netexio.database import Database
@@ -34,14 +30,11 @@ from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX
 # from utils.profiles import EPIP_CLASSES
 from utils.aux_logging import log_all, prepare_logger
 
-Tid = TypeVar("Tid", bound=EntityStructure)
-
 import re
-from collections.abc import Callable
-from typing import Any
 from storage.mdbx.core.references import resolve, resolve_embeddings_index
 
 _TOKEN_RE = re.compile(r"([^.[]+)|\[(\d*|\*)\]")
+
 
 def safe_attrgetter(path: str, default: Any = None) -> Callable[[object], Any]:
     """
@@ -65,7 +58,7 @@ def safe_attrgetter(path: str, default: Any = None) -> Callable[[object], Any]:
         if attr is not None:
             operations.append(attr)
         elif index in ("", "*"):
-            operations.append(None)          # wildcard
+            operations.append(None)  # wildcard
         else:
             operations.append(int(index))
 
@@ -113,39 +106,45 @@ def safe_attrgetter(path: str, default: Any = None) -> Callable[[object], Any]:
 
     return lambda obj: apply(obj, 0)
 
-def id_filter(db_read: MdbxStorage, txn, clazz: type[EntityStructure], object_filters: set[str]) -> Generator[tuple[bytes, EntityStructure], None, None]:
+
+def id_filter(db_read: MdbxStorage, txn: TXN, clazz: type[EntityStructure], object_filters: set[str]) -> Generator[tuple[bytes, EntityStructure], None, None]:
     for object_filter in object_filters:
         pair = db_read.load_object_by_id_version(txn, object_filter, clazz)
-        if pair:
+        if pair is not None:
             yield pair
+
 
 def attribute_filter(
     db_read: MdbxStorage,
-    txn,
+    txn: TXN,
     clazz: type[EntityStructure],
-    getter: Callable[[EntityStructure], str],
+    getter: Callable[...], # TODO!
     allowed_values: set[str],
 ) -> Generator[tuple[bytes, EntityStructure], None, None]:
     for key, obj in db_read.iter_objects(txn, clazz):
-        attrs = set(getter(obj))
         if not set([str(x) for x in getter(obj)]).isdisjoint(allowed_values):
             # I don't think this should belong here...
-            this_class_idx = db_read.class_idx[clazz]
-            full_key = key + this_class_idx.ljust(4, b'\x00')
+            this_clazz_idx = db_read.clazz_idx[clazz]
+            full_key = key + this_clazz_idx.ljust(4, b'\x00')
             yield full_key, obj
 
-def custom_filter(
-        db_read: MdbxStorage,
-        txn):
 
+def custom_filter(db_read: MdbxStorage, txn: TXN) -> Generator[tuple[bytes, EntityStructure], None, None]:
+    obj: Line
     for key, obj in db_read.iter_objects(txn, Line):
-        obj: Line
         if obj.authority_ref and obj.authority_ref.ref == 'NL:DOVA:Authority:LMB' and obj.transport_mode == AllPublicTransportModesEnumeration.BUS:
-            this_class_idx = db_read.class_idx[obj.__class__]
-            full_key = key + this_class_idx.ljust(4, b'\x00')
+            this_clazz_idx = db_read.clazz_idx[obj.__class__]
+            full_key = key + this_clazz_idx.ljust(4, b'\x00')
             yield full_key, obj
 
-def filter_db_to_db(source_database_file: Path, target_database_file: Path, filter_function: callable, inward_classes: set[type[EntityStructure]], conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]]) -> None:
+
+def filter_db_to_db(
+    source_database_file: Path,
+    target_database_file: Path,
+    filter_function: Callable[[MdbxStorage, TXN], bool],
+    inward_classes: set[type[EntityStructure]],
+    conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]],
+) -> None:
     with MdbxStorage(source_database_file, readonly=False) as db_write:
         # Assure we have a inward index.
         resolve(db_write)
@@ -175,7 +174,6 @@ def filter_db_to_db(source_database_file: Path, target_database_file: Path, filt
                 resolve(db_write)
                 resolve_embeddings_index(db_write)
 
-
     """
         with Database(target_database_file, serializer=MyPickleSerializer(compression=True), readonly=False) as db_write:
             # TODO: This is memory intensive, ideally we only keep what we have resolved and yield the objects to write them into the database
@@ -195,18 +193,18 @@ def filter_db_to_db(source_database_file: Path, target_database_file: Path, filt
         removable_classes = db_write.tables() - EPIP_CLASSES
         for removable_class in removable_classes:
             for parent_id, parent_version, parent_class, path in load_referencing_inwards(db_write, removable_class):
-                parent_klass: type[Any] = db_write.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
-                if parent_klass in EPIP_CLASSES:
+                parent_clazz: type[Any] = db_write.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
+                if parent_clazz in EPIP_CLASSES:
                     # Aggregate all parent_ids, so we prevent concurrency issues, and the cost of deserialisation and serialisation
-                    key = (parent_id, parent_version, parent_klass)
+                    key = (parent_id, parent_version, parent_clazz)
                     result[key].append(path)
                     print("REMOVABLE", removable_class, key, path)
 
         # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
         for key, paths in result.items():
-            parent_id, parent_version, parent_klass = key
-            print("1", parent_klass, parent_id, parent_version, path)
-            obj = db_write.get_single(parent_klass, parent_id, parent_version)
+            parent_id, parent_version, parent_clazz = key
+            print("1", parent_clazz, parent_id, parent_version, path)
+            obj = db_write.get_single(parent_clazz, parent_id, parent_version)
             for path in paths:
                 split = split_path(path)
                 update_attr(obj, split, None)
@@ -214,35 +212,48 @@ def filter_db_to_db(source_database_file: Path, target_database_file: Path, filt
             db_write.insert_one_object(obj)
     """
 
-def main(source: str, target: str, object_type: str, attributes: list[str], inwards_object_types: list[str], conditional_inward_object_types: list[str]) -> None:
+
+def main(
+    source: str, target: str, object_type: str, attributes: list[str], inwards_object_types: list[str], conditional_inward_object_types: list[str]
+) -> None:
     source_path = Path(source)
     if not source_path.exists():
         log_all(logging.ERROR, f"{source_path} does not exist.")
 
     else:
-        clazz: type[EntityStructure] | None
+        clazz: type[EntityStructure]
         with MdbxStorage(source_path) as db_read:
-            clazz = db_read.idx_class.get(
-                db_read.class_name_idx.get(object_type, None), None
-            )
-            if clazz is None:
+            # TODO: would be a good idea to have this done better.
+            clazz_idx = db_read.serializer.class_idx_by_name(object_type)
+            if clazz_idx is None:
                 log_all(logging.ERROR, "{object_type} does not exist.")
                 return
 
+            clazz = db_read.idx_clazz[clazz_idx]
             inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment}
-            conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {(Route, Line), (Line, Route), (ServiceJourneyPattern, Route), (Route, ServiceJourneyPattern), (ServiceJourneyPattern, ServiceJourney), (ServiceJourney, ServiceJourneyPattern), (PassengerStopAssignment, ScheduledStopPoint)}
+            conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {
+                (Route, Line),
+                (Line, Route),
+                (ServiceJourneyPattern, Route),
+                (Route, ServiceJourneyPattern),
+                (ServiceJourneyPattern, ServiceJourney),
+                (ServiceJourney, ServiceJourneyPattern),
+                (PassengerStopAssignment, ScheduledStopPoint),
+            }
             for inwards_object_type in inwards_object_types:
-                idx = db_read.class_name_idx.get(inwards_object_type, None)
-                if not idx:
+                clazz_idx = db_read.serializer.class_idx_by_name(inwards_object_type)
+                if not clazz:
                     log_all(logging.WARNING, f"{inwards_object_type} is not a (known) NeTEx class")
                 else:
-                    inward_classes.add(db_read.idx_class[idx])
+                    inward_classes.add(db_read.idx_clazz[clazz_idx])
 
         print(f'source_path: {source_path}')
         print(f'target_path: {Path(target)}')
         print(inward_classes)
         if attributes[0] == 'id':
-            filter_db_to_db(source_path, Path(target), partial(id_filter, clazz=clazz, object_filters=set(attributes[1:])), inward_classes, conditional_inward_classes)
+            filter_db_to_db(
+                source_path, Path(target), partial(id_filter, clazz=clazz, object_filters=set(attributes[1:])), inward_classes, conditional_inward_classes
+            )
 
         elif attributes[0] == 'custom':
             # TODO, fix argument
@@ -250,7 +261,13 @@ def main(source: str, target: str, object_type: str, attributes: list[str], inwa
 
         elif attributes is not None:
             getter = safe_attrgetter(attributes[0], set())
-            filter_db_to_db(source_path, Path(target), partial(attribute_filter, clazz=clazz, getter=getter, allowed_values=set(attributes[1:])), inward_classes, conditional_inward_classes)
+            filter_db_to_db(
+                source_path,
+                Path(target),
+                partial(attribute_filter, clazz=clazz, getter=getter, allowed_values=set(attributes[1:])),
+                inward_classes,
+                conditional_inward_classes,
+            )
 
             # if clazz == ResponsibilitySet and ResponsibilitySet in inward_classes:
             #    with MdbxStorage(Path(target)) as db_read:
@@ -258,6 +275,7 @@ def main(source: str, target: str, object_type: str, attributes: list[str], inwa
             #            refs = [obj.id for obj in db_read.iter_only_objects(txn, ResponsibilitySet)]
             #            getter = safe_attrgetter("responsibility_set", set())
             #            filter_db_to_db(source_path, Path(target), partial(attribute_filter, clazz=Line, getter=getter, allowed_values=set(attributes[1:])), inward_classes)
+
 
 if __name__ == "__main__":
     import argparse
@@ -281,12 +299,7 @@ if __name__ == "__main__":
         help="MDBX file to overwrite and store contents of the transformation.",
     )
 
-    parser.add_argument(
-    "inwards_object_types",
-        nargs="*",
-        type=str,
-        help="Optional list of additional object types to be inwards selected"
-    )
+    parser.add_argument("inwards_object_types", nargs="*", type=str, help="Optional list of additional object types to be inwards selected")
 
     parser.add_argument(
         "--conditional_inwards",
