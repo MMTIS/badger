@@ -1,7 +1,8 @@
 import logging
 from functools import partial
 from pathlib import Path
-from typing import Any, Generator, Callable
+from typing import Any
+from collections.abc import Callable, Generator
 from mdbx.mdbx import TXN
 
 from domain.netex.model import (
@@ -118,7 +119,7 @@ def attribute_filter(
     db_read: MdbxStorage,
     txn: TXN,
     clazz: type[EntityStructure],
-    getter: Callable[...], # TODO!
+    getter: Callable[[object], Any],
     allowed_values: set[str],
 ) -> Generator[tuple[bytes, EntityStructure], None, None]:
     for key, obj in db_read.iter_objects(txn, clazz):
@@ -141,7 +142,10 @@ def custom_filter(db_read: MdbxStorage, txn: TXN) -> Generator[tuple[bytes, Enti
 def filter_db_to_db(
     source_database_file: Path,
     target_database_file: Path,
-    filter_function: Callable[[MdbxStorage, TXN], bool],
+    filter_function: Callable[
+        [MdbxStorage, TXN],
+        Generator[tuple[bytes, EntityStructure], None, None],
+    ],
     inward_classes: set[type[EntityStructure]],
     conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]],
 ) -> None:
@@ -242,7 +246,7 @@ def main(
             }
             for inwards_object_type in inwards_object_types:
                 clazz_idx = db_read.serializer.class_idx_by_name(inwards_object_type)
-                if not clazz:
+                if clazz_idx is None:
                     log_all(logging.WARNING, f"{inwards_object_type} is not a (known) NeTEx class")
                 else:
                     inward_classes.add(db_read.idx_clazz[clazz_idx])
