@@ -97,7 +97,8 @@ def resolve(storage: MdbxStorage) -> None:
                 if not resolved_idx:
                     cursor = txn.cursor(db=db_id_idx)
 
-                    parts = storage.serializer.split_key(value)
+                    # TODO: it is obvious we must refactor this
+                    parts = list(storage.serializer.split_key(value))
                     class_part = separator + parts[-1]
 
                     # Alternative 1, id + version exists, class does not match
@@ -201,7 +202,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
-    parts: list[bytes]
+    parts: tuple[bytes, bytes, bytes]
 
     # TODO: fix with keycodec
     separator = bytes([10])
@@ -254,7 +255,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                 if not resolved_idx:
                     cursor = txn.cursor(db=db_id_idx)
 
-                    parts = storage.serializer.split_key(value)
+                    parts = list(storage.serializer.split_key(value))
                     class_part = separator + parts[-1]
 
                     # Alternative 1, id + version exists, class does not match
