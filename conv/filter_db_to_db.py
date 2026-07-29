@@ -1,8 +1,8 @@
 import logging
-from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Any, Generator
+from typing import Any, Generator, Callable
+from mdbx.mdbx import TXN
 
 from domain.netex.model import (
     Route,
@@ -107,42 +107,41 @@ def safe_attrgetter(path: str, default: Any = None) -> Callable[[object], Any]:
     return lambda obj: apply(obj, 0)
 
 
-def id_filter(db_read: MdbxStorage, txn, clazz: type[EntityStructure], object_filters: set[str]) -> Generator[tuple[bytes, EntityStructure], None, None]:
+def id_filter(db_read: MdbxStorage, txn: TXN, clazz: type[EntityStructure], object_filters: set[str]) -> Generator[tuple[bytes, EntityStructure], None, None]:
     for object_filter in object_filters:
         pair = db_read.load_object_by_id_version(txn, object_filter, clazz)
-        if pair:
+        if pair is not None:
             yield pair
 
 
 def attribute_filter(
     db_read: MdbxStorage,
-    txn,
+    txn: TXN,
     clazz: type[EntityStructure],
-    getter: Callable[[EntityStructure], str],
+    getter: Callable[...], # TODO!
     allowed_values: set[str],
 ) -> Generator[tuple[bytes, EntityStructure], None, None]:
     for key, obj in db_read.iter_objects(txn, clazz):
         if not set([str(x) for x in getter(obj)]).isdisjoint(allowed_values):
             # I don't think this should belong here...
-            this_class_idx = db_read.class_idx[clazz]
-            full_key = key + this_class_idx.ljust(4, b'\x00')
+            this_clazz_idx = db_read.clazz_idx[clazz]
+            full_key = key + this_clazz_idx.ljust(4, b'\x00')
             yield full_key, obj
 
 
-def custom_filter(db_read: MdbxStorage, txn):
-
+def custom_filter(db_read: MdbxStorage, txn: TXN) -> Generator[tuple[bytes, EntityStructure], None, None]:
+    obj: Line
     for key, obj in db_read.iter_objects(txn, Line):
-        obj: Line
         if obj.authority_ref and obj.authority_ref.ref == 'NL:DOVA:Authority:LMB' and obj.transport_mode == AllPublicTransportModesEnumeration.BUS:
-            this_class_idx = db_read.class_idx[obj.__class__]
-            full_key = key + this_class_idx.ljust(4, b'\x00')
+            this_clazz_idx = db_read.clazz_idx[obj.__class__]
+            full_key = key + this_clazz_idx.ljust(4, b'\x00')
             yield full_key, obj
 
 
 def filter_db_to_db(
     source_database_file: Path,
     target_database_file: Path,
-    filter_function: callable,
+    filter_function: Callable[[MdbxStorage, TXN], bool],
     inward_classes: set[type[EntityStructure]],
     conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]],
 ) -> None:
@@ -222,13 +221,15 @@ def main(
         log_all(logging.ERROR, f"{source_path} does not exist.")
 
     else:
-        clazz: type[EntityStructure] | None
+        clazz: type[EntityStructure]
         with MdbxStorage(source_path) as db_read:
-            clazz = db_read.idx_class.get(db_read.class_name_idx.get(object_type, None), None)
-            if clazz is None:
+            # TODO: would be a good idea to have this done better.
+            clazz_idx = db_read.serializer.class_idx_by_name(object_type)
+            if clazz_idx is None:
                 log_all(logging.ERROR, "{object_type} does not exist.")
                 return
 
+            clazz = db_read.idx_clazz[clazz_idx]
             inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment}
             conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {
                 (Route, Line),
@@ -240,11 +241,11 @@ def main(
                 (PassengerStopAssignment, ScheduledStopPoint),
             }
             for inwards_object_type in inwards_object_types:
-                idx = db_read.class_name_idx.get(inwards_object_type, None)
-                if not idx:
+                clazz_idx = db_read.serializer.class_idx_by_name(inwards_object_type)
+                if not clazz:
                     log_all(logging.WARNING, f"{inwards_object_type} is not a (known) NeTEx class")
                 else:
-                    inward_classes.add(db_read.idx_class[idx])
+                    inward_classes.add(db_read.idx_clazz[clazz_idx])
 
         print(f'source_path: {source_path}')
         print(f'target_path: {Path(target)}')
