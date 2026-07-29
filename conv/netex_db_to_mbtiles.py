@@ -1,6 +1,7 @@
 import copy
 import json
-from typing import Generator, Tuple, Iterator
+from collections.abc import Generator
+from typing import Tuple, Iterator
 import gzip
 
 import netex
@@ -21,15 +22,16 @@ from netexio.database import Database, Tid
 from netexio.dbaccess import recursive_attributes, load_referencing
 from netexio.pickleserializer import MyPickleSerializer
 from transformers.projection import get_all_geo_elements, reprojection
-from shapely.geometry import shape, mapping, box
+from shapely.geometry import mapping, box
 from pymbtiles import MBtiles, Tile
-import pathlib
 from pyproj import Transformer
 from shapely.geometry import LineString, box
-from shapely.ops import split
 
 from utils.utils import get_object_name
 from collections import defaultdict
+
+# from rtree import index as rtree_index
+from mapbox_vector_tile import encode
 
 
 def chunk_list(lst, dimension):
@@ -86,9 +88,6 @@ def to_feature(deserialized: Tid, clazz) -> Generator[dict, None, None]:
         # use the ServiceLink, and also find the scope.
 
 
-# from rtree import index as rtree_index
-from collections import defaultdict
-from mapbox_vector_tile import encode
 
 
 def mercator_to_tile_coords_tms(x: float, y: float, zoom: int, extent: int = 4096) -> Tuple[int, int, int, int, int]:
@@ -262,7 +261,7 @@ def main(database: str, output_filename: str) -> None:
             with db_read.env.begin(db=src_db, buffers=True, write=False) as src_txn:
                 cursor = src_txn.cursor()
 
-                for key, value in cursor:
+                for _key, value in cursor:
                     obj = db_read.serializer.unmarshall(value, clazz)
                     if class_name == 'ServiceJourney' and (
                         obj.link_sequence_projection_ref_or_link_sequence_projection is None

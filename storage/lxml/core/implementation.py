@@ -1,8 +1,8 @@
 from pathlib import Path
-from typing import Generator, IO, Any
+from collections.abc import Generator
+from typing import IO, Any
 import zipfile
 from isal import igzip_threaded
-from storage.interface import Storage
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
 
 

@@ -1,19 +1,17 @@
 import copy
 import hashlib
 from decimal import Decimal
-from typing import List, Dict, Generator
+from collections.abc import Generator
+from typing import List, Dict
 
 from mdbx.mdbx import TXN
 
 from domain.netex.model import (
-    Codespace,
     ServiceLink,
     RouteLink,
     RoutePoint,
     RoutePointRefStructure,
     TimingLink,
-    PointRefStructure,
-    TimingPoint,
     ScheduledStopPoint,
     TimingPointVersionStructure,
     ScheduledStopPointRefStructure,

@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import Any, Iterable, Generator, Optional
+from collections.abc import Iterable, Generator
+from typing import Any, Optional
 
 from domain.utils import get_object_name
 from domain.netex.model import EntityStructure, VersionOfObjectRefStructure

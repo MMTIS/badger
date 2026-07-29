@@ -1,5 +1,5 @@
 import functools
-from typing import Generator
+from collections.abc import Generator
 
 # import netex
 from mdbx.mdbx import TXN

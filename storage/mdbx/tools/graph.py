@@ -14,7 +14,7 @@ from storage.mdbx.core.implementation import (
 
 from domain.netex.model import EntityStructure
 from collections import defaultdict
-from typing import Iterable, Generator
+from collections.abc import Iterable, Generator
 
 
 # --- 1) graph bouwen (nodes uit DB_ID_IDX, edges uit DB_REFERENCE_OUTWARD) ---

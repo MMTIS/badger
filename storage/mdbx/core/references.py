@@ -22,7 +22,8 @@ from storage.mdbx.core.implementation import (
     DB_EMBEDDED_ID_IDX_FLAGS,
 )
 from mdbx.mdbx import TXN
-from typing import Optional, Generator, Any, cast
+from collections.abc import Generator
+from typing import Optional, Any, cast
 
 
 def resolve_embeddings_iterable(

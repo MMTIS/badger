@@ -1,6 +1,6 @@
 from functools import lru_cache
-from typing import Any, Generator, Hashable, Optional
-from collections.abc import Collection
+from typing import Any, Hashable, Optional
+from collections.abc import Collection, Generator
 
 from domain.netex import model as netex
 from domain.netex.model import (

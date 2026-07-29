@@ -1,5 +1,4 @@
 # This code is written to export all data into a NeTEx GeneralFrame this should be our complete database state
-from typing import Generator  # noqa: F401
 
 from mdbx.mdbx import TXN
 from xsdata.models.datatype import XmlDateTime

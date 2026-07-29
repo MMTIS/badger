@@ -2,7 +2,8 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 from types import TracebackType
-from typing import Optional, Type, Literal, Iterable, Generator, Self, cast
+from collections.abc import Iterable, Generator
+from typing import Optional, Type, Literal, Self, cast
 
 from mdbx import Env, MDBXDBFlags
 from mdbx.mdbx import TXN

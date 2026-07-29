@@ -1,4 +1,5 @@
-from typing import Dict, Any, Generator, cast
+from collections.abc import Generator
+from typing import Dict, Any, cast
 
 from mdbx.mdbx import TXN
 from domain.netex.model import ServiceJourneyPattern, Direction, MultilingualString, DirectionRef, TextType
