@@ -9,6 +9,7 @@ from domain.netex.model import (
     Route,
     ServiceJourneyPattern,
     Line,
+    Operator,
     PassengerStopAssignment,
     ScheduledStopPoint,
     ServiceJourney,
@@ -238,6 +239,8 @@ def main(
             conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {
                 (Route, Line),
                 (Line, Route),
+                (Operator, Line),
+                (Line, Operator),
                 (ServiceJourneyPattern, Route),
                 (Route, ServiceJourneyPattern),
                 (ServiceJourneyPattern, ServiceJourney),
