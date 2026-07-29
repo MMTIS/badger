@@ -3,11 +3,12 @@ from pathlib import Path
 from mdbx import MDBXDBFlags
 from tqdm import tqdm
 
-from domain.netex.services.model_typing import Tid
+from domain.netex.model import EntityStructure
 from domain.netex.services.utils import get_boring_classes
 from domain.utils import get_object_name
-from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_CLASS_IDX
+from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD, DB_CLAZZ_IDX
 import time
+
 
 def benchmark_mdbx(storage: MdbxStorage) -> None:
     db_names = storage.db_names()
@@ -31,8 +32,8 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
                     unit="entry",
                 ) as pbar,
             ):
-                for key, value in cursor.iter():
-                    _obj: Tid = storage.serializer.unmarshall(value, clazz)
+                for _key, value in cursor.iter():
+                    _obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
                     pbar.update(1)
 
             elapsed = time.perf_counter() - start_time
@@ -41,8 +42,8 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
             total_entries += entries
             total_elapsed += elapsed
 
-        for db_name in (DB_CLASS_IDX, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
-            db = txn.open_map(db_name, flags=MDBXDBFlags.MDBX_DB_ACCEDE) # TODO: Fix this with the known options
+        for db_name in (DB_CLAZZ_IDX, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
+            db = txn.open_map(db_name, flags=MDBXDBFlags.MDBX_DB_ACCEDE)  # TODO: Fix this with the known options
 
             entries = db.get_stat(txn).ms_entries
 
@@ -56,7 +57,7 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
                     unit="entry",
                 ) as pbar,
             ):
-                for key, value in cursor:
+                for _key, value in cursor:
                     _value = int.from_bytes(value, 'little')
                     pbar.update(1)
 

@@ -1,8 +1,9 @@
 import logging
 from pathlib import Path
 from types import TracebackType
-from typing import Optional, Type, Literal, Iterable
+from typing import Optional, Type, Literal, Iterable, Any, Self
 import multiprocessing as mp
+import queue
 
 from utils.aux_logging import log_all
 
@@ -15,7 +16,7 @@ from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENC
 
 
 class MdbxStorageMP(MdbxStorage):
-    queue: mp.Queue  # type: ignore
+    queue: queue.Queue[Any]
     writer: mp.Process
 
     def __init__(self, path: Path, readonly: bool = True, initial_size: int = 8 * 1024**3):
@@ -24,7 +25,7 @@ class MdbxStorageMP(MdbxStorage):
         self.manager = self.ctx.Manager()
         self.queue = self.manager.Queue(maxsize=1000)
 
-    def __enter__(self) -> Storage:
+    def __enter__(self) -> Self:
         super().__enter__()
 
         if not self.readonly:
@@ -51,7 +52,7 @@ class MdbxStorageMP(MdbxStorage):
         if self.readonly:
             raise
 
-        this_class_idx = self.class_idx[clazz]
+        this_clazz_idx = self.clazz_idx[clazz]
 
         with self.env.ro_transaction() as txn:
             db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
@@ -62,11 +63,11 @@ class MdbxStorageMP(MdbxStorage):
             for obj in objects:
                 # TODO: do the serial increment here too
                 # TODO: do overwriting here too
-                key = self.next_entry = self.next_entry + 1
+                idx = self.next_entry = self.next_entry + 1
 
-                full_key = ((int.from_bytes(this_class_idx, 'little') << 32) | key).to_bytes(8, 'little')
-                for referenced_class_idx, ref, version in only_references(obj, self.serializer):
-                    unresolved_value = self.serializer.encode_key_idx(ref, version, referenced_class_idx)
+                full_key =self.serializer.get_fullkey_by_clazz_idx(idx, this_clazz_idx)
+                for referenced_clazz, ref, version in only_references(obj, self.serializer):
+                    unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         self.queue.put(
@@ -88,15 +89,15 @@ class MdbxStorageMP(MdbxStorage):
                 value = self.serializer.marshall(obj, clazz)
                 self.queue.put(
                     (
-                        this_class_idx,
-                        key.to_bytes(4, 'little'),
+                        this_clazz_idx,
+                        idx.to_bytes(4, 'little'),
                         value,
                     )
                 )
                 self.queue.put(
                     (
                         DB_ID_IDX,
-                        self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__),
+                        self.serializer.encode_obj(obj),
                         full_key,
                     )
                 )
