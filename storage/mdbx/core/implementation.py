@@ -2,7 +2,7 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 from types import TracebackType
-from typing import Optional, Type, Literal, Iterable, Generator, Self
+from typing import Optional, Type, Literal, Iterable, Generator, Self, cast
 
 from mdbx import Env, MDBXDBFlags
 from mdbx.mdbx import TXN
@@ -23,6 +23,7 @@ from domain.utils import get_object_name
 from storage.mdbx.serialization.combinedserializer import CombinedSerializer
 from utils.aux_logging import log_all
 from storage.interface import Serializer
+from ctypes import c_uint64
 
 DB_CLAZZ_IDX = bytes(b'_clazz_idx')
 DB_UNRESOLVED = bytes(b'_unresolved')
@@ -85,7 +86,7 @@ class MdbxStorage:
                         self.idx_clazz[idx] = clazz
                         self.clazz_idx[clazz] = idx
 
-        self.serializer.set_clazz_idx(self.clazz_idx)
+        self.serializer.set_clazz_idx(self.clazz_idx, self.idx_clazz)
 
     def __enter__(self) -> Self:
         new_database = not self.path.exists()
@@ -585,6 +586,13 @@ class MdbxStorage:
                         count += 1
                         if count >= limit:
                             break
+
+    def count_objects(self, txn: TXN, clazz: type[EntityStructure]) -> int | c_uint64:
+        try:
+            db = txn.open_map(name=self.clazz_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+            return cast(c_uint64, db.get_stat(txn).ms_entries)
+        except:  # noqa: E722  # TODO: Better catching by pymdbx proper exceptions
+            return 0
 
     def iter_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[tuple[bytes, Tid], None, None]:
         try:

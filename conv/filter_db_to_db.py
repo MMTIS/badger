@@ -1,13 +1,16 @@
 import logging
 from functools import partial
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from collections.abc import Callable, Generator
 from mdbx.mdbx import TXN
+from domain.utils import get_object_name
+
 
 from domain.netex.model import (
     Route,
     ServiceJourneyPattern,
+    ServiceJourneyInterchange,
     Line,
     Operator,
     PassengerStopAssignment,
@@ -17,6 +20,8 @@ from domain.netex.model import (
     DayTypeAssignment,
     NoticeAssignment,
     AllPublicTransportModesEnumeration,
+    StopPlace,
+    SiteConnection,
 )
 
 # from domain.netex.services.recursive_attributes import recursive_attributes
@@ -218,70 +223,136 @@ def filter_db_to_db(
     """
 
 
+filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntityStructure], type[EntityStructure]]] | list[type[EntityStructure]]]] = {
+    ServiceJourney: {
+        "conditional_inward_classes": [
+            (PassengerStopAssignment, ScheduledStopPoint),
+        ],
+        "inward_classes": [DayTypeAssignment, NoticeAssignment],
+    },
+    ServiceJourneyInterchange: {
+        "conditional_inward_classes": [
+            (PassengerStopAssignment, ScheduledStopPoint),
+        ],
+        "inward_classes": [DayTypeAssignment, NoticeAssignment],
+    },
+    Line: {
+        "conditional_inward_classes": [
+            (Route, Line),
+            (Line, Route),
+            (Route, ServiceJourneyPattern),
+            (ServiceJourneyPattern, ServiceJourney),
+            (PassengerStopAssignment, ScheduledStopPoint),
+        ],
+        "inward_classes": [DayTypeAssignment, NoticeAssignment],
+    },
+    Operator: {
+        "conditional_inward_classes": [
+            (Route, Line),
+            (Line, Route),
+            (Operator, Line),
+            (Line, Operator),
+            (Route, ServiceJourneyPattern),
+            (ServiceJourneyPattern, ServiceJourney),
+            (PassengerStopAssignment, ScheduledStopPoint),
+        ],
+        "inward_classes": [DayTypeAssignment, NoticeAssignment],
+    },
+    StopPlace: {
+        "conditional_inward_classes": [
+            (SiteConnection, StopPlace),
+            (StopPlace, SiteConnection),
+        ]
+    },
+}
+
+
 def main(
-    source: str, target: str, object_type: str, attributes: list[str], inwards_object_types: list[str], conditional_inward_object_types: list[str]
+    source: str,
+    target: str,
+    object_type: str,
+    attributes: list[str],
+    inwards_object_types: list[str] | None,
+    conditional_inward_object_types: list[list[str]] | None,
+    use_template: bool,
 ) -> None:
     source_path = Path(source)
+    target_path = Path(target)
+    clazz: type[EntityStructure] | None
+
     if not source_path.exists():
         log_all(logging.ERROR, f"{source_path} does not exist.")
 
     else:
-        clazz: type[EntityStructure]
         with MdbxStorage(source_path) as db_read:
             # TODO: would be a good idea to have this done better.
-            clazz_idx = db_read.serializer.class_idx_by_name(object_type)
-            if clazz_idx is None:
+            clazz = db_read.serializer.class_by_name(object_type)
+            if clazz is None:
                 log_all(logging.ERROR, "{object_type} does not exist.")
                 return
 
-            clazz = db_read.idx_clazz[clazz_idx]
-            inward_classes: set[type[EntityStructure]] = {NoticeAssignment, PassengerStopAssignment, DayTypeAssignment}
-            conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = {
-                (Route, Line),
-                (Line, Route),
-                (Operator, Line),
-                (Line, Operator),
-                (ServiceJourneyPattern, Route),
-                (Route, ServiceJourneyPattern),
-                (ServiceJourneyPattern, ServiceJourney),
-                (ServiceJourney, ServiceJourneyPattern),
-                (PassengerStopAssignment, ScheduledStopPoint),
-            }
-            for inwards_object_type in inwards_object_types:
-                clazz_idx = db_read.serializer.class_idx_by_name(inwards_object_type)
-                if clazz_idx is None:
-                    log_all(logging.WARNING, f"{inwards_object_type} is not a (known) NeTEx class")
-                else:
-                    inward_classes.add(db_read.idx_clazz[clazz_idx])
+            inward_classes: set[type[EntityStructure]] = set({})
+            conditional_inward_classes: set[tuple[type[EntityStructure], type[EntityStructure]]] = set()
 
-        print(f'source_path: {source_path}')
-        print(f'target_path: {Path(target)}')
-        print(inward_classes)
+            if use_template:
+                for cic in filter_templates.get(clazz, {}).get("conditional_inward_classes", []):
+                    conditional_inward_classes.add(cast(tuple[type[EntityStructure], type[EntityStructure]], cic))
+
+                for ic in filter_templates.get(clazz, {}).get("inward_classes", []):
+                    inward_classes.add(cast(type[EntityStructure], ic))
+
+            if conditional_inward_object_types:
+                for referencing_type, inwards_object_type in conditional_inward_object_types:
+                    referencing_type_clazz = db_read.serializer.class_by_name(referencing_type)
+                    if referencing_type_clazz is None:
+                        log_all(logging.ERROR, "{referencing_type} does not exist. {referencing_type} {inwards_object_type} not added.")
+                        continue
+
+                    inwards_object_type_clazz = db_read.serializer.class_by_name(inwards_object_type)
+                    if inwards_object_type_clazz is None:
+                        log_all(logging.ERROR, "{referencing_type} does not exist. {referencing_type} {inwards_object_type} not added.")
+                        continue
+
+                    conditional_inward_classes.add((referencing_type_clazz, inwards_object_type_clazz))
+
+            log_all(logging.INFO, f"inward_classes: {', '.join([get_object_name(c) for c in inward_classes])}")
+            log_all(
+                logging.INFO, f"conditional_inward_classes: {', '.join([get_object_name(r) + '-' + get_object_name(i) for r, i in conditional_inward_classes])}"
+            )
+
+            if inwards_object_types:
+                for inwards_object_type in inwards_object_types:
+                    inwards_object_type_clazz = db_read.serializer.class_by_name(inwards_object_type)
+                    if inwards_object_type_clazz is None:
+                        log_all(logging.ERROR, "{inwards_object_type_clazz} does not exist.")
+                        continue
+
+                    inward_classes.add(inwards_object_type_clazz)
+
         if attributes[0] == 'id':
             filter_db_to_db(
-                source_path, Path(target), partial(id_filter, clazz=clazz, object_filters=set(attributes[1:])), inward_classes, conditional_inward_classes
+                source_path, target_path, partial(id_filter, clazz=clazz, object_filters=set(attributes[1:])), inward_classes, conditional_inward_classes
             )
 
         elif attributes[0] == 'custom':
             # TODO, fix argument
-            filter_db_to_db(source_path, Path(target), partial(custom_filter), inward_classes, conditional_inward_classes)
+            filter_db_to_db(source_path, target_path, partial(custom_filter), inward_classes, conditional_inward_classes)
 
         elif attributes is not None:
             getter = safe_attrgetter(attributes[0], set())
             filter_db_to_db(
                 source_path,
-                Path(target),
+                target_path,
                 partial(attribute_filter, clazz=clazz, getter=getter, allowed_values=set(attributes[1:])),
                 inward_classes,
                 conditional_inward_classes,
             )
 
-            # if clazz == ResponsibilitySet and ResponsibilitySet in inward_classes:
-            #    with MdbxStorage(Path(target)) as db_read:
-            #        with db_read.env.ro_transaction() as txn:
-            #            refs = [obj.id for obj in db_read.iter_only_objects(txn, ResponsibilitySet)]
-            #            getter = safe_attrgetter("responsibility_set", set())
-            #            filter_db_to_db(source_path, Path(target), partial(attribute_filter, clazz=Line, getter=getter, allowed_values=set(attributes[1:])), inward_classes)
+        with MdbxStorage(target_path) as db_read:
+            with db_read.env.ro_transaction() as txn:
+                log_all(logging.DEBUG, f"{get_object_name(clazz)}: {db_read.count_objects(txn, clazz)}")
+                if clazz != ServiceJourney:
+                    log_all(logging.DEBUG, f"{get_object_name(ServiceJourney)}: {db_read.count_objects(txn, ServiceJourney)}")
 
 
 if __name__ == "__main__":
@@ -306,11 +377,19 @@ if __name__ == "__main__":
         help="MDBX file to overwrite and store contents of the transformation.",
     )
 
+    parser.add_argument(
+        '--use-template',
+        action="store_true",
+        help=f'Use predefined templates ({', '.join([get_object_name(c) for c in filter_templates.keys()])}) for relational selections ',
+        default=False,
+    )
+
     parser.add_argument("inwards_object_types", nargs="*", type=str, help="Optional list of additional object types to be inwards selected")
 
     parser.add_argument(
         "--conditional_inwards",
         nargs=2,
+        action="append",
         metavar=("REFERENCING_TYPE", "INWARDS_OBJECT_TYPE"),
         help="Apply conditional inward resolving",
     )
@@ -320,7 +399,7 @@ if __name__ == "__main__":
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
     try:
-        main(args.source, args.target, args.object_type, args.attribute, args.inwards_object_types, args.conditional_inwards)
+        main(args.source, args.target, args.object_type, args.attribute, args.inwards_object_types, args.conditional_inwards, args.use_template)
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e

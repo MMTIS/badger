@@ -28,15 +28,17 @@ class Storage:
 
 class Serializer:
     name_object: dict[str, type[EntityStructure]]
+    idx_clazz: dict[bytes, type[EntityStructure]]
     clazz_idx: dict[type[EntityStructure], bytes]
     clazz_name_idx: dict[str, bytes]
 
     def __init__(self, classes: set[type[EntityStructure]]) -> None:
         self.name_object = {get_object_name(x): x for x in classes}
 
-    def set_clazz_idx(self, clazz_idx: dict[type, bytes]) -> None:
+    def set_clazz_idx(self, clazz_idx: dict[type, bytes], idx_clazz: dict[bytes, type[EntityStructure]]) -> None:
         """This mapping assures that the stored indices in the database, matches the lookup."""
         self.clazz_idx = clazz_idx
+        self.idx_clazz = idx_clazz
         # We use the direct str value, instead of NameOfClass due to each reference has its own
         # enumeration. Hence ScheduledStopPointRef only points to {ScheduledStopPoint, FareScheduledStopPoint}.
         self.clazz_name_idx = {get_object_name(clazz): idx for clazz, idx in self.clazz_idx.items()}
@@ -49,6 +51,12 @@ class Serializer:
 
     def class_idx_by_name(self, clazz_name: str) -> Optional[bytes]:
         return self.clazz_name_idx.get(clazz_name, None)
+
+    def class_by_name(self, clazz_name: str) -> Optional[type[EntityStructure]]:
+        clazz_idx = self.class_idx_by_name(clazz_name)
+        if clazz_idx:
+            return self.idx_clazz[clazz_idx]
+        return None
 
     def encode_key(self, id: str, version: str | None, clazz: type[EntityStructure]) -> bytes:
         return self.encode_key_idx(id, version, self.clazz_idx[clazz])

@@ -202,7 +202,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
     missing_classes = set([])
     unresolved_pairs: dict[bytes, set[bytes]] = {}
-    parts: tuple[bytes, bytes, bytes]
+    parts: list[bytes]
 
     # TODO: fix with keycodec
     separator = bytes([10])
