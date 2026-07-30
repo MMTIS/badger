@@ -78,6 +78,7 @@ def load_and_run(file_name: str, args_string: str) -> Any:
 
     (args, kwargs) = ArgumentStringParser.parse(args_string)
     result = main_function(*args, **kwargs)
+
     return result
 
 
