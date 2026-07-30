@@ -18,12 +18,12 @@ class CombinedSerializer(Serializer):
     def __init__(
         self,
         classes: set[type[EntityStructure]],
-        key_codec: type[KeyCodec] = BaseLineKeyCodec,
-        object_serializer: ObjectSerializer = PipelineSerializer(object_serializer=CloudPickleSerializer(), codecs=[Lz4Codec()]),
+        key_codec: type[KeyCodec] | None = None,
+        object_serializer: ObjectSerializer | None = None,
     ):
         super().__init__(classes)
-        self.key_codec = key_codec
-        self.object_serializer = object_serializer
+        self.key_codec = key_codec if key_codec else BaseLineKeyCodec
+        self.object_serializer = object_serializer if object_serializer else PipelineSerializer(object_serializer=CloudPickleSerializer(), codecs=[Lz4Codec()])
 
     def encode_key_idx(self, id: str, version: str | None, clazz_idx: bytes) -> bytes:
         return self.key_codec.encode_key_idx(id, version, clazz_idx)
@@ -31,7 +31,7 @@ class CombinedSerializer(Serializer):
     def encode_prefix(self, id: str, version: str | None = None, clazz_idx: bytes | None = None) -> bytes:
         return self.key_codec.encode_prefix(id, version, clazz_idx)
 
-    def split_key(self, key: bytes) -> list[bytes]:
+    def split_key(self, key: bytes) -> tuple[bytes, bytes, bytes]:
         return self.key_codec.split_key(key)
 
     def marshall(self, obj: Any, clazz: type[Tid]) -> bytes:

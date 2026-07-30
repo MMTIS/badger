@@ -3,7 +3,8 @@ import logging
 import sys
 import warnings
 from datetime import timedelta, datetime, time
-from typing import Generator, TypeVar, Any, cast, Iterable, Optional
+from collections.abc import Generator, Iterable
+from typing import TypeVar, Any, cast, Optional
 import itertools
 import copy
 

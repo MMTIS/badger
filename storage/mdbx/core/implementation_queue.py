@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
-from typing import Iterable, Any
+from collections.abc import Iterable
+from typing import Any
 import multiprocessing as mp
 
 from utils.aux_logging import log_all

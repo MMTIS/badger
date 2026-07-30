@@ -1,6 +1,7 @@
 from operator import attrgetter
 from itertools import groupby
-from typing import Optional, TypeVar, Any, Iterable
+from collections.abc import Iterable
+from typing import Optional, TypeVar, Any
 
 # TODO: This is required for globals to work, lets fix that later.
 from domain.netex.model import VersionOfObjectRefStructure, Version, Codespace, EntityInVersionStructure, EntityStructure, NameOfClass

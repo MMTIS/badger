@@ -2,7 +2,8 @@ import inspect
 
 import warnings
 import re
-from typing import TypeVar, Iterable, Any, Optional
+from collections.abc import Iterable
+from typing import TypeVar, Any, Optional
 from xsdata.models.datatype import XmlDuration, XmlTime
 
 from domain.netex.model import (

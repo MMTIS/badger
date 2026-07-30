@@ -1,7 +1,7 @@
 import logging
 from decimal import Decimal, ROUND_HALF_UP
 from itertools import chain
-from typing import Generator
+from collections.abc import Generator
 
 from mdbx.mdbx import TXN
 from pyproj import Transformer
@@ -24,7 +24,7 @@ def reprojection(deserialized: Tid, crs_to: str, force_latlon=False) -> Tid:
     # TODO: This function would walk over the class iteratively.
     # A general optimisation would be to precompute the paths within
     # a class to directly have a list (per class) of possible location targets
-    for obj, path in recursive_attributes(deserialized, []):
+    for obj, _path in recursive_attributes(deserialized, []):
         if isinstance(obj, LocationStructure2):
             project_location(obj, crs_to, force_latlon)
 

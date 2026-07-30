@@ -1,6 +1,7 @@
 import sys
 from itertools import groupby
-from typing import List, Generator, Tuple
+from collections.abc import Generator
+from typing import List, Tuple
 
 from netexio.database import Database
 from netexio.dbaccess import load_local, load_embedding_generator, load_generator
