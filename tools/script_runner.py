@@ -19,10 +19,10 @@ from utils.aux_logging import (
 )
 from configuration import defaults, processing_data, input_dir, list_scripts
 import urllib.request
+import urllib.error
 from datetime import datetime
 import re
 import hashlib
-
 
 
 def custom_hash(value: str) -> str:
@@ -60,6 +60,7 @@ def estimate_size_lmdb(file_name: str) -> int:
     raise
     return 0
 
+
 def create_list_from_string(input_string: str) -> list[str]:
     # Remove the square brackets from the string
     cleaned_string = input_string.strip("[]")
@@ -67,16 +68,17 @@ def create_list_from_string(input_string: str) -> list[str]:
     result_list = cleaned_string.split(" ")
     return result_list
 
+
 def load_and_run(file_name: str, args_string: str) -> Any:
 
     module_name = file_name.removesuffix(".py")
     mod = importlib.import_module(module_name)
-    main_function = getattr(mod, "main")
+    main_function = mod.main
 
     if not callable(main_function):
         raise TypeError(f"{module_name} is not callable!")
 
-    (args, kwargs) = ArgumentStringParser.parse(args_string)
+    args, kwargs = ArgumentStringParser.parse(args_string)
     result = main_function(*args, **kwargs)
 
     return result
@@ -101,7 +103,12 @@ def clean_tmp(f: str) -> None:
         if os.path.isfile(item_path):
             # Remove file if it matches the extensions
             if (
-                item.endswith(".duckdb") or item.endswith(".tmp") or item.endswith(".lmdb") or item.endswith(".mdb") or item.endswith(".dat") or item.endswith(".lck")
+                item.endswith(".duckdb")
+                or item.endswith(".tmp")
+                or item.endswith(".lmdb")
+                or item.endswith(".mdb")
+                or item.endswith(".dat")
+                or item.endswith(".lck")
             ):  # logs are NOT cleaned (as at least one is already locked)
                 try:
                     os.remove(item_path)
@@ -112,7 +119,7 @@ def clean_tmp(f: str) -> None:
             clean_tmp(item_path)
             # in the case of .mdbx folders we remove those
             if item.endswith(".mdbx"):
-                #it should be empty, so we can clean it
+                # it should be empty, so we can clean it
                 os.rmdir(item_path)
 
 
@@ -191,8 +198,9 @@ def download_one(folder: str, url: str, regex: str = '', forced: bool = False) -
     log_all(logging.INFO, f"Download from: {url} -> {local_path}")
     try:
         # allow unverified SSL if necessary (same as your original)
-        ssl._create_default_https_context = ssl._create_unverified_context
-        opener = urllib.request.build_opener()
+        ssl_context = ssl._create_unverified_context()
+
+        opener = urllib.request.build_opener(urllib.request.HTTPSHandler(context=ssl_context))
         opener.addheaders = [("User-Agent", "MyApp/1.0")]
         urllib.request.install_opener(opener)
         urllib.request.urlretrieve(url, local_path)
@@ -243,7 +251,7 @@ def remove_file(path: str) -> str:
             os.remove(path)
             return "File removed successfully."
         except OSError as e:
-            raise OSError(f"Failed to remove file: {str(e)}")
+            raise OSError(f"Failed to remove file: {str(e)}") from e
     else:
         raise FileNotFoundError(f"File not found: {path}")
 
@@ -457,7 +465,7 @@ class ArgumentStringParser:
     @staticmethod
     def _resolve_list_expression(value: str) -> None | list[str] | str:
         """
-            Resolves list expression expressed as list of space separated values enclosed in square brackets.
+        Resolves list expression expressed as list of space separated values enclosed in square brackets.
         """
         if value.startswith("[") and value.endswith("]"):
             # Argument is a list enclosed in square brackets
@@ -472,7 +480,7 @@ class ArgumentStringParser:
     @staticmethod
     def _get_args(expressions: list[str]) -> list[Any]:
         """
-            Gets positional args from list of argument expressions.
+        Gets positional args from list of argument expressions.
         """
         args = []
         for expr in expressions:
@@ -490,7 +498,7 @@ class ArgumentStringParser:
     @staticmethod
     def _get_kwargs(expressions: list[str]) -> dict[str, Any]:
         """
-            Gets key-value arguments from list of argument expressions.
+        Gets key-value arguments from list of argument expressions.
         """
         kwargs = {}
         for assignment in expressions:
@@ -505,12 +513,13 @@ class ArgumentStringParser:
     def _is_kwarg(expression: str) -> bool:
         return "=" in expression
 
+
 class ArgumentStringParserTest(unittest.TestCase):
     logger = logging.getLogger(__name__)
 
     def _parse(self, argument_string) -> tuple[list[Any], dict[str, Any]]:
         self.logger.debug("argument_string: %s", argument_string)
-        (args, kwargs) = ArgumentStringParser.parse(argument_string)
+        args, kwargs = ArgumentStringParser.parse(argument_string)
         self.logger.debug("-> args: %s", args)
         self.logger.debug("-> kwargs: %s", kwargs)
         self.assertIsNotNone(self)
@@ -518,19 +527,20 @@ class ArgumentStringParserTest(unittest.TestCase):
         return args, kwargs
 
     def test_positional_WHEN_parse_EXPECT_args(self):
-        (args, kwargs) = self._parse("arg1 arg2 [arg3a,arg3b]")
+        args, kwargs = self._parse("arg1 arg2 [arg3a,arg3b]")
         self.assertEqual(3, len(args))
-        self.assertEqual(0,len(kwargs))
+        self.assertEqual(0, len(kwargs))
 
     def test_key_value_WHEN_parse_EXPECT_kwargs(self):
-        (args, kwargs) = self._parse("arg1=value1 arg2=value2 arg3=[arg3a,arg3b]")
+        args, kwargs = self._parse("arg1=value1 arg2=value2 arg3=[arg3a,arg3b]")
         self.assertEqual(0, len(args))
         self.assertEqual(3, len(kwargs.keys()))
 
     def test_mixed_WHEN_parse_EXPECT_args_and_kwargs(self):
-        (args, kwargs) = self._parse("arg1 arg2 arg3=value")
+        args, kwargs = self._parse("arg1 arg2 arg3=value")
         self.assertEqual(2, len(args))
         self.assertEqual(1, len(kwargs))
+
 
 def configure_logging(debug: bool = True) -> None:
     logging.basicConfig(
@@ -539,6 +549,7 @@ def configure_logging(debug: bool = True) -> None:
         datefmt="%H:%M:%S",
         force=True,  # ensure reconfiguration even if something set a handler already
     )
+
 
 def cli(argv=None):
     import argparse
@@ -576,6 +587,7 @@ def cli(argv=None):
         )
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:

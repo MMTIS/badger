@@ -46,7 +46,7 @@ badger-gui = "gui.main:main"
 include = ["conv*", "tools*", "utils*"]
 [dependency-groups]
 dev = [
-    "mypy",
+    "ty",
     "black",
     "ruff",
 ]
@@ -57,9 +57,7 @@ preview = true
 line-length = 160
 skip-string-normalization = true
 
-[tool.mypy]
-strict = true
-ignore_missing_imports = true
+[tool.ty.src]
 exclude = ["domain/netex/model/*.py"]
 
 [tool.ruff]
