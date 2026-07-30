@@ -3,7 +3,7 @@ from collections.abc import Iterable, Generator
 from typing import Any, Optional
 
 from domain.utils import get_object_name
-from domain.netex.model import EntityStructure, VersionOfObjectRefStructure
+from domain.netex.model import EntityStructure, EntityInVersionStructure, VersionOfObjectRefStructure
 from domain.netex.services.model_typing import Tid
 
 
@@ -12,7 +12,7 @@ class Storage:
     def clean(self) -> None: ...
 
     @abstractmethod
-    def insert_objects_on_queue(self, clazz: type[EntityStructure], objects: Iterable[EntityStructure], empty: bool = False) -> None: ...
+    def insert_objects_on_queue(self, clazz: type[EntityStructure], objects: Iterable[EntityStructure]) -> None: ...
 
     @abstractmethod
     def db_names(self) -> dict[bytes, type]: ...
@@ -36,7 +36,7 @@ class Serializer:
     def __init__(self, classes: set[type[EntityStructure]]) -> None:
         self.name_object = {get_object_name(x): x for x in classes}
 
-    def set_clazz_idx(self, clazz_idx: dict[type, bytes], idx_clazz: dict[bytes, type[EntityStructure]]) -> None:
+    def set_clazz_idx(self, clazz_idx: dict[type[EntityStructure], bytes], idx_clazz: dict[bytes, type[EntityStructure]]) -> None:
         """This mapping assures that the stored indices in the database, matches the lookup."""
         self.clazz_idx = clazz_idx
         self.idx_clazz = idx_clazz
@@ -62,9 +62,9 @@ class Serializer:
     def encode_key(self, id: str, version: str | None, clazz: type[EntityStructure]) -> bytes:
         return self.encode_key_idx(id, version, self.clazz_idx[clazz])
 
-    def encode_obj(self, obj: EntityStructure) -> bytes:
+    def encode_obj(self, obj: EntityStructure | EntityInVersionStructure) -> bytes:
         assert obj.id is not None
-        version = obj.version if hasattr(obj, "version") else None
+        version = str(obj.version) if hasattr(obj, "version") else None
         return self.encode_key_idx(obj.id, version, self.clazz_idx[obj.__class__])
 
     def encode_ref(self, ref: VersionOfObjectRefStructure) -> bytes:

@@ -83,6 +83,8 @@ class MdbxStorage:
             with txn.open_map(name=DB_CLAZZ_IDX, flags=DB_ID_IDX_FLAGS) as db_clazz_idx:
                 with txn.cursor(db_clazz_idx) as cur:
                     for idx, name in cur.iter():
+                        assert idx is not None
+                        assert name is not None
                         clazz = self.serializer.name_object[name.decode('utf-8')]
                         self.idx_clazz[idx] = clazz
                         self.clazz_idx[clazz] = idx
@@ -118,10 +120,8 @@ class MdbxStorage:
         self.env.close()
         return False  # Allow errors to propagate!
 
-    def db_names(self, txn: TXN = None) -> dict[bytes, type[EntityStructure]]:
+    def db_names(self, txn: TXN) -> dict[bytes, type[EntityStructure]]:
         db_names: dict[bytes, type[EntityStructure]] = {}
-        if txn is None:
-            txn = self.env.ro_transaction()
         with txn.cursor(db=None) as cur:
             for db_name, _ in cur.iter():
                 if db_name in (DB_CLAZZ_IDX, DB_UNRESOLVED, DB_ID_IDX, DB_UNRESOLVED, DB_REFERENCE_OUTWARD):
@@ -129,6 +129,7 @@ class MdbxStorage:
 
                 clazz = self.idx_clazz.get(db_name, None)
                 if clazz is not None:
+                    assert db_name is not None
                     db_names[db_name] = clazz
         return db_names
 
@@ -169,6 +170,9 @@ class MdbxStorage:
         cursor = txn.cursor(db_reference_outward)
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
+                assert referencing_key is not None
+                assert reference_key is not None
+
                 referencing_clazz_idx = Serializer.full_key_to_clazz(referencing_key)
                 reference_clazz_idx = Serializer.full_key_to_clazz(reference_key)
 
@@ -196,6 +200,8 @@ class MdbxStorage:
                 referencing_clazz_idx = Serializer.full_key_to_clazz(referencing_key)
                 for t in cursor.iter_dupsort_rows(start_key=referencing_key):
                     for referencing_key2, reference_key in t:
+                        assert referencing_key2 is not None
+                        assert reference_key is not None
                         # referencing_clazz_idx2 = Serializer.full_key_to_clazz(referencing_key2) # TODO: Waarom stond deze hier?
                         # we skip when we can't find a matching key
                         if referencing_key2 != referencing_key:
@@ -242,7 +248,7 @@ class MdbxStorage:
 
         for obj in objects:
             idx: bytes  # The serial index in the object tables
-            full_key: bytes  # The clazz_idx + serial
+            full_key: Optional[bytes]  # The clazz_idx + serial
             this_clazz_idx = self.clazz_idx[obj.__class__]
             db = txn.create_map(name=this_clazz_idx)
 
@@ -273,7 +279,7 @@ class MdbxStorage:
             db_id_idx.put(txn, my_id, full_key)
 
     # Deprecate this one
-    def insert_objects_on_queue(self, clazz: type[EntityStructure], objects: Iterable[EntityStructure], empty: bool = False) -> None:
+    def insert_objects_on_queue(self, clazz: type[EntityStructure], objects: Iterable[EntityStructure]) -> None:
         if self.readonly:
             raise
 
@@ -284,9 +290,6 @@ class MdbxStorage:
             db_unresolved = txn.open_map(name=DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
             db_id_idx = txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
             db_reference_outward = txn.open_map(name=DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
-
-            if empty:
-                db.drop(txn, delete=False)
 
             for obj in objects:
                 my_id = self.serializer.encode_obj(obj)
@@ -322,6 +325,8 @@ class MdbxStorage:
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows(start_key=full_key):
             for referencing_key, reference_key in it:
+                assert referencing_key is not None
+                assert reference_key is not None
                 if referencing_key != full_key:
                     break
 
@@ -338,6 +343,8 @@ class MdbxStorage:
         cursor = txn.cursor(db)
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
+                assert referencing_key is not None
+                assert reference_key is not None
                 if reference_key == full_key:
                     yield referencing_key
 
@@ -348,6 +355,8 @@ class MdbxStorage:
         for it in cursor.iter_dupsort_rows():
             for referencing_key, reference_key in it:
                 if reference_key in full_keys:
+                    assert referencing_key is not None
+                    assert reference_key is not None
                     yield reference_key, referencing_key
 
     def _index_references_inwards(self, txn: TXN, force: bool = False) -> None:
@@ -366,6 +375,8 @@ class MdbxStorage:
 
                 for it in cursor.iter_dupsort_rows():
                     for referencing_key, reference_key in it:
+                        assert referencing_key is not None
+                        assert reference_key is not None
                         db_inward.put(txn, reference_key, referencing_key)
 
     def _load_references_inwards_by_fullkeys_index(self, txn: TXN, full_keys: set[bytes]) -> Generator[tuple[bytes, bytes], None, None]:
@@ -379,6 +390,8 @@ class MdbxStorage:
         for full_key in full_keys:
             for it in cursor.iter_dupsort_rows(start_key=full_key):
                 for reference_key, referencing_key in it:
+                    assert reference_key is not None
+                    assert referencing_key is not None
                     if reference_key != full_key:
                         break
 
@@ -396,7 +409,9 @@ class MdbxStorage:
         else:
             yield from self._load_references_by_fullkey(txn, full_key)
 
-    def load_references_by_clazz_key(self, txn: TXN, clazz: type, key: bytes, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
+    def load_references_by_clazz_key(
+        self, txn: TXN, clazz: type[EntityStructure], key: bytes, inwards: bool
+    ) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_clazz_idx = self.clazz_idx[clazz]
         full_key = Serializer.get_fullkey_by_clazz_idx(key, this_clazz_idx)
         for full_referenced_key in self.load_references_by_clazz_full_key(txn, full_key, inwards):
@@ -404,7 +419,7 @@ class MdbxStorage:
             yield self.idx_clazz[referenced_clazz_idx], referenced_idx
 
     def load_references_by_clazz_keys(
-        self, txn: TXN, clazz: type, keys: set[bytes], inwards: bool
+        self, txn: TXN, clazz: type[EntityStructure], keys: set[bytes], inwards: bool
     ) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
         this_clazz_idx = self.clazz_idx[clazz]
         for key in keys:
@@ -413,23 +428,17 @@ class MdbxStorage:
                 referenced_clazz_idx, referenced_idx = Serializer.full_key_to_clazz_idx(full_referenced_key)
                 yield self.idx_clazz[referenced_clazz_idx], referenced_idx
 
-    def load_references_by_object(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
-        if hasattr(obj, 'idx'):
-            full_key = obj.idx
+    def load_references_by_object(self, txn: TXN, obj: EntityStructure, inwards: bool) -> Generator[tuple[type[EntityStructure], bytes], None, None]:
+        with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
+            my_id = self.serializer.encode_obj(obj)
+            full_key = db_id_idx.get(txn, my_id)
+            assert full_key is not None
             if inwards:
                 yield from self._load_references_inwards(txn, full_key)
             else:
                 yield from self._load_references(txn, full_key)
-        else:
-            with txn.open_map(name=DB_ID_IDX, flags=DB_ID_IDX_FLAGS) as db_id_idx:
-                my_id = self.serializer.encode_key(str(obj.id), obj.version if hasattr(obj, "version") else None, obj.__class__)
-                full_key = db_id_idx.get(txn, my_id)
-                if inwards:
-                    yield from self._load_references_inwards(txn, full_key)
-                else:
-                    yield from self._load_references(txn, full_key)
 
-    def load_references_by_object_values(self, txn: TXN, obj: Tid, inwards: bool) -> Generator[EntityStructure, None, None]:
+    def load_references_by_object_values(self, txn: TXN, obj: EntityStructure, inwards: bool) -> Generator[EntityStructure, None, None]:
         for clazz, key in self.load_references_by_object(txn, obj, inwards):
             yield self.load_object(txn, clazz, key)
 
@@ -515,6 +524,8 @@ class MdbxStorage:
             prefix, _, _ = self.serializer.split_key(my_id)
             cursor = txn.cursor(db=DB_ID_IDX)
             for check_key, resolved_idx in cursor.iter(prefix):
+                assert check_key is not None
+                assert resolved_idx is not None
                 if check_key.startswith(prefix):
                     obj = self.load_object_by_full_key(txn, resolved_idx)
                     if obj is None:
@@ -563,6 +574,8 @@ class MdbxStorage:
                 prefix = self.serializer.encode_prefix(str(ref.ref))
                 cursor = txn.cursor(db_id_idx)
                 for check_key, resolved_idx in cursor.iter(prefix):
+                    assert check_key is not None
+                    assert resolved_idx is not None
                     if check_key.startswith(prefix):
                         referenced_clazz_idx, referenced_idx = Serializer.full_key_to_clazz_idx(resolved_idx)
                         # We now want to check if the referenced_clazz_idx actually matches what should be "possible"
@@ -575,13 +588,14 @@ class MdbxStorage:
         raise Exception(f"Can't load element from key {ref.ref} via {my_id!r}.")
         return None
 
-    def scan_objects(self, txn: TXN, clazz: type[Tid], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
+    def scan_objects(self, txn: TXN, clazz: type[EntityStructure], start_key: bytes | None = None, limit: int | None = None) -> Generator[bytes, None, None]:
         with txn.open_map(name=self.clazz_idx[clazz], flags=MDBXDBFlags.MDBX_DB_DEFAULTS) as db:
             with txn.cursor(db) as cursor:
                 count = 0
 
                 # Iterate over keys only for maximum efficiency
                 for key, _value in cursor.iter(start_key=start_key):  # TODO: MDBX_SET
+                    assert key is not None
                     yield key
                     if limit:
                         count += 1
@@ -606,6 +620,8 @@ class MdbxStorage:
             count = 0
 
             for key, value in cursor.iter(start_key=start_key):
+                assert key is not None
+                assert value is not None
                 if count % 100 == 0:
                     log_all(logging.INFO, f"{clazz.__name__} processed: {count}/{entries}")
 
