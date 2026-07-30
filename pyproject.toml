@@ -43,8 +43,7 @@ preview = true
 line-length = 160
 skip-string-normalization = true
 
-[tool.ty]
-strict = true
+[tool.ty.src]
 exclude = ["domain/netex/model/*.py"]
 
 [tool.ruff]

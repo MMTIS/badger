@@ -171,15 +171,16 @@
 {
 "block":"mobigo-list",
 "worked":"2026-01-24",
+"url": "https://transport.data.gouv.fr/datasets/reseau-de-transport-interurbain-mobigo-en-bourgogne-franche-comte",
 "description":"List of some mobigo data to fetch and transform",
 "download_urls":[
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT89",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT71",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT25",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT70",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT21",
-    "https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT89",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT71",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT25",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT70",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT21",
+    "https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT58"
 ],
 "scripts": [
  {"script": "process_url_list", "args": "gtfs2epip"}
@@ -570,8 +571,8 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.xml.gz"},
-        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/03-import.mdbx"},
+        {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/03.xml.zip"},
+        {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.zip] %%dir%%/03-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03-import.mdbx %%dir%%/04-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04-netex-database.mdbx %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/05-%%block%%-netex.xml.gz] %%dir%%/06-gtfs.mdbx "},
@@ -619,11 +620,11 @@
     {"script": "conv.netex_to_db", "args": "[%%dir%%/07-%%block%%-netex.xml.gz] %%dir%%/08-import.mdbx "},
     {"script": "conv.epip_db_to_db", "args": "%%dir%%/08-import.mdbx %%dir%%/09-netex-database.mdbx"},
     {"script": "conv.epip_db_to_xml", "args": "%%dir%%/09-netex-database.mdbx %%dir%%/10-%%block%%-full-netex.xml.gz"},
-    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f2-netex.mdbx Line Eurostar:Line:DEDTM-FRPNO  [Line Route ServiceJourneyPattern]" },
+    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx   %%dir%%/f2-netex.mdbx Line [id Eurostar:Line:FRMLV-NLAMA]  None None" },
     {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/f2-netex.mdbx %%dir%%/select_by_line.xml.gz"},
-    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f3-netex.mdbx Operator Eurostar:Operator:EUROSTAR_CONTINENTAL  [Operator Line ServiceJourney ServiceJourneyPattern] " },
+    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f3-netex.mdbx Operator [id Eurostar:Operator:EUROSTAR_CONTINENTAL] [ [Operator Line Route ServiceJourneyPattern ServiceJourney] []" },
     {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/f3-netex.mdbx %%dir%%/select_by_operator.xml.gz"},
-    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f4-netex.mdbx ServiceJourney Eurostar:ServiceJourney:9309-0404  [Route] " },
+    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f4-netex.mdbx ServiceJourney [id Eurostar:ServiceJourney:9147-0727]   [Operator Line Route ServiceJourneyPattern ServiceJourney] []" },
     {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/f4-netex.mdbx %%dir%%/select_by_sj.xml.gz"},
     {"script": "tools.xml_validator.py", "args": "%%dir%%/10-%%block%%-full-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
     {"script": "tools.xml_validator.py", "args": "%%dir%%/select_by_line.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
