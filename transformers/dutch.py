@@ -21,7 +21,7 @@ def dutch_scheduled_stop_point_memory(db_read: Database, db_write: Database) -> 
         else:
             print(f"ScheduledStopPoint {ssp.id} does not have a location.")
 
-    db_write.insert_objects_on_queue(ScheduledStopPoint, scheduled_stop_points, True)
+    db_write.insert_objects_on_queue(ScheduledStopPoint, scheduled_stop_points)
 
 
 def dutch_service_journey_pattern_time_demand_type_memory(db_read: Database, db_write: Database) -> None:

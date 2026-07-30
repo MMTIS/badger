@@ -49,43 +49,43 @@ def main(yeartimetable: Path, target_database_file: Path) -> None:
 
     with MdbxStorage(target_database_file, readonly=False) as db_write:
         # StopArea has a circular relationship to ScheduledStopPoints, removed.
-        db_write.insert_objects_on_queue(StopArea, get_stopareas(timetable), empty=True)
+        db_write.insert_objects_on_queue(StopArea, get_stopareas(timetable))
 
         # SiteConnection refers to StopArea
-        db_write.insert_objects_on_queue(SiteConnection, get_footpaths(timetable), empty=True)
+        db_write.insert_objects_on_queue(SiteConnection, get_footpaths(timetable))
 
         # ScheduledStopPoint refers to StopAreas
-        db_write.insert_objects_on_queue(ScheduledStopPoint, get_scheduledstoppoint(timetable), empty=True)
+        db_write.insert_objects_on_queue(ScheduledStopPoint, get_scheduledstoppoint(timetable))
 
         # Connection refers to ScheduledStopPoint
-        db_write.insert_objects_on_queue(Connection, get_connections(timetable), empty=True)
+        db_write.insert_objects_on_queue(Connection, get_connections(timetable))
 
         # TimingLinks do not exist in trout. Inference refers to ScheduledStopPoints
-        db_write.insert_objects_on_queue(TimingLink, get_timinglink(timetable), empty=True)
+        db_write.insert_objects_on_queue(TimingLink, get_timinglink(timetable))
 
         # TimeDemandType refers to TimingLinks (RunTime) and ScheduledStopPoints (WaitTime)
-        db_write.insert_objects_on_queue(TimeDemandType, get_timedemandtype(timetable), empty=True)
+        db_write.insert_objects_on_queue(TimeDemandType, get_timedemandtype(timetable))
 
         # Operator does not have references
-        db_write.insert_objects_on_queue(Operator, get_operators(timetable), empty=True)
+        db_write.insert_objects_on_queue(Operator, get_operators(timetable))
 
         # Line refers to Operator
-        db_write.insert_objects_on_queue(Line, get_lines(timetable), empty=True)
+        db_write.insert_objects_on_queue(Line, get_lines(timetable))
 
         # DestinationDisplay has no references
-        db_write.insert_objects_on_queue(DestinationDisplay, get_destinationdisplays(timetable), empty=True)
+        db_write.insert_objects_on_queue(DestinationDisplay, get_destinationdisplays(timetable))
 
         # ServiceJourneyPattern refers to ScheduledStopPoint and DestinationDisplay
-        db_write.insert_objects_on_queue(ServiceJourneyPattern, get_servicejourneypattern(timetable), empty=True)
+        db_write.insert_objects_on_queue(ServiceJourneyPattern, get_servicejourneypattern(timetable))
 
         # AvailabilityCondition has no references
-        db_write.insert_objects_on_queue(AvailabilityCondition, get_validitypatterns(timetable), empty=True)
+        db_write.insert_objects_on_queue(AvailabilityCondition, get_validitypatterns(timetable))
 
         # ProductCategory has no references
-        db_write.insert_objects_on_queue(TypeOfProductCategory, get_productcategory(timetable), empty=True)
+        db_write.insert_objects_on_queue(TypeOfProductCategory, get_productcategory(timetable))
 
         # ServiceJourney refers to Line, TimeDemandType, TypeOfProductCategory, ServiceJourneyPattern and AvailabilityCondition
-        db_write.insert_objects_on_queue(ServiceJourney, get_vehiclejourney(timetable), empty=True)
+        db_write.insert_objects_on_queue(ServiceJourney, get_vehiclejourney(timetable))
 
         # There must not be any unresolved entities at this point.
 
