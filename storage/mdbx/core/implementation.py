@@ -97,11 +97,6 @@ class MdbxStorage:
         self.env = Env(
             self.path.as_posix(),
             maxdbs=self.max_dbs,
-            # map_size=self.initial_size,
-            # writemap=True,
-            # metasync=True,
-            # sync=True,
-            # subdir=True,
         )
 
         if new_database:
@@ -238,7 +233,7 @@ class MdbxStorage:
         for clazz in other_classes:
             yield from self.iter_only_objects(txn, clazz)
 
-    def insert_any_object_on_queue(self, txn: TXN, objects: Iterable[Tid]) -> None:
+    def insert_any_object_on_queue(self, txn: TXN, objects: Iterable[EntityStructure]) -> None:
         if self.readonly:
             raise
 

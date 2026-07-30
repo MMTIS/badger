@@ -16,12 +16,14 @@ from domain.netex.services.model_typing import Tid
 from domain.utils import get_object_name
 from storage.lxml.core.time import class_contains_xml_time, recursive_replace
 
+from functools import cache
 from lxml import etree
 
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
 from storage.mdbx.core.implementation import MdbxStorage
 
 
+@cache
 def get_element_name_with_ns(clazz: type[Tid]) -> str:
     name = get_object_name(clazz)
     meta = getattr(clazz, "Meta", None)
@@ -29,6 +31,7 @@ def get_element_name_with_ns(clazz: type[Tid]) -> str:
     return "{" + (meta.namespace if meta is not None else "") + "}" + name
 
 
+@cache
 def get_interesting_classes(
     my_filter: set[type] | None = None,
 ) -> tuple[list[str], list[str], list[Any]]:
@@ -72,6 +75,7 @@ def get_interesting_classes(
     return clean_element_names, interesting_element_names, interesting_clazzes
 
 
+@cache
 def get_local_name(element: type[EntityStructure]) -> str:
     meta = getattr(element, "Meta", None)
     if meta:
