@@ -32,7 +32,7 @@ requires-python = ">=3.12"
 
 [dependency-groups]
 dev = [
-    "mypy",
+    "ty",
     "black",
     "ruff",
 ]
@@ -43,9 +43,8 @@ preview = true
 line-length = 160
 skip-string-normalization = true
 
-[tool.mypy]
+[tool.ty]
 strict = true
-ignore_missing_imports = true
 exclude = ["domain/netex/model/*.py"]
 
 [tool.ruff]
