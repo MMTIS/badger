@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import fields, is_dataclass
-from typing import Any, Dict, Iterable, List, Set, Type, Union, get_args, get_origin, get_type_hints
+from collections.abc import Iterable
+from typing import Any, Dict, List, Set, Type, Union, get_args, get_origin, get_type_hints
 from types import NoneType
 
 from domain.netex.model import GeneralFrameMembersRelStructure

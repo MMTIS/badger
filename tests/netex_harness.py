@@ -7,7 +7,8 @@ so a test reads like a tiny NeTEx file plus an assertion on what a transformer m
 
 import io
 import unittest
-from typing import Any, Callable, Iterable, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, TypeVar
 
 from lxml import etree
 

@@ -3,6 +3,7 @@ import decimal
 import functools
 from dataclasses import Field
 from enum import Enum
+from collections.abc import Iterable
 from typing import Any
 
 from xsdata.models.datatype import XmlDateTime, XmlDuration, XmlTime, XmlDate, XmlPeriod
@@ -39,7 +40,7 @@ def resolved_field_types(clazz: typing.Hashable) -> dict[str, typing.Any]:
 
 def unembed(
     clazz: typing.Any,
-) -> typing.Iterable[tuple[str, dataclasses.Field[typing.Any], typing.Any]]:
+) -> Iterable[tuple[str, dataclasses.Field[typing.Any], typing.Any]]:
     hints = resolved_field_types(clazz)
     all_references = []
     all_classes = []
@@ -90,7 +91,7 @@ IGNORE_ATTRIBUTES = ["name_of_class_attribute"]
 
 def list_attributes(
     clazz: T, parent_name: str | None = None
-) -> typing.Iterable[tuple[str, tuple[type[Any], bool] | None, Any, Field[Any]]]:
+) -> Iterable[tuple[str, tuple[type[Any], bool] | None, Any, Field[Any]]]:
     if hasattr(clazz, "__dataclass_fields__"):
         for name, field, field_type in unembed(clazz):
             if name in IGNORE_ATTRIBUTES:

@@ -1,7 +1,8 @@
 import logging
 from pathlib import Path
 from types import TracebackType
-from typing import Optional, Type, Literal, Iterable, Any, Self
+from collections.abc import Iterable
+from typing import Optional, Type, Literal, Any, Self
 import multiprocessing as mp
 import queue
 
@@ -11,7 +12,6 @@ from mdbx.mdbx import DBI, Env
 
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
-from storage.interface import Storage
 from storage.mdbx.core.implementation import MdbxStorage, DB_ID_IDX, DB_REFERENCE_OUTWARD, DB_UNRESOLVED, DB_ID_IDX_FLAGS
 
 

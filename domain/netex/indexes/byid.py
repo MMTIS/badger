@@ -1,5 +1,5 @@
 from operator import attrgetter
-from typing import Iterable
+from collections.abc import Iterable
 
 from domain.netex.services.model_typing import Tid
 
