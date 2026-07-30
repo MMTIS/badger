@@ -1,5 +1,7 @@
 repos:
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.8.0  # Check for latest version
-    hooks:
-      - id: mypy
+- repo: https://github.com/allganize/ty-pre-commit
+  # Ty version.
+  rev: v0.0.65a35a34a33a32a31a30a29a28a27a26a25a24a23a22a21a20
+  hooks:
+    # Run the type checker.
+    - id: ty-check
