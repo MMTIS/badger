@@ -1,10 +1,9 @@
 import inspect
 import logging
-import warnings
 from typing import IO, Any
 from zoneinfo import ZoneInfo
 
-from utils.aux_logging import log_once
+from utils.aux_logging import log_once, log_all
 
 from xsdata.formats.dataclass.context import XmlContext
 from xsdata.formats.dataclass.parsers import XmlParser
@@ -73,7 +72,7 @@ def get_interesting_classes(
     return clean_element_names, interesting_element_names, interesting_clazzes
 
 
-def get_local_name(element: type[Tid]) -> str:
+def get_local_name(element: type[EntityStructure]) -> str:
     meta = getattr(element, "Meta", None)
     if meta:
         return getattr(meta, "name", element.__name__)
@@ -298,14 +297,14 @@ def insert_database(
 
                 if hasattr(clazz, "order"):
                     if order is None:
-                        warnings.warn(f"{localname} {id} does not have a required order, setting it to 1.")
+                        log_all(logging.INFO, f"{localname} {id} does not have a required order, setting it to 1.")
                         order = 1
                         object.order = order
 
                 # TODO: Als we deze nu eens vervangen voor een lijst van objecten, tot het object type wijzigt.
                 if clazz != obj_clazz or len(obj_list) > 10000:
                     if obj_clazz is not None and len(obj_list) > 0:
-                        storage.insert_objects_on_queue(obj_clazz, obj_list, False)
+                        storage.insert_objects_on_queue(obj_clazz, obj_list)
                         obj_list = []
                     obj_clazz = clazz
 
@@ -322,5 +321,5 @@ def insert_database(
                 last_version_stack.pop()
 
     if obj_clazz is not None and len(obj_list) > 0:
-        storage.insert_objects_on_queue(obj_clazz, obj_list, False)
+        storage.insert_objects_on_queue(obj_clazz, obj_list)
         obj_list = []
