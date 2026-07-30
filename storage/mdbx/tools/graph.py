@@ -173,12 +173,12 @@ def order_graph(graph: dict[bytes, set[bytes]], scc_lookahead_threshold: int = 5
     # Precompute per-SCC metadata and internal ordering
     scc_meta = {}
     for i, members in enumerate(sccs):
-        # compute min class_idx as representative priority
-        class_idxs = [Serializer.full_key_to_clazz(n) for n in members]
-        min_class = min(class_idxs) if class_idxs else 0
+        # compute min clazz_idx as representative priority
+        clazz_idxs = [Serializer.full_key_to_clazz(n) for n in members]
+        min_class = min(clazz_idxs) if clazz_idxs else 0
         size = len(members)
         if size == 1:
-            # singleton: deterministic single-member list (still sort by class_idx,key for stability)
+            # singleton: deterministic single-member list (still sort by clazz_idx,key for stability)
             ordered_members = sorted(members, key=lambda n: (Serializer.full_key_to_clazz(n), n))
         else:
             if size <= scc_lookahead_threshold:

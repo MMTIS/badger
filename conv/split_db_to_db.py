@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import TypeVar, Any
 
 from netex import (
-    Route,
     ServiceJourneyPattern,
     Line,
     PassengerStopAssignment,
@@ -11,11 +10,8 @@ from netex import (
     EntityStructure,
     DayTypeAssignment,
     DayType,
-    UicOperatingPeriod,
     PublicationDelivery,
     TypeOfFrameRef,
-    ResponsibilitySet,
-    StopPointInJourneyPattern,
 )
 from netexio.attributes import update_attr
 from netexio.database import Database
@@ -64,17 +60,17 @@ def generate_epip_line_split(source_database_file: str, target_database_file: st
             removable_classes = db_write.tables() - EPIP_CLASSES
             for removable_class in removable_classes:
                 for parent_id, parent_version, parent_class, path in load_referencing_inwards(db_write, removable_class):
-                    parent_klass: type[Any] = db_write.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
-                    if parent_klass in EPIP_CLASSES:
+                    parent_clazz: type[Any] = db_write.get_class_by_name(parent_class)  # TODO: refactor at load_referencing_*
+                    if parent_clazz in EPIP_CLASSES:
                         # Aggregate all parent_ids, so we prevent concurrency issues, and the cost of deserialisation and serialisation
-                        key = (parent_id, parent_version, parent_klass)
+                        key = (parent_id, parent_version, parent_clazz)
                         result[key].append(path)
                         # print(removable_class, key, path)
 
             # TODO: Once removed the export should have less elements in the GeneralFrame, and only the relevant extra elements
             for key, paths in result.items():
-                parent_id, parent_version, parent_klass = key
-                obj = db_write.get_single(parent_klass, parent_id, parent_version)
+                parent_id, parent_version, parent_clazz = key
+                obj = db_write.get_single(parent_clazz, parent_id, parent_version)
                 if obj:
                     for path in paths:
                         split = split_path(path)
@@ -84,10 +80,10 @@ def generate_epip_line_split(source_database_file: str, target_database_file: st
 
                     db_write.insert_one_object(obj, delete_embedding=True)
 
-                    # print("SHOULD REMOVE", parent_klass, parent_id, parent_version, paths)
+                    # print("SHOULD REMOVE", parent_clazz, parent_id, parent_version, paths)
 
                 else:
-                    print("MISSING", parent_klass, parent_id, parent_version, paths)
+                    print("MISSING", parent_clazz, parent_id, parent_version, paths)
 
             # db_write.block_until_done()
             # rs: ResponsibilitySet = db_write.get_single(ResponsibilitySet, "RET:ResponsibilitySet:Partition_ALL")
