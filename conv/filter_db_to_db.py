@@ -1,7 +1,7 @@
 import logging
 from functools import partial
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, cast, Optional
 from collections.abc import Callable, Generator
 from mdbx.mdbx import TXN
 from domain.utils import get_object_name
@@ -265,9 +265,24 @@ filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntitySt
         ]
     },
 }
-
-
 def main(
+        source: str,
+        target: str,
+        object_type: str,
+        attributes: list[str],
+        **kwargs) -> None:
+
+    # unwinding the variable arguments for the main used only with positional arguments.
+    inwards_object_types : Optional[list[str]]= kwargs.get("inwards_object_types", None)
+    conditional_inwards : Optional[list[list[str]] ]= kwargs.get("conditional_inwards", None)
+    use_template :bool = kwargs.get("use-template",False)
+
+
+    main1(source, target, object_type, attributes, inwards_object_types,
+         conditional_inwards, use_template)
+    return
+
+def main1(
     source: str,
     target: str,
     object_type: str,
@@ -400,11 +415,11 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
-    args = parser.parse_args()
+    args,kwargs = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
     try:
-        main(args.source, args.target, args.object_type, args.attribute, args.inwards_object_types, args.conditional_inwards, args.use_template)
+        main1(args.source, args.target, args.object_type, args.attribute, args.inwards_object_types, args.conditional_inwards, args.use_template)
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e
