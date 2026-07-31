@@ -10,11 +10,14 @@ from storage.mdbx.core.implementation import MdbxStorage
 
 
 class MdbxStorageQueue(MdbxStorage):
-    queue: queue.Queue[tuple[bytes, bytes, bytes, tuple[bytes, ...]] | None]
+    queue: queue.Queue[list[tuple[bytes, bytes, bytes, tuple[bytes, ...]]] | None]
 
-    def __init__(self, path: Path, queue: queue.Queue[tuple[bytes, bytes, bytes, tuple[bytes, ...]] | None], readonly: bool = False):
+    def __init__(self, path: Path, queue: queue.Queue[list[tuple[bytes, bytes, bytes, tuple[bytes, ...]]] | None], readonly: bool = False):
         super().__init__(path, readonly=readonly)
         self.queue = queue
+
+    def insert_objects_on_queue(self, clazz: type[EntityStructure], objects: Iterable[EntityStructure]) -> None:
+        self.insert_any_object_on_queue(None, objects)
 
     def insert_any_object_on_queue(self, txn: TXN, objects: Iterable[EntityStructure]) -> None:
         """
@@ -27,11 +30,8 @@ class MdbxStorageQueue(MdbxStorage):
         if self.readonly:
             raise
 
+        batch = []
         for obj in objects:
-            # Queue format:
-            #         serialised object, unresolved
-            # (my_id, value,             [my_id_format])
-
             my_id = self.serializer.encode_obj(obj)
             value = self.serializer.marshall(obj, obj.__class__)
 
@@ -40,4 +40,9 @@ class MdbxStorageQueue(MdbxStorage):
                 {self.serializer.encode_key(ref, version, referenced_clazz) for referenced_clazz, ref, version in only_references(obj, self.serializer)}
             )
 
-            self.queue.put((my_id, value, self.clazz_idx[obj.__class__], unresolved))
+            batch.append((my_id, value, self.clazz_idx[obj.__class__], unresolved))
+            if len(batch) >= 100:
+                self.queue.put(batch)
+                batch = []
+        if batch:
+            self.queue.put(batch)

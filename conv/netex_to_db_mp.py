@@ -13,7 +13,7 @@ import queue
 n_proc = 10
 
 
-def parse_and_enqueue(target: Path, queue: queue.Queue[tuple[bytes, bytes, bytes, tuple[bytes, ...]] | None], source: Path, sub_filename: str) -> None:
+def parse_and_enqueue(target: Path, queue: queue.Queue[list[tuple[bytes, bytes, bytes, tuple[bytes, ...]]] | None], source: Path, sub_filename: str) -> None:
     """Runs in a subprocess: parse XML and enqueue objects."""
 
     import zipfile
@@ -33,8 +33,9 @@ def netex_to_db_mp(source: Path, target: Path, clean_database: bool = True) -> N
     xml_storage = XmlStorage(source)
     all_names = xml_storage.list_netex_files()
 
-    with MdbxStorageMP(target, readonly=False) as storage:
-        with ProcessPoolExecutor(max_workers=n_proc, mp_context=storage.ctx) as executor:
+    fork_ctx = mp.get_context("fork")
+    with ProcessPoolExecutor(max_workers=n_proc, mp_context=fork_ctx) as executor:
+        with MdbxStorageMP(target, readonly=False) as storage:
             futures = []
             for sub_filename in all_names:
                 futures.append(executor.submit(parse_and_enqueue, target, storage.queue, source, sub_filename))
