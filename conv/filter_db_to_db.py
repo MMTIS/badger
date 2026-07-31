@@ -280,6 +280,11 @@ def main(
     target_path = Path(target)
     clazz: type[EntityStructure] | None
 
+    # handling Stuff coming from script runner
+    if isinstance(inwards_object_types,str) and inwards_object_types=="None":
+        inwards_object_types=None
+    if isinstance(conditional_inward_object_types,str) and conditional_inward_object_types=="None":
+        conditional_inward_object_types=None
     if not source_path.exists():
         log_all(logging.ERROR, f"{source_path} does not exist.")
 
