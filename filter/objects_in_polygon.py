@@ -1,11 +1,10 @@
 import logging
-from typing import Generator
+from collections.abc import Generator
 
 from numpy.f2py.crackfortran import sourcecodeform
 from shapely.geometry import Point, Polygon, shape
 from shapely.prepared import prep
 
-import utils.utils
 from netex import LocationStructure2, ScheduledStopPoint, ServiceJourneyPattern, TimingLink, ServiceLink, RouteLink, \
     Route, ServiceJourney, Line, TemplateServiceJourney
 from netexio.database import Database, Tid

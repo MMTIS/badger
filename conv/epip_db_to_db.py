@@ -1,7 +1,5 @@
 from pathlib import Path
-from typing import Generator
-
-import mdbx
+from collections.abc import Generator
 
 from domain.netex.model import (
     Codespace,

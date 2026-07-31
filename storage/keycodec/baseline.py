@@ -68,5 +68,6 @@ class BaseLineKeyCodec(KeyCodec):
         return BaseLineKeyCodec.encode_key_idx(id, version, clazz_idx)
 
     @staticmethod
-    def split_key(key: bytes) -> list[bytes]:
-        return key.split(SEPARATOR_BYTES)
+    def split_key(key: bytes) -> tuple[bytes, bytes, bytes]:
+        id_bytes, version_bytes, clazz_idx = key.split(SEPARATOR_BYTES, 2)
+        return (id_bytes, version_bytes, clazz_idx)

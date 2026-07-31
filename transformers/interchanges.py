@@ -1,4 +1,5 @@
-from typing import Generator, Any, TypeVar, cast
+from collections.abc import Generator
+from typing import Any, TypeVar, cast
 
 from domain.netex.model import (
     InterchangeRule,

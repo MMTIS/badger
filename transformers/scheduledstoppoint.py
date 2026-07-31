@@ -1,4 +1,5 @@
-from typing import Generator, Dict, Any
+from collections.abc import Generator
+from typing import Dict, Any
 
 from mdbx.mdbx import TXN
 
@@ -11,7 +12,6 @@ from domain.netex.model import (
     ScheduledStopPointRef,
     QuayRef,
     StopPlaceRef,
-    ServiceJourney,
 )
 
 from storage.mdbx.core.implementation import MdbxStorage
@@ -24,7 +24,7 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: 
     ssp_location: Dict[str, LocationStructure2] = {}
 
     def process(ssp: ScheduledStopPoint, generator_defaults: dict[str, str]) -> Generator[ScheduledStopPoint, None, None]:
-        assert ssp.id is not None, f"ScheduledStopPoint without id"
+        assert ssp.id is not None, "ScheduledStopPoint without id"
         ssp.projections = None  # TODO: Somewhere else
         ssp.stop_areas = None  # TODO: Somewhere else
         if ssp.location is None:
@@ -42,16 +42,16 @@ def infer_locations_from_quay_or_stopplace_and_apply(db_read: MdbxStorage, txn: 
     sp: StopPlace
     for _key, sp in db_read.iter_objects(txn, StopPlace):
         if sp.centroid is not None:
-            assert sp.id is not None, f"StopPlace without id"
-            mapping[sp.id] = getattr(sp.centroid, "location")
+            assert sp.id is not None, "StopPlace without id"
+            mapping[sp.id] = sp.centroid.location
         if sp.quays is not None:
             for quay in sp.quays.taxi_stand_ref_or_quay_ref_or_quay:
                 if isinstance(quay, Quay):
-                    assert quay.id is not None, f"Quay without id"
+                    assert quay.id is not None, "Quay without id"
                     if quay.centroid is not None:
-                        mapping[quay.id] = getattr(quay.centroid, "location")
+                        mapping[quay.id] = quay.centroid.location
                     elif sp.centroid is not None:
-                        mapping[quay.id] = getattr(sp.centroid, "location")
+                        mapping[quay.id] = sp.centroid.location
 
     ssp_location = {}
 

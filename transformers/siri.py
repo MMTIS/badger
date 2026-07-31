@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
-from typing import Generator
+from collections.abc import Generator
 
-from xsdata.models.datatype import XmlDate, XmlDateTime
+from xsdata.models.datatype import XmlDateTime
 
 from callsprofile import CallsProfile
 from netex import (
@@ -19,7 +19,7 @@ from netex import (
     DirectionRef,
 )
 from netexio.database import Database
-from netexio.dbaccess import load_generator, get_single
+from netexio.dbaccess import load_generator
 from siri import DatedVehicleJourneyStructure, DatedCall, AimedDepartureTime, AimedArrivalTime, Order, StopPointRef, VehicleJourneyRef
 
 # TODO: update for lmdb

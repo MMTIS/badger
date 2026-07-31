@@ -1,7 +1,4 @@
-from typing import TypeVar
+from domain.netex.model import EntityStructure
 
-T = TypeVar("T")
-
-
-def get_object_name(clazz: type[T]) -> str:
+def get_object_name(clazz: type[EntityStructure]) -> str:
     return getattr(getattr(clazz, "Meta", None), "name", str(clazz.__name__))

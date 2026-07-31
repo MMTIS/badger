@@ -1,5 +1,6 @@
 from decimal import Decimal
-from typing import Iterable, Generator, cast
+from collections.abc import Iterable, Generator
+from typing import cast
 
 import duckdb
 

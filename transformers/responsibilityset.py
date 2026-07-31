@@ -1,4 +1,5 @@
-from typing import Dict, Generator, Set
+from collections.abc import Generator
+from typing import Dict, Set
 
 from netexio.database import Database
 from netexio.dbaccess import load_generator, load_local

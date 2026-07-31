@@ -4,7 +4,8 @@ import warnings
 from datetime import datetime, date, timedelta
 
 # from multiprocessing import Pool
-from typing import List, Set, Any, TypeVar, Generator, cast, Optional
+from collections.abc import Generator
+from typing import List, Set, Any, TypeVar, cast, Optional
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY

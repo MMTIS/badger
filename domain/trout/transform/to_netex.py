@@ -1,5 +1,6 @@
 from decimal import Decimal, ROUND_UP
-from typing import Generator, Union
+from collections.abc import Generator
+from typing import Union
 import datetime
 
 from xsdata.models.datatype import XmlTime, XmlDuration, XmlDateTime
