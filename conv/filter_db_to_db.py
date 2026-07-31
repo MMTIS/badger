@@ -240,6 +240,8 @@ filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntitySt
         "conditional_inward_classes": [
             (Route, Line),
             (Line, Route),
+            (Line, ServiceJourneyPattern),
+            (Line, ServiceJourney),
             (Route, ServiceJourneyPattern),
             (ServiceJourneyPattern, ServiceJourney),
             (PassengerStopAssignment, ScheduledStopPoint),
@@ -252,6 +254,8 @@ filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntitySt
             (Line, Route),
             (Operator, Line),
             (Line, Operator),
+            (Line, ServiceJourneyPattern),
+            (Line, ServiceJourney),
             (Route, ServiceJourneyPattern),
             (ServiceJourneyPattern, ServiceJourney),
             (PassengerStopAssignment, ScheduledStopPoint),
@@ -265,22 +269,18 @@ filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntitySt
         ]
     },
 }
-def main(
-        source: str,
-        target: str,
-        object_type: str,
-        attributes: list[str],
-        **kwargs) -> None:
+
+
+def main(source: str, target: str, object_type: str, attributes: list[str], **kwargs) -> None:
 
     # unwinding the variable arguments for the main used only with positional arguments.
-    inwards_object_types : Optional[list[str]]= kwargs.get("inwards_object_types", None)
-    conditional_inwards : Optional[list[list[str]] ]= kwargs.get("conditional_inwards", None)
-    use_template :bool = kwargs.get("use-template",False)
+    inwards_object_types: Optional[list[str]] = kwargs.get("inwards_object_types", None)
+    conditional_inwards: Optional[list[list[str]]] = kwargs.get("conditional_inwards", None)
+    use_template: bool = kwargs.get("use-template", False)
 
-
-    main1(source, target, object_type, attributes, inwards_object_types,
-         conditional_inwards, use_template)
+    main1(source, target, object_type, attributes, inwards_object_types, conditional_inwards, use_template)
     return
+
 
 def main1(
     source: str,
@@ -296,10 +296,10 @@ def main1(
     clazz: type[EntityStructure] | None
 
     # handling Stuff coming from script runner
-    if isinstance(inwards_object_types,str) and inwards_object_types=="None":
-        inwards_object_types=None
-    if isinstance(conditional_inward_object_types,str) and conditional_inward_object_types=="None":
-        conditional_inward_object_types=None
+    if isinstance(inwards_object_types, str) and inwards_object_types == "None":
+        inwards_object_types = None
+    if isinstance(conditional_inward_object_types, str) and conditional_inward_object_types == "None":
+        conditional_inward_object_types = None
     if not source_path.exists():
         log_all(logging.ERROR, f"{source_path} does not exist.")
 
@@ -415,7 +415,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
-    args,kwargs = parser.parse_args()
+    args, kwargs = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
 
     try:
