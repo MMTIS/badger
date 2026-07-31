@@ -56,7 +56,7 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.netex_to_db", "args": "[%%inputfilepath%%] %%dir%%/03.mdbx"},
+        {"script": "conv.netex_to_db_mp", "args": "%%inputfilepath%% %%dir%%/03.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/03.mdbx %%dir%%/04.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/04.mdbx %%dir%%/05-epip.xml.gz"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/05-epip.xml.gz] %%dir%%/06.mdbx"},
