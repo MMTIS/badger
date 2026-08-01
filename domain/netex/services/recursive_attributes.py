@@ -240,7 +240,7 @@ def only_embedding(
 
 
 def recursive_attributes_all(
-    obj: Tid, depth: list[int], interesting_classes: tuple[type[Any]] | None = None
+    obj: Tid, depth: list[int], interesting_classes: tuple[type[Any]] | None = None, block_classes: tuple[type[Any]] | None = None
 ) -> Generator[tuple[Any, Any, tuple[int, ...]], None, None]:
     # We skip data_source_ref_attribute and  responsibility_set_ref_attribute later in the pipeline
     # data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
@@ -258,19 +258,24 @@ def recursive_attributes_all(
         mydepth[-1] = col_idx
         v = getattr(obj, field_name, None)
         if v is not None:
+            if block_classes and v.__class__ in block_classes:
+                continue
+
             if not interesting_classes or v.__class__ in interesting_classes:
                 yield obj, v, tuple(mydepth)
 
             if hasattr(v, "__dataclass_fields__"):
-                yield from recursive_attributes_all(v, mydepth, interesting_classes)
+                yield from recursive_attributes_all(v, mydepth, interesting_classes, block_classes)
             elif v.__class__ in (list, tuple):
                 mydepth.append(0)
                 for j, x in enumerate(v):
                     mydepth[-1] = j
                     if x is not None:
+                        if block_classes and x.__class__ in block_classes:
+                            continue
                         if not interesting_classes or x.__class__ in interesting_classes:
                             yield obj, x, tuple(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
                         if hasattr(x, "__dataclass_fields__"):
-                            yield from recursive_attributes_all(x, mydepth, interesting_classes)
+                            yield from recursive_attributes_all(x, mydepth, interesting_classes, block_classes)
                 mydepth.pop()
     mydepth.pop()
