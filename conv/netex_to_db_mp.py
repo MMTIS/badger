@@ -9,6 +9,7 @@ from storage.lxml.core.implementation import XmlStorage
 from utils.aux_logging import log_all, prepare_logger, log_flush
 import multiprocessing as mp
 import queue
+import sys
 
 n_proc = 10
 
@@ -47,7 +48,13 @@ def parse_and_enqueue(target: Path, queue: queue.Queue[list[tuple[bytes, bytes, 
 
 def netex_to_db_mp(filenames: list[Path], target: Path, clean_database: bool = True) -> None:
 
-    fork_ctx = mp.get_context("fork")
+
+
+    if sys.platform == 'win32':
+        fork_ctx = mp.get_context("spawn")
+    else:
+        fork_ctx = mp.get_context("fork")
+
     with ProcessPoolExecutor(max_workers=n_proc, mp_context=fork_ctx) as executor:
         with MdbxStorageMP(target, readonly=False) as storage:
             futures = []
