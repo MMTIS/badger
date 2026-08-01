@@ -10,15 +10,10 @@ from storage.mdbx.core.mp_consumer import consumer
 
 
 class MdbxStorageMP(MdbxStorageQueue):
-    if sys.platform == 'win32':
-        context = mp.get_context('spawn')
-    else:
-        context = mp.get_context('fork')
-    writer: context.Process
     queue: queue.Queue[list[tuple[bytes, bytes, bytes, tuple[bytes, ...]]] | None]
 
     def __init__(self, path: Path, queue: Optional[queue.Queue] = None, readonly: bool = True):
-        self.ctx = context
+        self.ctx = mp.get_context('fork') if sys.platform != 'win32' else mp.get_context('spawn')
         self.manager = self.ctx.Manager()
         self.queue = queue if queue is not None else self.manager.Queue(maxsize=10000)
         super().__init__(path, self.queue, readonly)
