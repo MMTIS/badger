@@ -1,40 +1,49 @@
 # WORKING
 # =======
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1a
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissinterchange_r
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_aube
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_ciri.log 5t_ciri
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt filter1.log filter1
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt trenitalia.log trenitalia
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiavarese.log lombardiavarese
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiafunbus.log lombardiafunbus
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t.log 5t
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log swissmikro
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log fr_ardennes
-#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log blablacar-prod
-#python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt mylog.log flixbus-prod
-#needs to be redefined so that it validates.
-python -m tools.script_runner ./tools/tool_scripts/script_regression.txt mylog.log nlsmall
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log mmri_1a
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt newlog1.log swissinterchange
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt newlog1.log swissinterchange_r
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log fr_aube
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log 5t_ciri
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log trenitalia
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log lombardiavarese
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.loglombardiafunbus
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log 5t
+python -m tools.script_runner ./tools/tool_scripts/script_regression.txt newlog1.log swissmikro
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log fr_ardennes
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log fr_aube
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  lombardiamovibus
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  5t_2
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  filter1
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  trenitaliagtfs
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  aura
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log mobigo-jura
+
+
+
+# Biggies
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  eurostar
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  at-test
+python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt newlog1.log blablacar-prod
+python -m tools.script_runner ./tools/tool_scripts/script_swiss_coaches.txt newlog1.log flixbus-prod
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log sta_bolzano
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  sta_trentino
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log lux
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mnewlog1.log sncf_ter
+python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log fr_sncf_gtfs
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  lombardiatrainitalia
+python -m tools.script_runner  ./tools/tool_scripts/script_regression_v1.1.txt newlog1.log  lombardiatrennord
+
+
 
 # needs to be defined in script_regression_v1.1.txt
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_1g
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_2g
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log mmri_3g
 
-#  conv.gtfs_db_to_db C:/Users/ue71603/Downloads/5t_2/08-gtfs.mdbx C:/Users/ue71603/Downloads/5t_2/10-gtfs.mdbx
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt 5t_2.log 5t_2
-
 
 # problems with QuayRef that are not copied
 #python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt mylog.log lux
 
-
-
 #mandatory test
 #python -m tools.script_runner ./tools/tool_scripts/script_swiss_prod.txt mylog.log swiss-prod-epip-1
-
-
-# Problem: 	https://github.com/MMTIS/QA/issues/18
-python -m tools.script_runner ./tools/tool_scripts/script_regression_v1.1.txt lombardiatrendnord.log lombardiatrennord
-
