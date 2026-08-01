@@ -237,3 +237,40 @@ def only_embedding(
         if hasattr(obj, "id") and obj.id is not None:
             if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
                 yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj
+
+
+def recursive_attributes_all(
+    obj: Tid, depth: list[int], interesting_classes: tuple[type[Any]] | None = None
+) -> Generator[tuple[Any, Any, tuple[int, ...]], None, None]:
+    # We skip data_source_ref_attribute and  responsibility_set_ref_attribute later in the pipeline
+    # data_source_ref_attribute = getattr(obj, "data_source_ref_attribute", None)
+    # if data_source_ref_attribute:
+    #     yield DataSourceRefStructure(ref=data_source_ref_attribute), depth + ["data_source_ref_attribute"]
+
+    # responsibility_set_ref_attribute = getattr(obj, "responsibility_set_ref_attribute", None)
+    # if responsibility_set_ref_attribute:
+    #     yield ResponsibilitySetRef(ref=responsibility_set_ref_attribute), depth + ["responsibility_set_ref_attribute"]
+
+    mydepth = depth
+    mydepth.append(0)
+    field_names = _dc_field_names(obj.__class__)
+    for col_idx, field_name in enumerate(field_names):
+        mydepth[-1] = col_idx
+        v = getattr(obj, field_name, None)
+        if v is not None:
+            if not interesting_classes or v.__class__ in interesting_classes:
+                yield obj, v, tuple(mydepth)
+
+            if hasattr(v, "__dataclass_fields__"):
+                yield from recursive_attributes_all(v, mydepth, interesting_classes)
+            elif v.__class__ in (list, tuple):
+                mydepth.append(0)
+                for j, x in enumerate(v):
+                    mydepth[-1] = j
+                    if x is not None:
+                        if not interesting_classes or x.__class__ in interesting_classes:
+                            yield obj, x, tuple(mydepth)  # TODO: mydepth result is incorrect when list() but not as iterator
+                        if hasattr(x, "__dataclass_fields__"):
+                            yield from recursive_attributes_all(x, mydepth, interesting_classes)
+                mydepth.pop()
+    mydepth.pop()

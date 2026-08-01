@@ -38,7 +38,7 @@ from domain.netex.model import (
     StopPlaceRef,
 )
 from domain.netex.services.refs import getRef
-
+from transformers.multilingualstring import TransformMultilingualString
 from storage.mdbx.core.implementation import MdbxStorage
 
 import logging
@@ -174,7 +174,7 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                         # Network,
                         DestinationDisplay,
                         PassengerStopAssignment,
-                        VehicleType
+                        VehicleType,
                     ]:
                         # We need to have something like a backwards compatible copy,
                         # that takes the MultilingualString and only uses the features of NeTEx 1.3
@@ -204,12 +204,13 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                     target_db.insert_any_object_on_queue(txn_write, reprojection_update(target_db, txn_write, "urn:ogc:def:crs:EPSG::4326", force_latlon=True))
 
                     # already done in input
-                    # target_db.insert_any_object_on_queue(txn_write, avv_service_journey_operator(target_db, txn_write))
+                    target_db.insert_any_object_on_queue(txn_write, avv_service_journey_operator(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_vehicle_type_short_name(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_quay_name(target_db, txn_write))
                     target_db.insert_any_object_on_queue(txn_write, avv_sjp_order(target_db, txn_write))
 
-
+                    # Force MultilingualString v1
+                    target_db.insert_any_object_on_queue(txn_write, TransformMultilingualString.iter_to_v1(target_db, txn_write))
 
                     # TODO: overwrite with a single version
 
