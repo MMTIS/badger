@@ -8,6 +8,7 @@ from storage.mdbx.core.implementation_mp import MdbxStorageMP
 from tests.base import MdbxStorageMPTestCase
 from domain.netex.services.model_typing import Tver
 import queue
+import sys
 
 n_proc = 5
 
@@ -42,7 +43,7 @@ class TestMultiProcessing(MdbxStorageMPTestCase):
     def test_multi_processing(self) -> None:
         import multiprocessing as mp
 
-        fork_ctx = mp.get_context("fork")
+        fork_ctx = mp.get_context('fork') if sys.platform != 'win32' else mp.get_context('spawn')
         with ProcessPoolExecutor(max_workers=n_proc, mp_context=fork_ctx) as executor:
             with MdbxStorageMP(self.target, readonly=False) as storage:
                 futures = []
