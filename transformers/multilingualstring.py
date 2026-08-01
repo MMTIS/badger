@@ -45,7 +45,7 @@ class TransformMultilingualString:
                     yield obj
 
     @staticmethod
-    def to_v2(mls: MultilingualString) -> tuple[MultilingualString, bool]:
+    def to_v2(mls: MultilingualString, ats: AlternativeTextsRelStructure | None = None) -> tuple[MultilingualString, bool]:
         if len(mls.content) > 0:
             if isinstance(mls.content[0], TextType):
                 return mls, False
@@ -53,8 +53,14 @@ class TransformMultilingualString:
             else:
                 assert isinstance(mls.content[0], str)
                 mls.content = [TextType(value=mls.content[0])]
-                return mls, True
 
+                if ats and len(ats.alternative_text) > 0:
+                    for at in ats.alternative_text:
+                        # We are only accepting v1 input
+                        assert isinstance(at.text.content[0], str)
+                        mls.content.append(TextType(value=at.text.content[0], lang=at.use_for_language))
+
+                return mls, True
         return mls, False
 
     @staticmethod

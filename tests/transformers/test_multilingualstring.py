@@ -1,5 +1,5 @@
 import unittest
-from domain.netex.model import MultilingualString, TextType, LocaleStructure
+from domain.netex.model import MultilingualString, TextType, LocaleStructure, AlternativeTextsRelStructure
 
 from transformers.multilingualstring import TransformMultilingualString
 
@@ -40,4 +40,9 @@ class TestMultilingualString(unittest.TestCase):
         _m, alternative_texts, changed = TransformMultilingualString.to_v1(mls, default_locale)
         self.assertEqual(mls.content, [VALUE_NL])
         self.assertEqual(alternative_texts[0].text.content, [VALUE])
+        self.assertEqual(changed, True)
+
+        ats = AlternativeTextsRelStructure(alternative_text=alternative_texts)
+        _m, changed = TransformMultilingualString.to_v2(mls, ats)
+        self.assertEqual(mls.content, [TextType(value=VALUE_NL), TextType(value=VALUE)])
         self.assertEqual(changed, True)
