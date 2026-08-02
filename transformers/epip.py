@@ -1308,6 +1308,7 @@ def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_d
                 warnings.warn("Unhandled interchange rule, unspecific")
             # TODO: If for Feeder and Distributor no ServiceJourneyRef is specified, something should actually compute all relevant Interchanges once applied to ServiceJourneyInterchange.
         """
+    yield from query1(db_read, txn_read)
 
 
 # def epip_service_journey_notices(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
