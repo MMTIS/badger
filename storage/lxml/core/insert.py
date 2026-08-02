@@ -17,7 +17,7 @@ from domain.utils import get_object_name
 from storage.lxml.core.time import class_contains_xml_time, recursive_replace
 
 from functools import cache
-from lxml import etree
+from lxml import etree  # type: ignore
 
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
 from storage.mdbx.core.implementation import MdbxStorage
@@ -300,7 +300,7 @@ def insert_database(
                         recursive_replace(object, current_zoneinfo)
 
                 if hasattr(clazz, "order"):
-                    if order is None:
+                    if order is None or order == "0":  # order is non-negative. We have found data where it is 0, so we set it to 1 too
                         log_all(logging.INFO, f"{localname} {id} does not have a required order, setting it to 1.")
                         order = 1
                         object.order = order
