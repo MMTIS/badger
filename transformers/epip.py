@@ -1,11 +1,10 @@
 import logging
 import sys
-import warnings
 from datetime import datetime, date, timedelta
 
 # from multiprocessing import Pool
 from collections.abc import Generator
-from typing import List, Set, Any, TypeVar, cast, Optional
+from typing import Any, TypeVar, cast
 import itertools
 import hashlib
 from dateutil.rrule import rrule, DAILY
@@ -39,6 +38,7 @@ from domain.netex.model import (
     GeneralFrameMembersRelStructure,
     ServiceJourney,
     Notice,
+    InterchangeRule,
     StopPlace,
     CompositeFrame,
     FramesRelStructure,
@@ -125,7 +125,8 @@ from domain.netex.model import (
     OperatingDay,
     DayTypeRef,
     EntityStructure,
-    NameOfClassOperatingPeriodRefStructureType, TextType
+    NameOfClassOperatingPeriodRefStructureType,
+    TextType,
 )
 
 from transformers.servicecalendarepip import ServiceCalendarEPIPFrame
@@ -204,7 +205,7 @@ def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     refs = set([])
     missing = []
 
-    stop_assignments: List[PassengerStopAssignment] = list(db_read.iter_only_objects(txn, PassengerStopAssignment))
+    stop_assignments: list[PassengerStopAssignment] = list(db_read.iter_only_objects(txn, PassengerStopAssignment))
     retain_stop_assignments = []
     for stop_assignment in stop_assignments:
         if stop_assignment.taxi_stand_ref_or_quay_ref_or_quay is not None:  # and 'NL:Q:' in stop_assignment.taxi_stand_ref_or_quay_ref_or_quay.ref:
@@ -247,7 +248,7 @@ def epip_site_frame_memory(db_read: MdbxStorage, txn: TXN, generator_defaults):
     if len(retain_stop_assignments) > 0:
         yield from retain_stop_assignments
 
-    stop_places_list: List[StopPlace] = list(db_read.iter_only_objects(txn, StopPlace))
+    stop_places_list: list[StopPlace] = list(db_read.iter_only_objects(txn, StopPlace))
     for stop_place in stop_places_list:
         keep = False
         if stop_place.id in refs:
@@ -309,7 +310,7 @@ def epip_timetabled_passing_times_memory(db_read: MdbxStorage, db_write: MdbxSto
     print(sys._getframe().f_code.co_name)
 
     # TODO: Maybe do this on the fly, per servicejourney?
-    service_journey_patterns: List[ServiceJourneyPattern] = load_local(db_read, ServiceJourneyPattern)
+    service_journey_patterns: list[ServiceJourneyPattern] = load_local(db_read, ServiceJourneyPattern)
     time_demand_types = load_local(db_read, TimeDemandType)
     service_journeys = load_local(db_read, ServiceJourney)
 
@@ -343,7 +344,7 @@ def epip_timetabled_passing_times_memory(db_read: MdbxStorage, db_write: MdbxSto
 
 # TODO: Potentially refactor this
 def service_journey_pattern_from_calls(sj: ServiceJourney, generator_defaults: dict[str, Any]):
-    piss: List[StopPointInJourneyPattern] = []
+    piss: list[StopPointInJourneyPattern] = []
 
     # Because NeTEx only support LineRef from a Route, and a ServiceJourneyPattern can refer to a single Route
     # we must make our new ServiceJourneyPattern unique by Line.
@@ -379,10 +380,10 @@ def service_journey_ac_to_day_type(
     db_read: MdbxStorage,
     txn: TXN,
     service_journey: ServiceJourney,
-    availability_conditions_ids: Set[str],
-    day_types_ids: Set[str],
-    uic_operating_periods_ids: Set[str],
-    day_type_assignments_ids: Set[str],
+    availability_conditions_ids: set[str],
+    day_types_ids: set[str],
+    uic_operating_periods_ids: set[str],
+    day_type_assignments_ids: set[str],
 ) -> Generator[EntityStructure, None, None]:
     acs: list[AvailabilityCondition] = []
 
@@ -397,7 +398,7 @@ def service_journey_ac_to_day_type(
                 elif isinstance(a, AvailabilityCondition):
                     acs.append(a)
                 else:
-                    warnings.warn(f"Unhandled ValidityCondition in {service_journey.id}")
+                    log_all(logging.WARNING, f"Unhandled ValidityCondition in {service_journey.id}")
 
     if service_journey.day_types is not None:
         if len(acs) == 0:
@@ -412,14 +413,14 @@ def service_journey_ac_to_day_type(
         # TODO: Maybe sort and hash the id's to form a unique instance
         day_type_id = acs[0].id.replace('AvailabilityCondition', 'DayType')
     else:
-        warnings.warn(f'Check {service_journey.id}')
+        log_all(logging.WARNING, f"Check {service_journey.id}")
         return
 
     if day_type_id not in day_types_ids:
         valid_days, days_of_week = ServiceCalendarEPIPFrame.positiveAvailabilityCondition(acs)
 
         if len(valid_days) == 0:
-            warnings.warn(f"{day_type_id} does not have any valid days")
+            log_all(logging.WARNING, f"{day_type_id} does not have any valid days")
             uic_operating_period = UicOperatingPeriod(
                 id=acs[0].id.replace('AvailabilityCondition', 'UicOperatingPeriod'),
                 version=acs[0].version,
@@ -474,6 +475,7 @@ def service_journey_ac_to_day_type(
         day_type_ref = getFakeRef(day_type_id, DayTypeRef, service_journey.version)  # TODO: Prevent fake ref
 
     service_journey.day_types = DayTypeRefsRelStructure(day_type_ref=[day_type_ref])
+
 
 # TODO: Avoid running this for ValidBetween and ServiceCalendar
 def get_validbetween(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> ValidBetween:
@@ -555,20 +557,20 @@ def get_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dic
     )
 
 
-def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[Tid, None, None]:
+def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[EntityStructure, None, None]:
     # print(sys._getframe().f_code.co_name)
     # sjps: Dict[str, ServiceJourneyPattern] = {}
-    sjp_ids: Set[str] = set()
-    availability_conditions_ids: Set[str] = set()
-    day_types_ids: Set[str] = set()
-    uic_operating_periods_ids: Set[str] = set()
-    day_type_assignments_ids: Set[str] = set()
+    sjp_ids: set[str] = set()
+    availability_conditions_ids: set[str] = set()
+    day_types_ids: set[str] = set()
+    uic_operating_periods_ids: set[str] = set()
+    day_type_assignments_ids: set[str] = set()
     # vehicle_types: dict[str, VehicleType] = dict()
 
     # availability_conditions: Dict[str, AvailabilityCondition] = {}
     # day_types: Dict[str, DayType] = {}
-    # uic_operating_periods: List[UicOperatingPeriod] = []
-    # day_type_assignments: List[DayTypeAssignment] = []
+    # uic_operating_periods: list[UicOperatingPeriod] = []
+    # day_type_assignments: list[DayTypeAssignment] = []
 
     def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: MdbxStorage, txn: TXN) -> None:
         sj_line_ref = None
@@ -613,7 +615,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         sj: ServiceJourney
 
         # Prototype, just: TimeDemandType -> PassingTimes
-        service_journey_pattern: Optional[ServiceJourneyPattern] = None
+        service_journey_pattern: ServiceJourneyPattern | None = None
 
         if sj.passing_times:
             if sj.journey_pattern_ref.ref not in sjp_ids:
@@ -624,28 +626,27 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 
         elif sj.calls:
             if sj.journey_pattern_ref:
-                pass
-                # service_journey_pattern: ServiceJourneyPattern = db_read.get_single(ServiceJourneyPattern,
-                #                                                            sj.journey_pattern_ref.ref,
-                #                                                            sj.journey_pattern_ref.version)
-            else:
+                # we found a journey_pattern_ref and are therefore happy
+                service_journey_pattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
+
+            if service_journey_pattern is None:
+                # we generate a ServiceJourneyPattern from the calls
                 service_journey_pattern = service_journey_pattern_from_calls(sj, generator_defaults)
                 sj.journey_pattern_ref = getRef(service_journey_pattern)
 
             sj.passing_times = TimetabledPassingTimesRelStructure(
-                 timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
+                timetabled_passing_time=TimetablePassingTimesProfile.getTimetabledPassingtimesFromCalls(sj, service_journey_pattern)
             )
 
         elif sj.journey_pattern_ref and sj.time_demand_type_ref:
-            service_journey_pattern: ServiceJourneyPattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
+            # generate PassingTimes from the ServiceJourneyPattern and the TimeDemandType
+            service_journey_pattern = db_read.load_object_by_reference(txn, sj.journey_pattern_ref)
             time_demand_type: TimeDemandType = db_read.load_object_by_reference(txn, sj.time_demand_type_ref)
             CallsProfile.getPassingTimesFromTimeDemandType(sj, service_journey_pattern, time_demand_type)
 
         else:
-            log_all(
-                logging.ERROR,
-                f"No matching timing transformation found for journey: {sj}",
-            )
+            # works for EPIP without TimeDemandType so, only warning and we set the service_journey_pattern to the sj ones
+            log_all(logging.ERROR, f"No matching timing transformation found for journey: {sj}")
 
         # If we already know that this generated SJP already exists, we should not even add it.
         if sj.journey_pattern_ref.ref in sjp_ids:
@@ -675,7 +676,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                 if isinstance(pis, StopPointInJourneyPattern)
             ]
 
-            # Ater the Routes to ServiceLinks!
+            # After the Routes to ServiceLinks!
             recover_line_ref(sj, service_journey_pattern, db_read, txn)
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
@@ -697,7 +698,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
         sj.time_demand_type_ref = None
         sj.key_list = None
         sj.private_code = None
-        sj.train_numbers = None # Leonard, this must be removed
+        sj.train_numbers = None  # Leonard, this must be removed
         sj.extensions = None
         sj.notice_assignments = None
         sj.calls = None
@@ -745,7 +746,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
 def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[EntityStructure, None, None]:
     log_all(logging.INFO, "Calendar creation...")
 
-    service_calendars: List[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
+    service_calendars: list[ServiceCalendar] = list(db_read.iter_only_objects(txn, ServiceCalendar))
     if False and len(service_calendars) > 0:
         # TODO: WORKAROUND
         log_once("problem with epip_service_calender")
@@ -983,7 +984,7 @@ def epip_service_calendar(db_read: MdbxStorage, txn: TXN, generator_defaults: di
 
 def epip_remove_keylist_extensions(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]):
     def process(deserialised: Tid, keys: list[str]) -> Any:
-        for obj, path in recursive_attributes(deserialised, []):
+        for obj, _path in recursive_attributes(deserialised, []):
             for key in keys:
                 if hasattr(obj, key):
                     obj.key = None
@@ -1006,19 +1007,25 @@ def epip_remove_keylist_extensions(db_read: MdbxStorage, txn: TXN, generator_def
         for obj in db_read.iter_only_objects(txn, ServiceJourney):
             yield process(obj, ['key_list', 'extensions'])
 
-    yield from query1(db_read)
-    yield from query2(db_read)
-    yield from query3(db_read)
-    yield from query4(db_read)
+    yield from query1(db_read, txn)
+    yield from query2(db_read, txn)
+    yield from query3(db_read, txn)
+    yield from query4(db_read, txn)
 
 
 def export_epip_network_offer(
     db_epip: MdbxStorage,
     txn: TXN,
     composite_frame_id: str = "EU_NETWORK_OFFER",
-    type_of_frame_ref: TypeOfFrameRef = TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0'),
-    default_locale: LocaleStructure = LocaleStructure(default_language="nl", time_zone="Europe/Amsterdam")
+    type_of_frame_ref: TypeOfFrameRef | None = None,
+    default_locale: LocaleStructure | None = None,
 ) -> PublicationDelivery:
+    if not type_of_frame_ref:
+        type_of_frame_ref = TypeOfFrameRef(ref='epip:EU_PI_NETWORK_OFFER', version_ref='1.0')
+
+    if not default_locale:
+        default_locale = LocaleStructure(default_language="nl", time_zone="Europe/Amsterdam")
+
     # Maybe generalize this for other profiles too
     default_codespace: Codespace | None = None
     # frame_defaults: VersionFrameDefaultsStructure
@@ -1259,21 +1266,27 @@ def export_epip_network_offer(
 def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
     print(sys._getframe().f_code.co_name)
 
-    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange, None, None]:
+    def query1(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyInterchange | InterchangeRule | JourneyMeeting, None, None]:
         # _load_generator = load_generator(db_read, InterchangeRule)
         # for interchange_rule in _load_generator:
         #     interchange_rule: InterchangeRule
         #     service_journey_interchange: ServiceJourneyInterchange = project(interchange_rule, ServiceJourneyInterchange)
         #     yield service_journey_interchange
 
-        journey_meeting: JourneyMeeting
-        for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
-            # TODO: I want the from_journey ref having the "correct" name_of_ref_class
-            service_journey_interchange: ServiceJourneyInterchange = project(
-                journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
-            )
-            yield service_journey_interchange
+        # journey_meeting: JourneyMeeting
+        # for journey_meeting in db_read.iter_only_objects(txn, JourneyMeeting):
+        #    #TODO MG: Suggest just returing JourneyMeetings
+        #    # TODO: I want the from_journey ref having the "correct" name_of_ref_class
+        #    service_journey_interchange: ServiceJourneyInterchange = project(
+        #        journey_meeting, ServiceJourneyInterchange, from_point_ref=journey_meeting.at_stop_point_ref, to_point_ref=journey_meeting.at_stop_point_ref
+        #    )
+        #    yield journey_meeting
 
+        # interchange_rule: InterchangeRule
+        # for interchange_rule in db_read.iter_only_objects(txn, InterchangeRule):
+        #     yield interchange_rule
+        # TODO interchange_rule and journey_meeting should be handled at some point.
+        yield from db_read.iter_only_objects(txn, ServiceJourneyInterchange)
         """
         _load_generator = load_generator(db_read, InterchangeRule)
         for interchange_rule in _load_generator:
@@ -1282,25 +1295,23 @@ def epip_service_journey_interchange(db_read: MdbxStorage, txn: TXN, generator_d
             if isinstance(interchange_rule.feeder_filter.service_journey_ref_or_journey_designator_or_service_designator, ServiceJourneyRef) and isinstance(interchange_rule.distributor_filter.service_journey_ref_or_journey_designator_or_service_designator, ServiceJourneyRef):
                 service_journey_interchange.from_journey_ref = interchange_rule.feeder_filter.service_journey_ref_or_journey_designator_or_service_designator
                 service_journey_interchange.to_journey_ref = interchange_rule.distributor_filter.service_journey_ref_or_journey_designator_or_service_designator
-
+        
                 # TODO: implement by computing the  interchange_rule.feeder_filter StopPlaceRef and AdjacentStopPlaceRef to match a ScheduledStopPoint of the ServiceJourney
                 # - service_journey_interchange.from_point_ref
                 # - service_journey_interchange.to_point_ref
                 # Fetch PassengerStopAssignment for all ScheduledStopPoints under StopPlace and AdjacentStopPlace, this gives possible ScheduledStopPoint
                 # Fetch ServiceJourneyPattern, cross validate previous set, and select single ScheduledStopPoint. Warn, if two are found.
-
+        
                 yield service_journey_interchange
-
+        
             else:
                 warnings.warn("Unhandled interchange rule, unspecific")
             # TODO: If for Feeder and Distributor no ServiceJourneyRef is specified, something should actually compute all relevant Interchanges once applied to ServiceJourneyInterchange.
-
         """
 
-    yield from query1(db_read, txn)
 
-def epip_service_journey_notices(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
-    print(sys._getframe().f_code.co_name)
+# def epip_service_journey_notices(db_read: MdbxStorage, txn: TXN, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyInterchange, None, None]:
+#   print(sys._getframe().f_code.co_name)
 
 
 """
