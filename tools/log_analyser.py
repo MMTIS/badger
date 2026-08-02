@@ -79,17 +79,26 @@ class RunSequence:
         self.name = name
         self.start_time = start_time
         self.start_time_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
-        self.steps: List[Tuple[str, float]] = []  # (script_name, execution_time)
+        # Store full step info: (step_number, full_message, execution_time, line_number)
+        self.steps: List[Tuple[str, str, float, int]] = []
+        self.terminated_with_error = False
+        self.error_script: Optional[str] = None
         self.current_script: Optional[str] = None
         self.current_step_start: Optional[datetime] = None
 
-    def add_step(self, script_name: str, execution_time: float):
-        """Add a step with its execution time."""
-        self.steps.append((script_name, execution_time))
+    def add_step(self, step_number: str, full_message: str, execution_time: float, line_number: int = 0):
+        """Add a step with its full message, execution time, and line number."""
+        self.steps.append((step_number, full_message, execution_time, line_number))
+
+    def mark_as_failed(self, script_name: str):
+        """Mark this sequence as terminated with an error."""
+        self.terminated_with_error = True
+        self.error_script = script_name
 
     def __repr__(self):
-        steps_str = ", ".join([f"{name} ({time}s)" for name, time in self.steps])
-        return f"RunSequence({self.name}, {self.start_time_str}, steps: [{steps_str}])"
+        steps_str = ", ".join([f"{name} ({time}s)" for _, name, time, _ in self.steps])
+        status = "FAILED" if self.terminated_with_error else "SUCCESS"
+        return f"RunSequence({self.name}, {self.start_time_str}, steps: [{steps_str}], status: {status})"
 
 
 class ErrorEntry:
@@ -146,7 +155,7 @@ def parse_log_file(file_path: str) -> List[LogEntry]:
     return entries
 
 
-def extract_run_sequences(entries: List[LogEntry]) -> Dict[str, RunSequence]:
+def extract_run_sequences(entries: List[LogEntry], file_path: str = "") -> Dict[str, RunSequence]:
     """
     Extract run sequences from log entries.
 
@@ -158,11 +167,31 @@ def extract_run_sequences(entries: List[LogEntry]) -> Dict[str, RunSequence]:
     sequences: Dict[str, RunSequence] = {}
     current_sequence: Optional[RunSequence] = None
 
+    # Read all lines from file for line number tracking
+    all_file_lines = []
+    if file_path and os.path.exists(file_path):
+        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+            all_file_lines = f.readlines()
+
+    # Track error terminations
+    error_terminations: Dict[str, str] = {}  # block_name -> script_name that caused error
+    
     for entry in entries:
-        if entry.level != 'INFO':
+        message = entry.message
+        
+        # Check for error termination messages
+        script_error_match = SCRIPT_ERROR_PATTERN.match(message)
+        if script_error_match:
+            script_name = script_error_match.group(1)
+            block_name = script_error_match.group(2)
+            error_terminations[block_name] = script_name
+            # Mark the sequence as failed if it exists
+            if block_name in sequences:
+                sequences[block_name].mark_as_failed(script_name)
             continue
 
-        message = entry.message
+        if entry.level != 'INFO':
+            continue
 
         # Check for step start pattern: "block - step: N: script_name args..."
         # Only match if the message starts with a block name (not "Execution time:")
@@ -173,9 +202,16 @@ def extract_run_sequences(entries: List[LogEntry]) -> Dict[str, RunSequence]:
             step_match = BLOCK_STEP_PATTERN.match(message)
             if step_match:
                 block_name, step_num, script_with_args = step_match.groups()
+                full_message = f"{block_name} - step: {step_num}: {script_with_args}"
 
-                # Extract just the script name (first word or module.path format)
-                script_name = script_with_args.split()[0] if script_with_args else "unknown"
+                # Find the actual line number in the file
+                line_number = entry.line_number
+                if line_number == 0 and file_path:
+                    # Try to find the line number by matching the message
+                    for idx, line in enumerate(all_file_lines, 1):
+                        if message in line:
+                            line_number = idx
+                            break
 
                 # If this is step 1, it's the start of a new sequence
                 if step_num == '1':
@@ -189,9 +225,9 @@ def extract_run_sequences(entries: List[LogEntry]) -> Dict[str, RunSequence]:
                     else:
                         current_sequence = sequences[block_name]
 
-                # Add step to current sequence (without execution time initially)
+                # Add step to current sequence with full message and line number
                 if current_sequence:
-                    current_sequence.add_step(script_name, 0.0)
+                    current_sequence.add_step(step_num, full_message, 0.0, line_number)
                 continue
 
         # Check for execution time pattern
@@ -219,17 +255,29 @@ def extract_run_sequences(entries: List[LogEntry]) -> Dict[str, RunSequence]:
                     step_num = ""
                     script_with_args = rest_after
 
-                script_name = script_with_args.split()[0] if script_with_args else "unknown"
+                full_message = f"{block_name} - step: {step_num}: {script_with_args}"
+
+                # Find line number
+                line_number = entry.line_number
+                if line_number == 0 and file_path:
+                    for idx, line in enumerate(all_file_lines, 1):
+                        if message in line:
+                            line_number = idx
+                            break
 
                 # Store execution time for this step
                 if block_name in sequences:
-                    # Update the last step with this execution time
-                    if sequences[block_name].steps:
-                        # Get the last step and update its time
-                        # But we need to match the step number
-                        # For now, just update the last step
-                        _last_step = sequences[block_name].steps[-1]
-                        sequences[block_name].steps[-1] = (script_name, time_seconds)
+                    # Find the matching step and update its execution time
+                    sequence = sequences[block_name]
+                    for i, (s_num, s_msg, s_time, s_line) in enumerate(sequence.steps):
+                        if s_num == step_num:
+                            sequence.steps[i] = (step_num, s_msg if s_msg else full_message, time_seconds, s_line)
+                            break
+
+    # Apply error terminations to sequences that were created after the error
+    for block_name, script_name in error_terminations.items():
+        if block_name in sequences and not sequences[block_name].terminated_with_error:
+            sequences[block_name].mark_as_failed(script_name)
 
     return sequences
 
@@ -390,7 +438,7 @@ def analyse_log_file(file_path: str, days_back: int) -> Tuple[Dict[str, RunSeque
     recent_entries = [e for e in entries if e.timestamp >= cutoff_date]
 
     # Extract sequences and errors from recent entries
-    sequences = extract_run_sequences(recent_entries)
+    sequences = extract_run_sequences(recent_entries, file_path)
     errors = extract_errors(recent_entries, file_path)
 
     return sequences, errors
@@ -416,19 +464,36 @@ def generate_markdown_report(sequences: List[RunSequence], errors: List[ErrorEnt
         # Sort sequences by start time
         sorted_sequences = sorted(sequences, key=lambda x: x.start_time)
         for sequence in sorted_sequences:
-            # Format: "2025-12-27 13:28:18,189, nl1epip: clan_tmp, download_input_file, conv.netex_to_db (8.3s), ..."
             start_time_str = sequence.start_time.strftime("%Y-%m-%d %H:%M:%S")
 
-            # Format steps
-            step_parts = []
-            for script_name, exec_time in sequence.steps:
-                if exec_time > 0:
-                    step_parts.append(f"{script_name} ({exec_time}s)")
+            # Format as code block for proper monospace rendering
+            md_lines.append(f"- **{start_time_str}** - {sequence.name}")
+            md_lines.append("")
+            md_lines.append("  ```")
+            
+            for i, (step_number, full_message, exec_time, line_number) in enumerate(sequence.steps):
+                time_str = f" ({exec_time}s)" if exec_time > 0 else ""
+                line_str = f" [line: {line_number}]" if line_number > 0 else ""
+                
+                # Use tree structure in code block
+                if i < len(sequence.steps) - 1:
+                    connector = "├── "
                 else:
-                    step_parts.append(script_name)
-
-            steps_str = ", ".join(step_parts)
-            md_lines.append(f"- {start_time_str}, {sequence.name}: {steps_str}")
+                    connector = "└── "
+                
+                md_lines.append(f"  {connector}{full_message}{time_str}{line_str}")
+            
+            # Add success/failure status
+            if sequence.terminated_with_error:
+                if sequence.error_script:
+                    md_lines.append(f"      ╰──> **FAILED** (script: {sequence.error_script})")
+                else:
+                    md_lines.append("      ╰──> **FAILED**")
+            else:
+                md_lines.append("      ╰──> **success**")
+            
+            md_lines.append("  ```")
+            md_lines.append("")
 
         md_lines.append("")
     else:

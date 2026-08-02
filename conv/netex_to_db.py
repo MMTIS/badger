@@ -48,6 +48,9 @@ def main(filenames: list[str], database: str, clean_database: bool = True) -> No
             else:
                 paths.append(path)
 
+    if len(paths) == 0:
+        exit(1)
+
     netex_to_db(paths, Path(database), clean_database)
 
 

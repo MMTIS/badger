@@ -51,3 +51,12 @@ class MdbxStorageTestCase(unittest.TestCase):
         route = Route(id="r1", version="1", line_ref=LineRef(ref="l1", version="1"))
         sjp = ServiceJourneyPattern(id="sjp1", version="1", route_ref_or_route_view=RouteRef(ref="r1", version="1"))
         return line, route, sjp
+
+
+class MdbxStorageMPTestCase(unittest.TestCase):
+    """Base class providing a writable, empty MdbxStorage in a per-test temporary directory."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.target = Path(tmp.name) / "test-mp.mdbx"

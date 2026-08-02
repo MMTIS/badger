@@ -34,8 +34,9 @@ def swiss_to_db_mp(source: Path, target: Path, clean_database: bool = True) -> N
     xml_storage = XmlStorage(source)
     all_names = xml_storage.list_netex_files()
 
-    with MdbxStorageMP(target, readonly=False) as storage:
-        with ProcessPoolExecutor(max_workers=n_proc, mp_context=storage.ctx) as executor:
+    fork_ctx = mp.get_context("fork")
+    with ProcessPoolExecutor(max_workers=n_proc, mp_context=fork_ctx) as executor:
+        with MdbxStorageMP(target, readonly=False) as storage:
             futures = []
             for sub_filename in all_names:
                 if "_RESOURCE_" in sub_filename or '_SITE_' in sub_filename or '_SERVICECALENDAR_' in sub_filename:
