@@ -8,6 +8,7 @@ domain/netex/model/**
 **/*.mdbx/
 *.pyc
 *.txt
+**/.DS_Store
 
 *.jar
 local_configuration.py
