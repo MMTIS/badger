@@ -55,8 +55,9 @@ from domain.netex.model import (
     DataManagedObjectStructure,
     VersionOfObjectRefStructure,
     LevelRef,
-    Level, AllPublicTransportModesEnumeration,
     FlexibleLineView,
+    Level,
+    AllPublicTransportModesEnumeration,
 )
 
 import operator as operator_f
@@ -71,6 +72,12 @@ def advanced_round(coord:float, length:int) -> str | float:
     if coord is None:
         return ''
     return round(coord, 7)
+
+def advanced_round(coord: float, length: int) -> str | float:
+    if coord is None:
+        return ''
+    return round(coord, 7)
+
 
 class GtfsProfile:
     empty_stop_time = {
@@ -135,27 +142,29 @@ class GtfsProfile:
 
     @staticmethod
     def getOptionalMultilingualString(multilingual_string: MultilingualString | List[MultilingualString] | None) -> str | None:
-        mstring  : MultilingualString =None
+        mstring: MultilingualString | None = None
+
         if isinstance(multilingual_string, List):
             if len(multilingual_string) > 0:
                 mstring = multilingual_string[0]
-            else:
                 mstring = None
-        else:
-            mstring=multilingual_string
-        if mstring is not None:
-            if isinstance(mstring.content, List):
-                if len(mstring.content)== 0:
-                    log_once(logging.ERROR,"gtfsprofile",  f'Got empty multilingualstring: {mstring}')
-                    return None
-                if isinstance(mstring.content[0], str):
-                    return mstring.content[0]  # needed for 5t_ciri
-                if isinstance(mstring.content[0], TextType):
-                    return mstring.content[0].value # needed for fr_mobigo_jura
-                else:
-                    #very strange if we end here
-                    log_once(logging.ERROR,"gtfsprofile", f'Problem with multilingual string: {mstring}')
-            return mstring.content
+            else:
+                mstring = multilingual_string
+
+            if mstring is not None:
+                if isinstance(mstring.content, List):
+                    if len(mstring.content) == 0:
+                        log_once(logging.ERROR, "gtfsprofile", f'Got empty multilingualstring: {mstring}')
+                        return None
+                    if isinstance(mstring.content[0], str):
+                        return mstring.content[0]  # needed for 5t_ciri
+                    if isinstance(mstring.content[0], TextType):
+                        return mstring.content[0].value  # needed for fr_mobigo_jura
+                    else:
+                        # very strange if we end here
+                        log_once(logging.ERROR, "gtfsprofile", f'Problem with multilingual string: {mstring}')
+                return mstring.content
+
         return None
 
     @staticmethod
@@ -674,8 +683,11 @@ class GtfsProfile:
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None:
             if isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, LineRefStructure):
                 return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view
-            elif isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineView) and isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref, LineRefStructure) :
+            elif isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineView) and isinstance(
+                service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref, LineRefStructure
+            ):
                 return service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view.line_ref
+
         elif service_journey_pattern is not None:
             if service_journey.journey_pattern_ref.ref == service_journey_pattern.id:
                 if isinstance(service_journey_pattern.route_ref_or_route_view, RouteView):
@@ -1041,8 +1053,8 @@ class GtfsProfile:
             yield shape_point
 
     @staticmethod
-    def projectLevelToLevel(level: Level) -> Generator[dict[str, Any], None, None]:
-        level = {
+    def projectLevelToLevel(level: Level) -> dict[str, Any]:
+        level: dict[str, Any] = {
             'level_id': GtfsProfile.getOriginalGtfsId(level, 'level_id'),
             'level_index': level.relative_level_order or 0,
             'name': GtfsProfile.getOptionalMultilingualString(level.name),

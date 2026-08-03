@@ -42,4 +42,5 @@ class StorageController(QObject):
                 yield StorageObject(clazz, key, self)
 
     def db_names(self) -> dict[bytes, type]:
-        return self._storage.db_names()
+        with self._storage.env.ro_transaction() as txn:
+            return self._storage.db_names(txn)

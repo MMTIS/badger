@@ -15,7 +15,7 @@ def infer_directions_from_sjps_and_apply(
     directions: Dict[str, Direction] = {}
     direction_refs: Dict[str, DirectionRef | None] = {}
 
-    def process(sjp: ServiceJourneyPattern, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyPattern | Direction, None, None] :
+    def process(sjp: ServiceJourneyPattern, generator_defaults: dict[str, Any]) -> Generator[ServiceJourneyPattern | Direction, None, None]:
         # TODO In 2.1 and perhaps for the new European profile Direction may be no longer wanted. IVU however, needs it currently.
         if sjp.direction_type is not None and sjp.direction_ref_or_direction_view is None:
             key = str(sjp.direction_type.value)

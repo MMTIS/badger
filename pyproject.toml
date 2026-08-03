@@ -1,7 +1,3 @@
-[build-system]
-requires = ["setuptools>=70", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
 name = "badger"
 version = "0.1.0"
@@ -35,6 +31,9 @@ dependencies = [
 ]
 requires-python = ">=3.12"
 
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
 
 [project.scripts]
 badger-script-runner = "tools.script_runner:cli"
@@ -44,6 +43,7 @@ badger-gui = "gui.main:main"
 # Only package the specified packages
 [tool.setuptools.packages.find]
 include = ["conv*", "tools*", "utils*"]
+
 [dependency-groups]
 dev = [
     "ty",

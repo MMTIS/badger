@@ -8,10 +8,10 @@ from domain.netex.services.model_typing import Tid
 from domain.netex.model import EntityStructure, EntityInVersionStructure, NameOfClass
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
 from domain.utils import get_object_name
-from storage.interface import Serializer
+from storage.keycodec.relation import RelationKeyCodec
 
-from storage.mdbx.core.implementation import (
-    MdbxStorage,
+from storage.mdbx.core.implementation import MdbxStorage
+from storage.mdbx.core.const import (
     DB_UNRESOLVED,
     DB_REFERENCE_OUTWARD,
     DB_ID_IDX,
@@ -87,6 +87,8 @@ def resolve(storage: MdbxStorage) -> None:
             references_to_fix: list[tuple[bytes, bytes | None, bool, bool]] = []
 
             for idx, value in it:
+                assert idx is not None
+                assert value is not None
                 seen_count += 1
                 if seen_count % 1_000_000 == 0:
                     log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
@@ -152,12 +154,12 @@ def resolve(storage: MdbxStorage) -> None:
 
             # In this situation the original reference was incomplete
             if len(references_to_fix) > 0:
-                referencing_clazz_idx, referencing_idx = Serializer.full_key_to_clazz_idx(idx)
+                referencing_clazz_idx, referencing_idx = RelationKeyCodec.full_key_to_clazz_idx(idx)
                 referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
                 referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
 
                 for resolved_idx, value, version_change, class_change in references_to_fix:
-                    referenced_clazz_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
+                    referenced_clazz_idx, referenced_key = RelationKeyCodec.full_key_to_clazz_idx(resolved_idx)
 
                     for reference in only_reference_objects(referencing_obj):
                         if isinstance(reference.name_of_ref_class, str):
@@ -223,6 +225,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for full_key, value in unresolved_cursor.iter():
+            assert full_key is not None
+            assert value is not None
             parts = storage.serializer.split_key(value)
             unresolved_pairs.setdefault(value, set()).add(full_key)
             missing_classes.add(storage.idx_clazz[parts[-1]])
@@ -236,6 +240,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
             db = txn.open_map(this_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             with txn.cursor(db) as cur:
                 for idx, value in cur.iter():
+                    assert idx is not None
+                    assert value is not None
                     full_key = idx + this_clazz_idx.ljust(4, b'\x00')
                     obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
 
@@ -249,6 +255,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
             references_to_fix: list[tuple[bytes, bytes, bool, bool]] = []
 
             for idx, value in it:
+                assert idx is not None
+                assert value is not None
                 prefix: bytes
                 resolved_idx = db_id_idx.get(txn, value)  # This will be the id + version + class check
                 class_change = False
@@ -263,6 +271,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                     parts.pop()
                     prefix = separator.join(parts) + separator
                     for check_key, check_idx in cursor.iter(prefix):
+                        assert check_key is not None
+                        assert check_idx is not None
                         if check_key.startswith(prefix):
                             class_change = check_idx
                             resolved_idx = check_idx
@@ -276,6 +286,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
                         prefix = separator.join(parts) + separator
                         for check_key, check_idx in cursor.iter(prefix):
+                            assert check_key is not None
+                            assert check_idx is not None
                             if check_key.startswith(prefix) and check_key.endswith(class_part):
                                 class_change = False
                                 version_change = check_idx
@@ -308,12 +320,12 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
             # In this situation the original reference was incomplete
             if len(references_to_fix) > 0:
-                referencing_clazz_idx, referencing_idx = Serializer.full_key_to_clazz_idx(idx)
+                referencing_clazz_idx, referencing_idx = RelationKeyCodec.full_key_to_clazz_idx(idx)
                 referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
                 referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
 
                 for resolved_idx, value, version_change, class_change in references_to_fix:
-                    referenced_clazz_idx, referenced_key = Serializer.full_key_to_clazz_idx(resolved_idx)
+                    referenced_clazz_idx, referenced_key = RelationKeyCodec.full_key_to_clazz_idx(resolved_idx)
 
                     for reference in only_reference_objects(referencing_obj):
                         if isinstance(reference.name_of_ref_class, str):

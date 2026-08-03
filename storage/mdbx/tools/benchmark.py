@@ -11,13 +11,13 @@ import time
 
 
 def benchmark_mdbx(storage: MdbxStorage) -> None:
-    db_names = storage.db_names()
     results = []
     results_metadata = []
     total_entries = 0
     total_elapsed = 0.0
 
     with storage.env.ro_transaction() as txn:
+        db_names = storage.db_names(txn)
         for db_name, clazz in db_names.items():
             db = txn.open_map(db_name, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
             entries = db.get_stat(txn).ms_entries
@@ -33,6 +33,7 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
                 ) as pbar,
             ):
                 for _key, value in cursor.iter():
+                    assert value is not None
                     _obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
                     pbar.update(1)
 
@@ -58,6 +59,7 @@ def benchmark_mdbx(storage: MdbxStorage) -> None:
                 ) as pbar,
             ):
                 for _key, value in cursor:
+                    assert value is not None
                     _value = int.from_bytes(value, 'little')
                     pbar.update(1)
 

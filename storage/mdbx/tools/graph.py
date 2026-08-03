@@ -1,16 +1,16 @@
 import logging
-from storage.interface import Serializer
 
 from mdbx.mdbx import TXN
 
 from utils.aux_logging import log_all
-from storage.mdbx.core.implementation import (
-    MdbxStorage,
+from storage.mdbx.core.implementation import MdbxStorage
+from storage.mdbx.core.const import (
     DB_ID_IDX,
     DB_REFERENCE_OUTWARD,
     DB_ID_IDX_FLAGS,
     DB_REFERENCE_OUTWARD_FLAGS,
 )
+from storage.keycodec.relation import RelationKeyCodec
 
 from domain.netex.model import EntityStructure
 from collections import defaultdict
@@ -33,6 +33,8 @@ def build_graph(txn: TXN) -> dict[bytes, set[bytes]]:
     db_refs = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
     cursor_r = txn.cursor(db_refs)
     for referencing_key, reference_key in cursor_r:
+        assert referencing_key is not None
+        assert reference_key is not None
         # zorg dat refererende knoop in graph staat (soms kan referencing_key niet in DB_ID_IDX voorkomen)
         if referencing_key not in graph:
             graph.setdefault(referencing_key, set())
@@ -118,7 +120,7 @@ def sort_scc_by_internal_indegree(members: Iterable[bytes], graph: dict[bytes, s
             if v in members_set:
                 indeg[v] += 1
     # eerst hoge interne indegree (veel anderen verwijzen naar deze), dan type, dan key
-    return sorted(members_set, key=lambda n: (-indeg[n], Serializer.full_key_to_clazz(n), n))
+    return sorted(members_set, key=lambda n: (-indeg[n], RelationKeyCodec.full_key_to_clazz(n), n))
 
 
 def greedy_minimize_forward_within_scc(members: Iterable[bytes], graph: dict[bytes, set[bytes]], max_size: int = 500) -> list[bytes]:
@@ -135,7 +137,7 @@ def greedy_minimize_forward_within_scc(members: Iterable[bytes], graph: dict[byt
         best_key = None
         for n in remaining:
             score = len(out_inside[n])  # minder is beter
-            cls_idx = Serializer.full_key_to_clazz(n)
+            cls_idx = RelationKeyCodec.full_key_to_clazz(n)
             key = (score, cls_idx, n)
             if best is None or best_key is None or key < best_key:
                 best = n
@@ -174,12 +176,12 @@ def order_graph(graph: dict[bytes, set[bytes]], scc_lookahead_threshold: int = 5
     scc_meta = {}
     for i, members in enumerate(sccs):
         # compute min clazz_idx as representative priority
-        clazz_idxs = [Serializer.full_key_to_clazz(n) for n in members]
+        clazz_idxs = [RelationKeyCodec.full_key_to_clazz(n) for n in members]
         min_class = min(clazz_idxs) if clazz_idxs else 0
         size = len(members)
         if size == 1:
             # singleton: deterministic single-member list (still sort by clazz_idx,key for stability)
-            ordered_members = sorted(members, key=lambda n: (Serializer.full_key_to_clazz(n), n))
+            ordered_members = sorted(members, key=lambda n: (RelationKeyCodec.full_key_to_clazz(n), n))
         else:
             if size <= scc_lookahead_threshold:
                 ordered_members = greedy_minimize_forward_within_scc(members, graph, max_size=scc_lookahead_threshold)

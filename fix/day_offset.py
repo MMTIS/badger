@@ -9,8 +9,8 @@ from utils.aux_logging import prepare_logger, log_all
 # TODO: there could be a situation where 'sometimes' the offset is set, we would not be able to handle that variant
 
 
-def fix_calls(service_journey: ServiceJourney):
-    changed = False
+def fix_calls(service_journey: ServiceJourney) -> bool:
+    changed: bool = False
     if service_journey.calls is None:
         return changed
 
@@ -69,8 +69,8 @@ def fix_calls(service_journey: ServiceJourney):
     return changed
 
 
-def fix_passing_times(service_journey: ServiceJourney):
-    changed = False
+def fix_passing_times(service_journey: ServiceJourney) -> bool:
+    changed: bool = False
     if service_journey.passing_times is None:
         return changed
 
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
     try:
-        main(Path(args.source))
+        main(args.source)
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e
