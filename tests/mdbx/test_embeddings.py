@@ -73,26 +73,57 @@ class TestEmbeddings(MdbxStorageTestCase):
                         id="spijp1",
                         version="1",
                         notice_assignments=NoticeAssignmentsRelStructure(
-                            sales_notice_assignment_or_notice_assignment_or_notice_assignment_view=NoticeAssignment(
-                                id="na1", version="1", notice_ref_or_group_of_notices_ref_or_notice=Notice(id="n1", version="1")
-                            )
+                            sales_notice_assignment_or_notice_assignment_or_notice_assignment_view=[
+                                NoticeAssignment(id="na1", version="1", notice_ref_or_group_of_notices_ref_or_notice=Notice(id="n1", version="1"))
+                            ]
                         ),
                     ),
                     StopPointInJourneyPattern(
                         id="spijp2",
                         version="1",
                         notice_assignments=NoticeAssignmentsRelStructure(
-                            sales_notice_assignment_or_notice_assignment_or_notice_assignment_view=NoticeAssignment(
-                                id="na1", version="1", notice_ref_or_group_of_notices_ref_or_notice=NoticeRef(ref="n1", version="1")
-                            )
+                            sales_notice_assignment_or_notice_assignment_or_notice_assignment_view=[
+                                NoticeAssignment(id="na2", version="1", notice_ref_or_group_of_notices_ref_or_notice=NoticeRef(ref="n1", version="1"))
+                            ]
+                        ),
+                    ),
+                    StopPointInJourneyPattern(
+                        id="spijp3",
+                        version="1",
+                        notice_assignments=NoticeAssignmentsRelStructure(
+                            sales_notice_assignment_or_notice_assignment_or_notice_assignment_view=[
+                                NoticeAssignment(id="na3", version="1", notice_ref_or_group_of_notices_ref_or_notice=NoticeRef(ref="n2", version="1"))
+                            ]
                         ),
                     ),
                 ]
             ),
         )
 
+        sjp2 = ServiceJourneyPattern(
+            id="sjp2",
+            version="1",
+            points_in_sequence=PointsInJourneyPatternRelStructure(
+                point_in_journey_pattern_or_stop_point_in_journey_pattern_or_timing_point_in_journey_pattern=[
+                    StopPointInJourneyPattern(
+                        id="spijp4",
+                        version="1",
+                        notice_assignments=NoticeAssignmentsRelStructure(
+                            sales_notice_assignment_or_notice_assignment_or_notice_assignment_view=[
+                                NoticeAssignment(id="na3", version="1", notice_ref_or_group_of_notices_ref_or_notice=Notice(id="n2", version="1"))
+                            ]
+                        ),
+                    ),
+                    StopPointInJourneyPattern(
+                        id="spijp5",
+                        version="1",
+                    ),
+                ]
+            ),
+        )
+
         with self.storage.env.rw_transaction() as txn_write:
-            self.storage.insert_any_object_on_queue(txn_write, [sjp1])
+            self.storage.insert_any_object_on_queue(txn_write, [sjp1, sjp2])
             txn_write.commit()
 
         with self.storage.env.ro_transaction() as txn_read:
