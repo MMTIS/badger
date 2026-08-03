@@ -9,8 +9,8 @@ from utils.aux_logging import prepare_logger, log_all
 # TODO: there could be a situation where 'sometimes' the offset is set, we would not be able to handle that variant
 
 
-def fix_calls(service_journey: ServiceJourney):
-    changed = False
+def fix_calls(service_journey: ServiceJourney) -> bool:
+    changed: bool = False
     if service_journey.calls is None:
         return changed
 
@@ -69,8 +69,8 @@ def fix_calls(service_journey: ServiceJourney):
     return changed
 
 
-def fix_passing_times(service_journey: ServiceJourney):
-    changed = False
+def fix_passing_times(service_journey: ServiceJourney) -> bool:
+    changed: bool = False
     if service_journey.passing_times is None:
         return changed
 
@@ -166,7 +166,7 @@ def main(source_database_file: str) -> None:
                     changed |= fix_passing_times(service_journey)
 
                     if changed:
-                        yield changed
+                        yield service_journey
 
             source_db.insert_any_object_on_queue(txn_write, all_sj())
             txn_write.commit()
@@ -176,13 +176,13 @@ if __name__ == "__main__":
     import argparse
     import traceback
 
-    parser = argparse.ArgumentParser(description="Check an MDBX for missing references")
+    parser = argparse.ArgumentParser(description="Check an MDBX for not correctly set DayOffsets. It will transform 25:00 to 01:00 with DayOffset=1.")
     parser.add_argument("source", type=str, help="mdbx file to use as input.")
     parser.add_argument("--log_file", type=str, required=False, help="the logfile")
     args = parser.parse_args()
     mylogger = prepare_logger(logging.INFO, args.log_file)
     try:
-        main(Path(args.source))
+        main(args.source)
     except Exception as e:
         log_all(logging.ERROR, f"{e} {traceback.format_exc()}")
         raise e
