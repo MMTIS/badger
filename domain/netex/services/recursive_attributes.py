@@ -122,7 +122,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     already_done: set[tuple[type[EntityStructure], str, str | None]] = set()
     # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
 
-    ids: dict[tuple[str, str], str] = dict()
+    ids: dict[tuple[str, str], bytes] = dict()
     refs: list[Any] = []
 
     for obj, _path in recursive_attributes(deserialized, [], embeddings=True):
@@ -145,6 +145,11 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
         #        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
         #    elif obj.__class__.__name__.endswith("Ref"):
         #        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+
+        this_clazz_idx = ids.get((obj.ref, obj.version), None)
+        if this_clazz_idx:
+            # This is be a shortcut, it is possible that there are more objects with same id-pairs
+            continue
 
         ref_class = None
         if hasattr(obj.name_of_ref_class, 'value'):
@@ -187,10 +192,6 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 obj.ref,
                 getattr(obj, "version", getattr(obj, "versionRef", "any")),
             )
-
-            if (obj.ref, obj.version) in ids:
-                # This is a shortcut, because theoretically there can be a different class for this pairs
-                continue
 
             if result not in already_done:
                 already_done.add(result)
