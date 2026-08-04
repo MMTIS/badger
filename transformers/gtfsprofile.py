@@ -141,23 +141,24 @@ class GtfsProfile:
         if isinstance(multilingual_string, List):
             if len(multilingual_string) > 0:
                 mstring = multilingual_string[0]
-                mstring = None
             else:
-                mstring = multilingual_string
+                mstring = None
+        else:
+            mstring = multilingual_string
 
-            if mstring is not None:
-                if isinstance(mstring.content, List):
-                    if len(mstring.content) == 0:
-                        log_once(logging.ERROR, "gtfsprofile", f'Got empty multilingualstring: {mstring}')
-                        return None
-                    if isinstance(mstring.content[0], str):
-                        return mstring.content[0]  # needed for 5t_ciri
-                    if isinstance(mstring.content[0], TextType):
-                        return mstring.content[0].value  # needed for fr_mobigo_jura
-                    else:
-                        # very strange if we end here
-                        log_once(logging.ERROR, "gtfsprofile", f'Problem with multilingual string: {mstring}')
-                return mstring.content
+        if mstring is not None:
+            if isinstance(mstring.content, list):
+                if len(mstring.content) == 0:
+                    log_once(logging.ERROR, "gtfsprofile", f'Got empty multilingualstring: {mstring}')
+                    return None
+                if isinstance(mstring.content[0], str):
+                    return mstring.content[0]  # needed for 5t_ciri
+                if isinstance(mstring.content[0], TextType):
+                    return mstring.content[0].value  # needed for fr_mobigo_jura
+                else:
+                    # very strange if we end here
+                    log_once(logging.ERROR, "gtfsprofile", f'Problem with multilingual string: {mstring}')
+            return mstring.content
 
         return None
 
