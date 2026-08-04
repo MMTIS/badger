@@ -59,7 +59,17 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                             f_out.writelines(g)
                 else:
                     zip_file.extract(filename)
-                    os.rename(filename, '_tmp')
+                    try:
+                        # Remove destination if it exists
+                        Path('_tmp').unlink(missing_ok=True)
+                        os.rename(filename, '_tmp')
+                    except OSError as e:
+                        # Alternative approach if rename fails
+                        with open('_tmp', 'wb') as tmp_file:
+                            with open(filename, 'rb') as src_file:
+                                tmp_file.write(src_file.read())
+                        os.remove(filename)
+
             else:
                 with zip_file.open(filename, mode='r') as f:
                     g = io.TextIOWrapper(f, 'utf-8')
@@ -67,7 +77,16 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                     header = next(reader)
 
                 zip_file.extract(filename)
-                os.rename(filename, '_tmp')
+                try:
+                    # Remove destination if it exists
+                    Path('_tmp').unlink(missing_ok=True)
+                    os.rename(filename, '_tmp')
+                except OSError as e:
+                    # Alternative approach if rename fails
+                    with open('_tmp', 'wb') as tmp_file:
+                        with open(filename, 'rb') as src_file:
+                            tmp_file.write(src_file.read())
+                    os.remove(filename)
 
             filename = '_tmp'
 

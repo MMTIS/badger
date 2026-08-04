@@ -7,12 +7,19 @@ import os
 
 
 def gtfs_import_to_db(source: Path, target: Path) -> None:
-    # Workaround for https://github.com/duckdb/duckdb/issues/8261
+    # Remove target file if it exists (workaround for DuckDB issue)
     try:
-        os.remove(target.resolve())
-    except OSError:
-        pass
+        target.resolve().unlink(missing_ok=True)
+    except OSError as e:
+        print(f"Warning: Could not remove target file {target}: {e}")
 
+    # Ensure temporary files are cleaned up before operation
+    temp_files = ['_tmp', '_tmp2']  # Add any other temp files you use
+    for temp_file in temp_files:
+        try:
+            Path(temp_file).unlink(missing_ok=True)
+        except OSError:
+            pass
     load_gtfs_to_duckdb(source, target)
 
 
