@@ -12,7 +12,9 @@ from domain.netex.model import (
     VersionOfObjectRefStructure,
     EntityStructure,
     DataManagedObject,
+    EntityInVersionStructure,
 )
+from domain.utils import get_object_name
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.utils import get_boring_classes
 from storage.interface import Serializer
@@ -122,13 +124,13 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     already_done: set[tuple[type[EntityStructure], str, str | None]] = set()
     # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
 
-    ids: dict[tuple[str, str], bytes] = dict()
+    ids: dict[tuple[str, str], type[EntityInVersionStructure]] = dict()
     refs: list[Any] = []
 
     for obj, _path in recursive_attributes(deserialized, [], embeddings=True):
-        if hasattr(obj, "id") and hasattr(obj, "version"):
-            if obj.id is not None and obj.version is not None and obj.__class__ in serializer.clazz_idx:
-                ids[(obj.id, obj.version)] = serializer.clazz_idx[obj.__class__]
+        if isinstance(obj, EntityInVersionStructure):
+            if obj.id is not None and obj.version is not None:
+                ids[(obj.id, obj.version)] = obj.__class__
 
         elif hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
@@ -146,16 +148,23 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
         #    elif obj.__class__.__name__.endswith("Ref"):
         #        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
 
-        this_clazz_idx = ids.get((obj.ref, obj.version), None)
-        if this_clazz_idx:
+        clazz = ids.get((obj.ref, obj.version), None)
+        if clazz:
             # This is be a shortcut, it is possible that there are more objects with same id-pairs
+            f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
+            if f.default is not MISSING and f.default is not None:
+                try:
+                    obj.name_of_ref_class = type(f.default)(get_object_name(clazz))
+                except:
+                    obj.name_of_ref_class = f.default
+                    pass
             continue
 
         ref_class = None
         if hasattr(obj.name_of_ref_class, 'value'):
             if obj.name_of_ref_class.value not in serializer.name_object.keys():
                 # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
-                # obj.name_of_ref_class = obj.__class__(ref=None).name_of_ref_class
+                # o_bj.name_of_ref_class = obj.__class__(ref=None).name_of_ref_class
                 # TODO: Maybe precompute this?
                 f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
                 if f.default is not MISSING and f.default is not None:
