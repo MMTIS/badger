@@ -8,6 +8,21 @@ from types import NoneType
 
 from domain.netex.model import GeneralFrameMembersRelStructure
 
+# Likely to refactor
+def classes_and_subclasses(classes: Iterable[type[EntityStructure]]) -> set[type[EntityStructure]]:
+    result: set[type] = set()
+
+    def walk(cls: type) -> None:
+        if cls in result:
+            return
+        result.add(cls)
+        for sub in cls.__subclasses__():
+            walk(sub)
+
+    for cls in classes:
+        walk(cls.__mro__[1])
+
+    return result
 
 def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type[Any]] | None = None, scope_classes: set[Type[Any]] | None = None) -> Dict[Type[Any], Set[Type[Any]]]:
     """
@@ -29,10 +44,11 @@ def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type
         contained = _collect_contained_types(clazz, ignore_classes)
 
         # Filter de contained types op scope_classes
-        contained_in_scope = {c for c in contained if c in scope_classes}
+        all_scope_classes = classes_and_subclasses(scope_classes)
+        contained_in_scope = {c for c in contained if c in all_scope_classes}
 
         for candidate in contained_in_scope:
-            if candidate in scope_classes:
+            if candidate in all_scope_classes:
                 index.setdefault(candidate, set()).add(clazz)
 
     # Verwijder eventueel None uit values

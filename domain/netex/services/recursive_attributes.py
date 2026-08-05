@@ -1,7 +1,8 @@
 from functools import lru_cache
 from typing import Any, Hashable, Optional
 from collections.abc import Collection, Generator
-
+import re
+from domain.utils import get_object_name
 from domain.netex import model as netex
 from domain.netex.model import (
     LocationStructure2,
@@ -12,6 +13,8 @@ from domain.netex.model import (
     VersionOfObjectRefStructure,
     EntityStructure,
     DataManagedObject,
+    NameOfClass,
+    EntityInVersion,
 )
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.utils import get_boring_classes
@@ -52,6 +55,7 @@ netex.set_all = frozenset(  # type: ignore
 
 GEO_CLASSES = {LocationStructure2, SimplePointVersionStructure, LineString, Polygon, MultiSurface}
 
+REF_SUFFIX = re.compile(r"(?:RefStructure|Ref)$")
 
 def get_all_geo_elements() -> Generator[Any, None, None]:
     for clazz_parent in get_boring_classes():
@@ -148,8 +152,8 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                         ref_class = serializer.name_object[obj.name_of_ref_class.value]
                     else:
                         # TODO: We should handle the case were we really have no clue, no default, not set
-                        obj.name_of_ref_class = 'DataManagedObject'
-                        ref_class = DataManagedObject
+                        obj.name_of_ref_class = NameOfClass.ENTITY_IN_VERSION
+                        ref_class = EntityInVersion
                 else:
                     ref_class = serializer.name_object[obj.name_of_ref_class.value]
 
@@ -165,8 +169,18 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
 
                     else:
                         # TODO: We should handle the case were we really have no clue, no default, not set
-                        obj.name_of_ref_class = 'DataManagedObject'
-                        ref_class = DataManagedObject
+                        # Ideally we want to have the default set: https://github.com/tefra/xsdata/issues/1184
+                        if obj.__class__.__name__.endswith('RefStructure'):
+                            import domain.netex.model
+                            name_of_class = getattr(domain.netex.model, f"NameOfClass{obj.__class__.__name__}Type")
+                            parent_class = serializer.name_object.get(next(iter(name_of_class)).value).__mro__[2]
+                            hack = parent_class.__name__.replace('VersionStructure', '')
+                            obj.name_of_ref_class = NameOfClass(hack)
+                            ref_class = getattr(domain.netex.model, hack)
+
+                        else:
+                            obj.name_of_ref_class = NameOfClass.ENTITY_IN_VERSION
+                            ref_class = EntityInVersion
 
                 else:
                     ref_class = serializer.name_object[obj.name_of_ref_class]
@@ -194,7 +208,7 @@ def only_reference_objects(deserialized: EntityStructure) -> Generator[VersionOf
             # continue
 
             if obj.name_of_ref_class is None:
-                obj.name_of_ref_class = 'DataManagedObject'
+                obj.name_of_ref_class = NameOfClass.ENTITY_IN_VERSION
                 # Hack, because NeTEx does not define the default name of ref class yet
                 # if obj.__class__.__name__.endswith("RefStructure"):
                 #     obj.name_of_ref_class = obj.__class__.__name__[0:-12]

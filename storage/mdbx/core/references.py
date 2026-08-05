@@ -332,12 +332,12 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
                             # TODO: I think we want to write to the console that a NameOfRefClass has been specified that does not match the natural scope of the Reference.
                             # print(reference.name_of_ref_class, reference)
                             if reference.name_of_ref_class not in storage.serializer.name_object:
-                                reference.name_of_ref_class = NameOfClass.DATA_MANAGED_OBJECT
+                                reference.name_of_ref_class = NameOfClass.ENTTY_IN_VERSION
                             name_of_ref_class = reference.name_of_ref_class
 
                         elif not reference.name_of_ref_class or (reference.name_of_ref_class.value not in storage.serializer.name_object):
                             # TODO: Add a warning.
-                            reference.name_of_ref_class = NameOfClass.DATA_MANAGED_OBJECT
+                            reference.name_of_ref_class = NameOfClass.ENTTY_IN_VERSION
 
                         else:
                             name_of_ref_class = reference.name_of_ref_class.value

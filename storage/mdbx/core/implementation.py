@@ -263,6 +263,7 @@ class MdbxStorage:
 
             for referenced_clazz, ref, version in only_references(obj, self.serializer):
                 unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
+                # TODO: je wilt hier niet de referenced class doorgeven als we die niet kennen, maar de "ReferentieClass" zodat we hopelijk later objecten kunnen ophalen
                 resolved_idx = db_id_idx.get(txn, unresolved_value)
                 if resolved_idx:
                     db_reference_outward.put(txn, full_key, resolved_idx)

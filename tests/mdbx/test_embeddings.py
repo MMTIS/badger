@@ -9,6 +9,13 @@ from domain.netex.model import (
     NoticeAssignment,
     Notice,
     NoticeRef,
+    ResponsibilitySet,
+    ResponsibilityRoleAssignment,
+    ResponsibilityRoleAssignmentsRelStructure,
+    Authority,
+    OrganisationRefStructure,
+    MultilingualString,
+    TextType,
 )
 
 from storage.mdbx.core.references import resolve_embeddings_iterable, resolve_embeddings_index
@@ -19,6 +26,28 @@ from tests.base import MdbxStorageTestCase
 
 
 class TestEmbeddings(MdbxStorageTestCase):
+    def test_ambigious_embedding(self) -> None:
+        # https://github.com/MMTIS/badger/issues/169
+        rs = ResponsibilitySet(id="IT:ITH1:Authority:apb:", version="any",
+                               roles=ResponsibilityRoleAssignmentsRelStructure(responsibility_role_assignment=[
+                                   ResponsibilityRoleAssignment(id="IT:ITH1:Authority:apb:", version="any",
+                                                                responsible_organisation_ref=OrganisationRefStructure(ref="IT:ITH1:Authority:apb:", version="any")),
+
+                               ]))
+        authority = Authority(id="IT:ITH1:Authority:apb:", version="any", name=MultilingualString(content=[TextType(value="Authority")]))
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage.insert_any_object_on_queue(txn_write, [rs, authority])
+            txn_write.commit()
+
+        with self.storage.env.ro_transaction() as txn_read:
+            result = self.storage.load_object_by_id_version(txn_read, "IT:ITH1:Authority:apb:", ResponsibilitySet, "any")
+            pass
+
+        resolve_embeddings_index(self.storage)
+        print("...")
+
+
     def test_embedded_object_can_be_resolved_and_promoted(self) -> None:
         day_type = DayType(id="dt1", version="1")
         calendar = ServiceCalendar(id="sc1", version="1", day_types=DayTypesRelStructure(day_type_ref_or_day_type_dummy=[day_type]))
