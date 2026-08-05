@@ -65,11 +65,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                         os.rename(filename, '_tmp')
                     except OSError as e:
                         # Alternative approach if rename fails
-                        with open('_tmp', 'wb') as tmp_file:
-                            with open(filename, 'rb') as src_file:
-                                tmp_file.write(src_file.read())
-                    finally:
-                        os.remove(filename)
+                        raise e
 
             else:
                 with zip_file.open(filename, mode='r') as f:
@@ -84,11 +80,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                     os.rename(filename, '_tmp')
                 except OSError as e:
                     # Alternative approach if rename fails
-                    with open('_tmp', 'wb') as tmp_file:
-                        with open(filename, 'rb') as src_file:
-                            tmp_file.write(src_file.read())
-                finally:
-                    os.remove(filename)
+                    raise e
 
             filename = '_tmp'
 
@@ -107,7 +99,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
             cur.execute(sql_create_table)
 
             if filename == '_tmp':
-                os.remove('_tmp')
+                Path('_tmp').unlink(missing_ok=True)
 
             for column in column_mapping.keys() - this_mapping.keys():
                 datatype = column_mapping.get(column, 'VARCHAR')
