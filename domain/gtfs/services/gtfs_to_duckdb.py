@@ -26,82 +26,86 @@ from domain.gtfs.model.tables import (
 )
 from domain.gtfs.services.gtfs_inference import create_feed_info, handle_single_agency, update_empty_enumerations, update_empty_service_id
 from utils.aux_logging import log_all
+from tempfile import TemporaryDirectory
 
 
 def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, filename: str, column_mapping: dict[str, str]) -> None:
     print(filename)
-    table = filename.split('/')[-1].replace('.txt', '')
-    with con.cursor() as cur:
-        sql_drop_table = f"""DROP TABLE IF EXISTS {table};"""
-        # print(sql_drop_table)
-        cur.execute(sql_drop_table)
+    with TemporaryDirectory() as tmpdir:
+        # os.chdir(tmpdir)
 
-        if filename in [x.filename for x in zip_file.filelist]:
-            if filename not in {'shapes.txt'}:
-                detector = UniversalDetector()
-                for line in zip_file.open(filename, 'r'):
-                    detector.feed(line)
-                    if detector.done:
-                        break
-                detector.close()
+        tmpfile = Path(tmpdir) / '_tmp'
 
-                assert detector.result is not None, "Detector must have a result"
+        table = filename.split('/')[-1].replace('.txt', '')
+        with con.cursor() as cur:
+            sql_drop_table = f"""DROP TABLE IF EXISTS {table};"""
+            # print(sql_drop_table)
+            cur.execute(sql_drop_table)
 
-                with zip_file.open(filename, mode='r') as f:
-                    g = io.TextIOWrapper(f, detector.result['encoding'])
-                    reader = csv.reader(g)
-                    header = next(reader)
+            if filename in [x.filename for x in zip_file.filelist]:
+                if filename not in {'shapes.txt'}:
+                    detector = UniversalDetector()
+                    for line in zip_file.open(filename, 'r'):
+                        detector.feed(line)
+                        if detector.done:
+                            break
+                    detector.close()
 
-                if (detector.result['encoding'] or '').lower() not in ('utf-8', 'utf-8-sig', 'ascii'):
-                    with zip_file.open(filename, 'r') as f_in:
-                        g = io.TextIOWrapper(f_in, detector.result['encoding'])
-                        with open("_tmp", 'w', encoding='UTF-8') as f_out:
-                            f_out.writelines(g)
+                    assert detector.result is not None, "Detector must have a result"
+
+                    with zip_file.open(filename, mode='r') as f:
+                        g = io.TextIOWrapper(f, detector.result['encoding'])
+                        reader = csv.reader(g)
+                        header = next(reader)
+
+                    if (detector.result['encoding'] or '').lower() not in ('utf-8', 'utf-8-sig', 'ascii'):
+                        with zip_file.open(filename, 'r') as f_in:
+                            g = io.TextIOWrapper(f_in, detector.result['encoding'])
+                            with tmpfile.open("w", encoding="utf-8") as f_out:
+                                f_out.writelines(g)
+                    else:
+                        zip_file.extract(filename, tmpdir)
+                        tmpfile = Path(tmpdir) / filename
+
                 else:
-                    zip_file.extract(filename)
-                    os.rename(filename, '_tmp')
+                    with zip_file.open(filename, mode='r') as f:
+                        g = io.TextIOWrapper(f, 'utf-8')
+                        reader = csv.reader(g)
+                        header = next(reader)
+
+                    zip_file.extract(filename, tmpdir)
+                    tmpfile = Path(tmpdir) / filename
+
+                this_mapping = {}
+                for column in header:
+                    this_mapping[column] = column_mapping.get(column, 'VARCHAR')
+
+                missing_mapping = {}
+                for column in column_mapping.keys() - this_mapping.keys():
+                    missing_mapping[column] = column_mapping.get(column, 'VARCHAR')
+
+                this_mapping_str = json.dumps(this_mapping)
+
+                sql_create_table = f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{tmpfile}', delim=',', quote='"', escape='"',header=true, auto_detect=true, columns = {this_mapping_str});"""
+                # print(sql_create_table)
+                cur.execute(sql_create_table)
+
+                os.remove(tmpfile)
+
+                for column in column_mapping.keys() - this_mapping.keys():
+                    datatype = column_mapping.get(column, 'VARCHAR')
+                    cur.execute(f"""ALTER TABLE {table} ADD COLUMN {column} {datatype};""")
+
             else:
-                with zip_file.open(filename, mode='r') as f:
-                    g = io.TextIOWrapper(f, 'utf-8')
-                    reader = csv.reader(g)
-                    header = next(reader)
+                data_types = []
+                for column in column_mapping.keys():
+                    datatype = column_mapping.get(column, 'VARCHAR')
+                    data_types.append(f"{column} {datatype}")
 
-                zip_file.extract(filename)
-                os.rename(filename, '_tmp')
+                data_types_str = ', '.join(data_types)
 
-            filename = '_tmp'
-
-            this_mapping = {}
-            for column in header:
-                this_mapping[column] = column_mapping.get(column, 'VARCHAR')
-
-            missing_mapping = {}
-            for column in column_mapping.keys() - this_mapping.keys():
-                missing_mapping[column] = column_mapping.get(column, 'VARCHAR')
-
-            this_mapping_str = json.dumps(this_mapping)
-
-            sql_create_table = f"""CREATE TABLE {table} AS SELECT * FROM read_csv('{filename}', delim=',', quote='"', escape='"',header=true, auto_detect=true, columns = {this_mapping_str});"""
-            # print(sql_create_table)
-            cur.execute(sql_create_table)
-
-            if filename == '_tmp':
-                os.remove('_tmp')
-
-            for column in column_mapping.keys() - this_mapping.keys():
-                datatype = column_mapping.get(column, 'VARCHAR')
-                cur.execute(f"""ALTER TABLE {table} ADD COLUMN {column} {datatype};""")
-
-        else:
-            data_types = []
-            for column in column_mapping.keys():
-                datatype = column_mapping.get(column, 'VARCHAR')
-                data_types.append(f"{column} {datatype}")
-
-            data_types_str = ', '.join(data_types)
-
-            sql_create_table = f"""CREATE TABLE {table} ({data_types_str});"""
-            cur.execute(sql_create_table)
+                sql_create_table = f"""CREATE TABLE {table} ({data_types_str});"""
+                cur.execute(sql_create_table)
 
 
 def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
