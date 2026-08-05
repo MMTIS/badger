@@ -1,0 +1,9 @@
+# a comment
+# currently only working for netex
+xpathcountgreater //* 1000
+xpathcountequal //netex:SiteFrame 1
+contains PublicationDelivery
+contains \d{4}-\d{2}-\d{2}
+xpathcountgreater //netex:StopPlace 7
+xpathcountgreater //netex:ServiceJourney 10
+xpathcountgreater //netex:ServiceJourneyPattern 10
