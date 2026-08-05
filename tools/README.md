@@ -179,11 +179,13 @@ are fixes.
 * INCLUDEORDERINID: Previous to NeTEx 2.0 the order attribute was part of the key. So sometimes elements are only unique when order is used. So we append the order to the id. As this does not fix refs. We do it only for elements that are not referenced usually: " in actions_set or not actions_set: "NoticeAssignment", "PassengerStopAssignment","AlternativeName"
 * SIMPLIFYVERSION: As validators can deal with the fact that the version="all" can match other versions between id/ref. We make it explicit. any is replaces with the most used version. This only works, if version handling is not used in full.
 * FIXEMAILNONE: We had data sets, where the eMail was "None". This is not valid in GTFS. so we change it.
+* FIXGMLID: Gml needs id to start not with a number, so we add a prefix.
 * ADDHTTPSURL: The GTFS validator wants https: in the url of agency.txt. So it is added.
 * REMOVESOMEREFS: In some cases Ref elements are used to store codes (e.g. BrandingRef). This is not working with full validation. So we remove them: "SupplyContactRef","TopographicPlaceRef", "ParentSiteRef","TypeOfPlaceRef","BrandingRef"
 * REMOVESOMEATTRS: removes datasourceref attribute. To be done, when it is not defined.
 * REMOVESNCFPROBLEMS: Remove elements DestinationDisplayRef and OperatorRef when they have attribute ref == "". Remove elements TypeOfLineRef and routes unconditionally. Remove attributes responsibilitySetRef when value == "".
 * REMOVELUXPROBLEMS: nameOfClassRef in FromJourney and ToJourney is wrong and is replaced.
+* REMOVEDEFAULTRESPONSIBILITYSET: Removes the DefaultResponsibilitySet (as it is not really used for that in STA files)
 * NONE: No action
 
 ## The ftp_uploader (untested)

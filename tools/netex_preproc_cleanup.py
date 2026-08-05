@@ -114,6 +114,34 @@ def set_emails(root: ET.Element, consider_namespaces: bool = False) -> None:
         if stripped == "" or stripped.lower() == "none":
             elem.text = replacement
 
+
+def fix_gml_id(root: ET.Element, consider_namespaces: bool = False) -> None:
+    """
+    In some cases the gml id start with a digit. This is not allowed.
+    All gml id obtain an "gml"-prefix
+    """
+    for elem in root.iter():
+        tag = elem.tag
+        if not isinstance(tag, str):
+            continue
+
+        is_gml = False
+        if tag.startswith('{'):
+            namespace = tag.split('}', 1)[0][1:]
+            is_gml = 'opengis.net/gml' in namespace
+        else:
+            is_gml = tag.startswith('gml:') or tag == 'gml'
+
+        if not is_gml:
+            continue
+
+        for attr_name, attr_val in list(elem.attrib.items()):
+            local_attr_name = local_name_from_attr(attr_name)
+            if local_attr_name == 'id' and attr_val:
+                elem.set(attr_name, 'gml' + attr_val)
+                break
+
+
 def fix_linestring_ids(root: ET.Element,
                        consider_namespaces: bool = False) -> None:
     """
@@ -224,6 +252,28 @@ def replace_versionref_with_version(root: ET.Element,
             # if "version" exists it will be overwritten with the same value (or you can choose to keep)
             elem.set("version", val)
 
+def remove_default_responsibility_set(root: ET.Element, consider_namespaces: bool = False) -> None:
+    """
+    Removes all DefaultResponsibilitySet elements from the XML tree (e.g. needed for STA files)
+
+    Args:
+        root: The root element of the XML tree
+        consider_namespaces: If True, will look for elements with namespace tags
+    """
+    if consider_namespaces:
+        # Find all elements with any namespace
+        for elem in root.iter():
+            # Check if the local name (without namespace) is DefaultResponsibilitySet
+            if elem.tag.endswith('}DefaultResponsibilitySet') or elem.tag == 'DefaultResponsibilitySet':
+                parent = elem.getparent()
+                if parent is not None:
+                    parent.remove(elem)
+    else:
+        # Simple case without namespaces
+        for elem in root.iter('DefaultResponsibilitySet'):
+            parent = elem.getparent()
+            if parent is not None:
+                parent.remove(elem)
 
 def include_order_in_id(root: ET.Element,
                         elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment","AlternativeName"),
@@ -627,6 +677,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("Removes id and version from elements like Centroid and Location")
             remove_id_and_version_from_tags(et.getroot())
 
+        # remove the DefaultResponsibilitySet
+        if "REMOVEDEFAULTRESPONSIBILITYSET" in actions_set or not actions_set:
+            log_print("Removes the DefaultResponsibilitySet")
+            remove_default_responsibility_set(et.getroot())
         # Fixes the line string id to become valid
         if "FIXLINESTRINGID" in actions_set or not actions_set:
             log_print("Fixes the line string id to become valid as it is not allowed to start with a number.")
@@ -651,6 +705,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
+
+        if "FIXGMLID" in actions_set or not actions_set:
+            log_print("GML elements need to have an id that does not start with a digit.")
+            fix_gml_id(et.getroot())
 
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
