@@ -68,6 +68,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                         with open('_tmp', 'wb') as tmp_file:
                             with open(filename, 'rb') as src_file:
                                 tmp_file.write(src_file.read())
+                    finally:
                         os.remove(filename)
 
             else:
@@ -86,6 +87,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                     with open('_tmp', 'wb') as tmp_file:
                         with open(filename, 'rb') as src_file:
                             tmp_file.write(src_file.read())
+                finally:
                     os.remove(filename)
 
             filename = '_tmp'
