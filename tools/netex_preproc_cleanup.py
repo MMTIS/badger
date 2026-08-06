@@ -315,7 +315,7 @@ def include_order_in_id(root: ET.Element,
             elem.set("id", f"{id_val}{suffix}")
 
 def change_order_0(root: ET.Element,
-                   elements_to_process: Iterable[str] = ("PassengerStopAssignment","AlternativeName"),
+                   elements_to_process: Iterable[str] = ("PassengerStopAssignment","AlternativeName","DayTypeAssignment"),
                    consider_namespaces: bool = False) -> None:
     """
     Traverse the XML tree rooted at `root` and for each element whose tag matches one of
