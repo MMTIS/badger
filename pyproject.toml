@@ -27,7 +27,7 @@ dependencies = [
     "tqdm",
     "xsdata[cli,soap,lxml]==26.2",
     "pandas-stubs~=2.3.3",
-    "cryptography>=48.0.1",
+    "cryptography>=50.0.0",
 ]
 requires-python = ">=3.12"
 
