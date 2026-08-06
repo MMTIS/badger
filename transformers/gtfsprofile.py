@@ -836,7 +836,7 @@ class GtfsProfile:
         if transformer:
             latitude, longitude = transformer.transform(stop_place.centroid.location.pos.value[0], stop_place.centroid.location.pos.value[1])
         else:
-            assert stop_place.centroid.location is not None, f'StopPlace without coordinate {stop_place.public_code} - {stop_place.name}'
+            assert stop_place.centroid is not None and stop_place.centroid.location is not None, f"StopPlace without coordinate {stop_place.public_code} - {stop_place.name}"
             project_location_4326(stop_place.centroid.location)
             latitude, longitude = stop_place.centroid.location.latitude, stop_place.centroid.location.longitude
 
