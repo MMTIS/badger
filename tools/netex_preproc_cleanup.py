@@ -118,7 +118,7 @@ def set_emails(root: ET.Element, consider_namespaces: bool = False) -> None:
 def fix_gml_id(root: ET.Element, consider_namespaces: bool = False) -> None:
     """
     In some cases the gml id start with a digit. This is not allowed.
-    All gml id obtain an "gml"-prefix
+    All gml id obtain a "gml"-prefix
     """
     for elem in root.iter():
         tag = elem.tag
@@ -142,49 +142,6 @@ def fix_gml_id(root: ET.Element, consider_namespaces: bool = False) -> None:
                 break
 
 
-def fix_linestring_ids(root: ET.Element,
-                       consider_namespaces: bool = False) -> None:
-    """
-    Ensure all LineString elements have an id attribute that starts with a letter.
-    If an id starts with a digit, prefix it with "fix-".
-    Modifies the tree in place.
-
-    Parameters:
-    - root: ET.Element — the root element to search under
-    - consider_namespaces: bool — if False (default), match elements by local name
-                                    (ignores namespaces). If True, match only when
-                                    the tag exactly equals 'LineString' or a namespaced
-                                    tag that includes the namespace braces.
-    Returns:
-    - None
-    """
-    def local_name(tag: str) -> str:
-        if tag.startswith('{'):
-            return tag.split('}', 1)[1]
-        return tag
-
-    for elem in root.iter():
-        if consider_namespaces:
-            # match only when the full tag equals 'LineString' or any namespaced variant
-            # (i.e. exact tag including namespace) — this means only tags that end with
-            # 'LineString' but keep their namespace are matched as well.
-            # To be strict: require the local name to be exactly 'LineString' but keep namespace considered
-            match = (elem.tag == 'LineString') or (elem.tag.startswith('{') and local_name(elem.tag) == 'LineString')
-            if not match:
-                continue
-        else:
-            # ignore namespace, match solely by local name
-            if local_name(elem.tag) != 'LineString':
-                continue
-
-        for attr_name, attr_val in list(elem.attrib.items()):
-            local_attr_name = local_name_from_attr(attr_name)
-            if local_attr_name == 'id':
-                id_val = attr_val
-                if id_val and _id_starts_with_digit.match(id_val):
-                    # preserve original attribute key (including namespace) when setting
-                    elem.set(attr_name, 'fix-' + id_val)
-                break
 
 
 def remove_id_and_version_from_tags(root: ET.Element,
@@ -252,7 +209,7 @@ def replace_versionref_with_version(root: ET.Element,
             # if "version" exists it will be overwritten with the same value (or you can choose to keep)
             elem.set("version", val)
 
-def remove_default_responsibility_set(root: ET.Element, consider_namespaces: bool = False) -> None:
+def remove_default_responsibility_set_ref(root: ET.Element, consider_namespaces: bool = False) -> None:
     """
     Removes all DefaultResponsibilitySet elements from the XML tree (e.g. needed for STA files)
 
@@ -264,13 +221,13 @@ def remove_default_responsibility_set(root: ET.Element, consider_namespaces: boo
         # Find all elements with any namespace
         for elem in root.iter():
             # Check if the local name (without namespace) is DefaultResponsibilitySet
-            if elem.tag.endswith('}DefaultResponsibilitySet') or elem.tag == 'DefaultResponsibilitySet':
+            if elem.tag.endswith('}DefaultResponsibilitySetRef') or elem.tag == 'DefaultResponsibilitySetRef':
                 parent = elem.getparent()
                 if parent is not None:
                     parent.remove(elem)
     else:
         # Simple case without namespaces
-        for elem in root.iter('DefaultResponsibilitySet'):
+        for elem in root.iter('DefaultResponsibilitySetRef'):
             parent = elem.getparent()
             if parent is not None:
                 parent.remove(elem)
@@ -678,13 +635,9 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             remove_id_and_version_from_tags(et.getroot())
 
         # remove the DefaultResponsibilitySet
-        if "REMOVEDEFAULTRESPONSIBILITYSET" in actions_set or not actions_set:
-            log_print("Removes the DefaultResponsibilitySet")
-            remove_default_responsibility_set(et.getroot())
-        # Fixes the line string id to become valid
-        if "FIXLINESTRINGID" in actions_set or not actions_set:
-            log_print("Fixes the line string id to become valid as it is not allowed to start with a number.")
-            fix_linestring_ids(et.getroot())
+        if "REMOVEDEFAULTRESPONSIBILITYSETREF" in actions_set or not actions_set:
+            log_print("Removes the DefaultResponsibilitySetRef")
+            remove_default_responsibility_set_ref(et.getroot())
 
         if "ADDIDVERSION" in actions_set or not actions_set:
             log_print("Adds id and version to a a set of Tags")
