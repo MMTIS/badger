@@ -244,7 +244,8 @@
     "scripts": [
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
-        {"script": "conv.gtfs_import_to_db", "args": "%%inputfilepath%% %%dir%%/03-gtfs-import.duckdb"},
+        {"script": "tools.fix_gtfs_aura", "args": "%%inputfilepath%% %%dir%%/gtfs.zip"},
+        {"script": "conv.gtfs_import_to_db", "args": "%%dir%%/gtfs.zip %%dir%%/03-gtfs-import.duckdb"},
         {"script": "conv.gtfs_convert_to_db", "args": "%%dir%%/03-gtfs-import.duckdb %%dir%%/05-netex-import.mdbx"},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
@@ -261,7 +262,7 @@
   {
     "block": "mobigo-jura",
     "worked":"gtfs_db_to_db",
-    "download_url":"https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
+    "download_url":"https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
     "description":"Réseau interurbain Mobigo! mer Dateien",
       "scripts": [
        {"script": "clean_tmp", "args": "%%dir%%"},
