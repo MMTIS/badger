@@ -8,6 +8,7 @@ import logging
 from pyproj import Transformer
 from decimal import Decimal
 
+from domain.netex import FlexibleLineView
 from transformers.projection import project_location_4326
 
 from utils.utils import to_seconds
