@@ -6,23 +6,23 @@ from utils.aux_logging import log_all, prepare_logger
 import os
 
 
-def gtfs_import_to_db(source: Path, target: Path) -> None:
+def gtfs_import_to_db(source: Path, target: Path) -> int:
     # Workaround for https://github.com/duckdb/duckdb/issues/8261
     try:
         os.remove(target.resolve())
     except OSError:
         pass
 
-    load_gtfs_to_duckdb(source, target)
+    return load_gtfs_to_duckdb(source, target)
 
 
-def main(gtfs_file: str, database_file: str) -> None:
+def main(gtfs_file: str, database_file: str) -> int:
     gtfs_path = Path(gtfs_file)
     if not gtfs_path.exists():
         log_all(logging.ERROR, f"{gtfs_path} does not exist.")
-
+        return 1
     else:
-        gtfs_import_to_db(gtfs_path, Path(database_file))
+        return gtfs_import_to_db(gtfs_path, Path(database_file))
 
 
 if __name__ == "__main__":
