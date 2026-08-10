@@ -53,8 +53,6 @@ class GtfsTripsAggregator:
             stop_names = []
             stop_ids = []
             trip_stop_times = self.df_stop_times[self.df_stop_times["trip_id"] == trip_row["trip_id"]]
-            trip_stop_times["stop_id"] = trip_stop_times["stop_id"].astype(str)
-            self.df_stops["stop_id"] = self.df_stops["stop_id"].astype(str)
             trip_stop_times = pd.merge(trip_stop_times, self.df_stops, on="stop_id")
             for idx, stop_row in trip_stop_times.iterrows():
                 stop_coordinates.append((stop_row["stop_lat"], stop_row["stop_lon"]))
