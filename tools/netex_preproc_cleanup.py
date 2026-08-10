@@ -211,26 +211,44 @@ def replace_versionref_with_version(root: ET.Element,
 
 def remove_default_responsibility_set_ref(root: ET.Element, consider_namespaces: bool = False) -> None:
     """
-    Removes all DefaultResponsibilitySet elements from the XML tree (e.g. needed for STA files)
+    Removes DefaultResponsibilitySetRef, Authority and ResponsibilitySet elements from the XML tree
+    (as identified by "IT:ITH1:Authority:"-prefix in id attribute)
 
     Args:
         root: The root element of the XML tree
         consider_namespaces: If True, will look for elements with namespace tags
     """
-    if consider_namespaces:
-        # Find all elements with any namespace
-        for elem in root.iter():
-            # Check if the local name (without namespace) is DefaultResponsibilitySet
-            if elem.tag.endswith('}DefaultResponsibilitySetRef') or elem.tag == 'DefaultResponsibilitySetRef':
-                parent = elem.getparent()
-                if parent is not None:
-                    parent.remove(elem)
-    else:
-        # Simple case without namespaces
-        for elem in root.iter('DefaultResponsibilitySetRef'):
-            parent = elem.getparent()
-            if parent is not None:
-                parent.remove(elem)
+    # We need to collect elements to remove first, as we can't modify the tree while iterating
+    elements_to_remove = []
+
+    for elem in root.iter():
+        # Check for DefaultResponsibilitySetRef
+        if (consider_namespaces and elem.tag.endswith('}DefaultResponsibilitySetRef')) or \
+           (not consider_namespaces and elem.tag.endswith ('DefaultResponsibilitySetRef')):
+            print("happ")
+            elements_to_remove.append(elem)
+        # Check for Authority
+        elif (consider_namespaces and elem.tag.endswith('}Authority')) or \
+             (not consider_namespaces and elem.tag.endswith('Authority')):
+            elements_to_remove.append(elem)
+        # Check for ResponsibilitySet with specific id
+        elif ((consider_namespaces and elem.tag.endswith('}ResponsibilitySet')) or
+              (not consider_namespaces and elem.tag.endswith('ResponsibilitySet')) and \
+             elem.attrib.get('id') is not None and 'IT:ITH1:Authority:' in elem.attrib.get('id')):
+            elements_to_remove.append(elem)
+
+    # Now remove all collected elements
+    for elem in elements_to_remove:
+        parent = _find_parent(root, elem)
+        if parent is not None:
+            parent.remove(elem)
+
+def _find_parent(root: ET.Element, child: ET.Element) -> Optional[ET.Element]:
+    """Helper function to find parent of an element in ElementTree"""
+    for parent in root.iter():
+        if child in list(parent):
+            return parent
+    return None
 
 def include_order_in_id(root: ET.Element,
                         elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment","AlternativeName"),
@@ -635,8 +653,8 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             remove_id_and_version_from_tags(et.getroot())
 
         # remove the DefaultResponsibilitySet
-        if "REMOVEDEFAULTRESPONSIBILITYSETREF" in actions_set or not actions_set:
-            log_print("Removes the DefaultResponsibilitySetRef")
+        if "REMOVEAUTHORITY" in actions_set or not actions_set:
+            log_print("Removes the Authority and DefaultResponsibilitySetRef for STA")
             remove_default_responsibility_set_ref(et.getroot())
 
         if "ADDIDVERSION" in actions_set or not actions_set:

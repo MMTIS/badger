@@ -184,7 +184,7 @@ are fixes.
 * REMOVESOMEATTRS: removes datasourceref attribute. To be done, when it is not defined.
 * REMOVESNCFPROBLEMS: Remove elements DestinationDisplayRef and OperatorRef when they have attribute ref == "". Remove elements TypeOfLineRef and routes unconditionally. Remove attributes responsibilitySetRef when value == "".
 * REMOVELUXPROBLEMS: nameOfClassRef in FromJourney and ToJourney is wrong and is replaced.
-* REMOVEDEFAULTRESPONSIBILITYSETREF: Removes the DefaultResponsibilitySetRef (as it is not really used for that in STA files)
+* REMOVEAUTHORITY: Removes the DefaultResponsibilitySetRef and Authority (as it is not really used for that in STA files)
 * NONE: No action
 
 ## The ftp_uploader (untested)
