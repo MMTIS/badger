@@ -68,7 +68,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/06-gtfs.mdbx %%dir%%/07-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -119,7 +119,7 @@
         {"script": "#tools.netex_check_assertions", "args": "./scripts/general-netex-assertions.txt %%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -147,7 +147,7 @@
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -164,7 +164,7 @@
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/05-netex-import.mdbx %%dir%%/06-netex-database.mdbx"},
         {"script": "conv.epip_db_to_xml", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/07-%%block%%-netex.xml.gz"},
         {"script": "tools.gtfs_validator", "args": "%%inputfilepath%% %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/09-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/09-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -220,7 +220,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.gtfs_validator", "args": "%%inputfilepath%% %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/14-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%inputfilepath%% map_file=%%dir%%/14-%%block%%-map.html max_routes=1000"}
         ]
   },
 {
@@ -232,7 +232,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.gtfs_validator", "args": "D:\\badger_work\\oebb\\GTFS_OP_2025_obb.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "D:\\badger_work\\oebb\\GTFS_OP_2025_obb.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "D:\\badger_work\\oebb\\GTFS_OP_2025_obb.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=1000"}
         ]
   },
 
@@ -261,7 +261,7 @@
   {
     "block": "mobigo-jura",
     "worked":"gtfs_db_to_db",
-    "download_url":"https://exs.mobigo.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
+    "download_url":"https://exs.mobigo2.cityway.fr/gtfs.aspx?key=OPENDATA&operatorCode=UT39",
     "description":"Réseau interurbain Mobigo! mer Dateien",
       "scripts": [
        {"script": "clean_tmp", "args": "%%dir%%"},
@@ -276,7 +276,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/10-netex-database.mdbx %%dir%%/11-netex-database.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/11-netex-database.mdbx %%dir%%/12-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/12-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/12-%%block%%-gtfs.zip map_file=%%dir%%/14-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -317,7 +317,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02-trenitalia.xml.gz"},
-        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02-trenitalia.xml.gz %%dir%%/03-trenitalia.xml.gz [INCLUDEORDERINID ADDIDVERSION FIXLINESTRINGID REMOVESOMEREFS]"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02-trenitalia.xml.gz %%dir%%/03-trenitalia.xml.gz [INCLUDEORDERINID FIXEMAILNONE ADDIDVERSION FIXLINESTRINGID REMOVESOMEREFS]"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03-trenitalia.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
@@ -328,7 +328,7 @@
        {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -351,7 +351,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
        {
@@ -374,7 +374,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -399,7 +399,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
   {
@@ -420,7 +420,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
     },
 
@@ -443,7 +443,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
   {
@@ -464,7 +464,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"},
         {"script": "tools.xml_validator", "args": "09-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
@@ -487,7 +487,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"},
         {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
@@ -501,7 +501,7 @@
         {"script": "clean_tmp", "args": "%%dir%%"},
         {"script": "download_input_file", "args": "%%dir%%"},
         {"script": "tools.netex_uicoperatingperiod_correction", "args": "%%inputfilepath%% %%dir%%/02.xml.gz"},
-        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02.xml.gz %%dir%%/03.xml.gz [FIXEMAILNONE]"},
+        {"script": "tools.netex_preproc_cleanup", "args": "%%dir%%/02.xml.gz %%dir%%/03.xml.gz [FIXEMAILNONE FIXGMLID]"},
         {"script": "conv.netex_to_db", "args": "[%%dir%%/03.xml.gz] %%dir%%/02-import.mdbx "},
         {"script": "fix.day_offset", "args": "%%dir%%/02-import.mdbx "},
         {"script": "conv.epip_db_to_db", "args": "%%dir%%/02-import.mdbx %%dir%%/07-netex-database.mdbx"},
@@ -513,7 +513,7 @@
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_sanitize_stops", "args": "%%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
 
@@ -536,7 +536,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"},
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"},
         {"script": "tools.xml_validator", "args": "%%dir%%/08-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"}
          ]
   },
@@ -560,7 +560,7 @@
         {"script": "conv.gtfs_db_to_db", "args": "%%dir%%/08-gtfs.mdbx %%dir%%/10-gtfs.mdbx"},
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/10-gtfs.mdbx %%dir%%/11-%%block%%-gtfs.zip"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/11-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/11-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
   {
@@ -582,7 +582,7 @@
         {"script": "#tools.netex_stats", "args": "%%dir%%/05-%%block%%-netex.xml.gz"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
   {
@@ -601,7 +601,7 @@
         {"script": "conv.gtfs_db_to_gtfs", "args": "%%dir%%/07-gtfs.mdbx %%dir%%/08-%%block%%-gtfs.zip"},
         {"script": "tools.xml_validator", "args": "%%dir%%/05-%%block%%-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
         {"script": "tools.gtfs_validator", "args": "%%dir%%/08-%%block%%-gtfs.zip %%dir%%"},
-        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1"}
+        {"script": "tools.gtfs_map_visualisation", "args": "%%dir%%/08-%%block%%-gtfs.zip map_file=%%dir%%/13-%%block%%-map.html max_routes=1000"}
          ]
   },
   {
@@ -620,11 +620,11 @@
     {"script": "conv.netex_to_db", "args": "[%%dir%%/07-%%block%%-netex.xml.gz] %%dir%%/08-import.mdbx "},
     {"script": "conv.epip_db_to_db", "args": "%%dir%%/08-import.mdbx %%dir%%/09-netex-database.mdbx"},
     {"script": "conv.epip_db_to_xml", "args": "%%dir%%/09-netex-database.mdbx %%dir%%/10-%%block%%-full-netex.xml.gz"},
-    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx   %%dir%%/f2-netex.mdbx Line [id Eurostar:Line:FRMLV-NLAMA]  None None" },
+    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx   %%dir%%/f2-netex.mdbx Line [id Eurostar:Line:FRMLV-NLAMA]  --use-template=True" },
     {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/f2-netex.mdbx %%dir%%/select_by_line.xml.gz"},
-    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f3-netex.mdbx Operator [id Eurostar:Operator:EUROSTAR_CONTINENTAL] [ [Operator Line Route ServiceJourneyPattern ServiceJourney] []" },
+    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f3-netex.mdbx Operator [id Eurostar:Operator:EUROSTAR_CONTINENTAL] --use-template=True" },
     {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/f3-netex.mdbx %%dir%%/select_by_operator.xml.gz"},
-    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f4-netex.mdbx ServiceJourney [id Eurostar:ServiceJourney:9147-0727]   [Operator Line Route ServiceJourneyPattern ServiceJourney] []" },
+    {"script": "conv.filter_db_to_db", "args": "%%dir%%/06-netex-database.mdbx %%dir%%/f4-netex.mdbx ServiceJourney [id Eurostar:ServiceJourney:9022-1001]   --use-template=True" },
     {"script": "conv.epip_db_to_xml.py", "args": "%%dir%%/f4-netex.mdbx %%dir%%/select_by_sj.xml.gz"},
     {"script": "tools.xml_validator.py", "args": "%%dir%%/10-%%block%%-full-netex.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},
     {"script": "tools.xml_validator.py", "args": "%%dir%%/select_by_line.xml.gz domain/netex/schema/xsd/NeTEx_publication.xsd"},

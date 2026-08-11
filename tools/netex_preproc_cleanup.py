@@ -114,6 +114,32 @@ def set_emails(root: ET.Element, consider_namespaces: bool = False) -> None:
         if stripped == "" or stripped.lower() == "none":
             elem.text = replacement
 
+def fix_gml_id(root: ET.Element, consider_namespaces: bool= False) -> None:
+    """
+    In some cases the gml id start with a digit. This is not allowed.
+    All gml id obtain an "gml"-prefix
+    """
+    for elem in root.iter():
+        tag = elem.tag
+        if not isinstance(tag, str):
+            continue
+        
+        is_gml = False
+        if tag.startswith('{'):
+            namespace = tag.split('}', 1)[0][1:]
+            is_gml = 'opengis.net/gml' in namespace
+        else:
+            is_gml = tag.startswith('gml:') or tag == 'gml'
+        
+        if not is_gml:
+            continue
+        
+        for attr_name, attr_val in list(elem.attrib.items()):
+            local_attr_name = local_name_from_attr(attr_name)
+            if local_attr_name == 'id' and attr_val:
+                elem.set(attr_name, 'gml' + attr_val)
+                break
+
 def fix_linestring_ids(root: ET.Element,
                        consider_namespaces: bool = False) -> None:
     """
@@ -651,6 +677,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
+
+        if "FIXGMLID" in actions_set or not actions_set:
+            log_print("GML elements need to have an id that does not start with a digit.")
+            fix_gml_id(et.getroot())
 
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")

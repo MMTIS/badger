@@ -68,7 +68,6 @@ def create_list_from_string(input_string: str) -> list[str]:
     result_list = cleaned_string.split(" ")
     return result_list
 
-
 def load_and_run(file_name: str, args_string: str) -> Any:
 
     module_name = file_name.removesuffix(".py")
@@ -82,6 +81,8 @@ def load_and_run(file_name: str, args_string: str) -> Any:
     result = main_function(*args, **kwargs)
 
     return result
+
+
 
 
 def replace_in_string(input: str, search: str, replace: str) -> str:
@@ -460,6 +461,7 @@ class ArgumentStringParser:
         arguments = re.findall(r"\[.*?]|\S+", argument_string)
         args = ArgumentStringParser._get_args(arguments)
         kwargs = ArgumentStringParser._get_kwargs(arguments)
+        ## remove -- in the keys
         return args, kwargs
 
     @staticmethod
@@ -499,14 +501,15 @@ class ArgumentStringParser:
     def _get_kwargs(expressions: list[str]) -> dict[str, Any]:
         """
         Gets key-value arguments from list of argument expressions.
+        Converts hyphens (-) in keys to underscores (_).
         """
         kwargs = {}
         for assignment in expressions:
             if not ArgumentStringParser._is_kwarg(assignment):
                 continue
             key_value = assignment.split("=", maxsplit=1)
-            kwargs[key_value[0]] = key_value[1]
-
+            key = key_value[0].lstrip('-').replace('-', '_')  # <-- Fix: Replace hyphens with underscores
+            kwargs[key] = key_value[1]
         return kwargs
 
     @staticmethod

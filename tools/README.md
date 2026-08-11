@@ -173,7 +173,8 @@ are fixes.
 
 * VERSIONREF: The attribute versionRef is moved to version. With the exception of "TypeOfFrameRef".
 * REMOVEUNNECESSARYIDTAGS: removes id and version from Centroid and Location and reponsibilitySets
-* FIXLINESTRINGID: Gml needs id to start not with a number, so we add a prefix.
+* FIXLINESTRINGID: Fixes the line string id to become valid as it is not allowed to start with a number.
+* FIXGMLID: Gml needs id to start not with a number, so we add a prefix.
 * ADDIDVERSION: It is sometimes easier to add artifical id and version attributes to a list of elements: "AlternativeName","AlternativeText", "OperatorRef","DayTypeRef","LineRef", "ScheduledStopPointRef", "ServiceJourneyPatternRef", "PassingTime","StopPointInJourneyPatternRef","TimetabledPassingTime"),
 * FIXORDER0: The order attribute can't be 0. We set it to 1.
 * INCLUDEORDERINID: Previous to NeTEx 2.0 the order attribute was part of the key. So sometimes elements are only unique when order is used. So we append the order to the id. As this does not fix refs. We do it only for elements that are not referenced usually: " in actions_set or not actions_set: "NoticeAssignment", "PassengerStopAssignment","AlternativeName"
