@@ -114,49 +114,34 @@ def set_emails(root: ET.Element, consider_namespaces: bool = False) -> None:
         if stripped == "" or stripped.lower() == "none":
             elem.text = replacement
 
-def fix_linestring_ids(root: ET.Element,
-                       consider_namespaces: bool = False) -> None:
-    """
-    Ensure all LineString elements have an id attribute that starts with a letter.
-    If an id starts with a digit, prefix it with "fix-".
-    Modifies the tree in place.
 
-    Parameters:
-    - root: ET.Element — the root element to search under
-    - consider_namespaces: bool — if False (default), match elements by local name
-                                    (ignores namespaces). If True, match only when
-                                    the tag exactly equals 'LineString' or a namespaced
-                                    tag that includes the namespace braces.
-    Returns:
-    - None
+def fix_gml_id(root: ET.Element, consider_namespaces: bool = False) -> None:
     """
-    def local_name(tag: str) -> str:
-        if tag.startswith('{'):
-            return tag.split('}', 1)[1]
-        return tag
-
+    In some cases the gml id start with a digit. This is not allowed.
+    All gml id obtain a "gml"-prefix
+    """
     for elem in root.iter():
-        if consider_namespaces:
-            # match only when the full tag equals 'LineString' or any namespaced variant
-            # (i.e. exact tag including namespace) — this means only tags that end with
-            # 'LineString' but keep their namespace are matched as well.
-            # To be strict: require the local name to be exactly 'LineString' but keep namespace considered
-            match = (elem.tag == 'LineString') or (elem.tag.startswith('{') and local_name(elem.tag) == 'LineString')
-            if not match:
-                continue
+        tag = elem.tag
+        if not isinstance(tag, str):
+            continue
+
+        is_gml = False
+        if tag.startswith('{'):
+            namespace = tag.split('}', 1)[0][1:]
+            is_gml = 'opengis.net/gml' in namespace
         else:
-            # ignore namespace, match solely by local name
-            if local_name(elem.tag) != 'LineString':
-                continue
+            is_gml = tag.startswith('gml:') or tag == 'gml'
+
+        if not is_gml:
+            continue
 
         for attr_name, attr_val in list(elem.attrib.items()):
             local_attr_name = local_name_from_attr(attr_name)
-            if local_attr_name == 'id':
-                id_val = attr_val
-                if id_val and _id_starts_with_digit.match(id_val):
-                    # preserve original attribute key (including namespace) when setting
-                    elem.set(attr_name, 'fix-' + id_val)
+            if local_attr_name == 'id' and attr_val:
+                elem.set(attr_name, 'gml' + attr_val)
                 break
+
+
 
 
 def remove_id_and_version_from_tags(root: ET.Element,
@@ -224,6 +209,46 @@ def replace_versionref_with_version(root: ET.Element,
             # if "version" exists it will be overwritten with the same value (or you can choose to keep)
             elem.set("version", val)
 
+def remove_default_responsibility_set_ref(root: ET.Element, consider_namespaces: bool = False) -> None:
+    """
+    Removes DefaultResponsibilitySetRef, Authority and ResponsibilitySet elements from the XML tree
+    (as identified by "IT:ITH1:Authority:"-prefix in id attribute)
+
+    Args:
+        root: The root element of the XML tree
+        consider_namespaces: If True, will look for elements with namespace tags
+    """
+    # We need to collect elements to remove first, as we can't modify the tree while iterating
+    elements_to_remove = []
+
+    for elem in root.iter():
+        # Check for DefaultResponsibilitySetRef
+        if (consider_namespaces and elem.tag.endswith('}DefaultResponsibilitySetRef')) or \
+           (not consider_namespaces and elem.tag.endswith ('DefaultResponsibilitySetRef')):
+            print("happ")
+            elements_to_remove.append(elem)
+        # Check for Authority
+        elif (consider_namespaces and elem.tag.endswith('}Authority')) or \
+             (not consider_namespaces and elem.tag.endswith('Authority')):
+            elements_to_remove.append(elem)
+        # Check for ResponsibilitySet with specific id
+        elif ((consider_namespaces and elem.tag.endswith('}ResponsibilitySet')) or
+              (not consider_namespaces and elem.tag.endswith('ResponsibilitySet')) and \
+             elem.attrib.get('id') is not None and 'IT:ITH1:Authority:' in elem.attrib.get('id')):
+            elements_to_remove.append(elem)
+
+    # Now remove all collected elements
+    for elem in elements_to_remove:
+        parent = _find_parent(root, elem)
+        if parent is not None:
+            parent.remove(elem)
+
+def _find_parent(root: ET.Element, child: ET.Element) -> Optional[ET.Element]:
+    """Helper function to find parent of an element in ElementTree"""
+    for parent in root.iter():
+        if child in list(parent):
+            return parent
+    return None
 
 def include_order_in_id(root: ET.Element,
                         elements_to_process: Iterable[str] = ("NoticeAssignment", "PassengerStopAssignment","AlternativeName"),
@@ -265,7 +290,7 @@ def include_order_in_id(root: ET.Element,
             elem.set("id", f"{id_val}{suffix}")
 
 def change_order_0(root: ET.Element,
-                   elements_to_process: Iterable[str] = ("PassengerStopAssignment","AlternativeName"),
+                   elements_to_process: Iterable[str] = ("PassengerStopAssignment","AlternativeName","DayTypeAssignment"),
                    consider_namespaces: bool = False) -> None:
     """
     Traverse the XML tree rooted at `root` and for each element whose tag matches one of
@@ -627,10 +652,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
             log_print("Removes id and version from elements like Centroid and Location")
             remove_id_and_version_from_tags(et.getroot())
 
-        # Fixes the line string id to become valid
-        if "FIXLINESTRINGID" in actions_set or not actions_set:
-            log_print("Fixes the line string id to become valid as it is not allowed to start with a number.")
-            fix_linestring_ids(et.getroot())
+        # remove the DefaultResponsibilitySet
+        if "REMOVEAUTHORITY" in actions_set or not actions_set:
+            log_print("Removes the Authority and DefaultResponsibilitySetRef for STA")
+            remove_default_responsibility_set_ref(et.getroot())
 
         if "ADDIDVERSION" in actions_set or not actions_set:
             log_print("Adds id and version to a a set of Tags")
@@ -651,6 +676,10 @@ def process_file(file_path, output_filename, actions: Iterable[str] | None = Non
         if "FIXEMAILNONE" in actions_set or not actions_set:
             log_print("Remove a 'None' in the eMail.")
             set_emails(et.getroot())
+
+        if "FIXGMLID" in actions_set or not actions_set:
+            log_print("GML elements need to have an id that does not start with a digit.")
+            fix_gml_id(et.getroot())
 
         if "ADDHTTPSURL" in actions_set or not actions_set:
             log_print("GTFS demands real URL so, we need to add them before")
