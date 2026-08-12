@@ -108,7 +108,7 @@ def _handle_file(con: duckdb.DuckDBPyConnection, zip_file: zipfile.ZipFile, file
                 cur.execute(sql_create_table)
 
 
-def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
+def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> int:
     con: duckdb.DuckDBPyConnection = duckdb.connect(database=database_file)
 
     zf = zipfile.ZipFile(zip_file.resolve())
@@ -116,7 +116,7 @@ def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
     # check if this is a GTFS file
     if len(set(zf.namelist()) & {'agency.txt', 'routes.txt', 'trips.txt', 'stop_times.txt'}) == 0:
         log_all(logging.ERROR, 'This is not a GTFS file')
-        return
+        return -1
 
     _handle_file(con, zf, 'feed_info.txt', feed_info_txt)
     _handle_file(con, zf, 'agency.txt', agency_txt)
@@ -136,3 +136,4 @@ def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> None:
     handle_single_agency(con)
     update_empty_enumerations(con)
     update_empty_service_id(con)
+    return 0
