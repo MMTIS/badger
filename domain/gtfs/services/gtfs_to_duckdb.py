@@ -116,7 +116,7 @@ def load_gtfs_to_duckdb(zip_file: Path, database_file: Path) -> int:
     # check if this is a GTFS file
     if len(set(zf.namelist()) & {'agency.txt', 'routes.txt', 'trips.txt', 'stop_times.txt'}) == 0:
         log_all(logging.ERROR, 'This is not a GTFS file')
-        return 1
+        return -1
 
     _handle_file(con, zf, 'feed_info.txt', feed_info_txt)
     _handle_file(con, zf, 'agency.txt', agency_txt)
