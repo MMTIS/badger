@@ -37,7 +37,7 @@ def gtfs_db_to_db(source_database: Path, target_database: Path, clean_database: 
                 # Copy tables that we don't change as-is.
                 with db_read.env.ro_transaction() as txn_read:
                     for clazz in [DataSource, Codespace, StopPlace, PassengerStopAssignment, ScheduledStopPoint, StopArea, InterchangeRule, Version]:
-                        db_write.copy_map(txn_read, db_write, txn_write, clazz)
+                        db_read.copy_map(txn_read, db_write, txn_write, clazz)
 
                     # service_calendars: List[ServiceCalendar] = list(db_read.iter_only_objects(txn_read, ServiceCalendar))
 
