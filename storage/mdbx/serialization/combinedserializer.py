@@ -1,3 +1,4 @@
+import os
 from typing import Any, cast
 
 from domain.netex import EntityStructure
@@ -8,6 +9,7 @@ from storage.keycodec.baseline import BaseLineKeyCodec
 from storage.objectserializer.interface import ObjectSerializer
 from storage.objectserializer.codecs.lz4 import Lz4Codec
 from storage.objectserializer.cloudpickle.serializer import CloudPickleSerializer
+from storage.objectserializer.msgspec.serializer import MsgspecSerializer
 from storage.objectserializer.pipeline import PipelineSerializer
 
 
@@ -23,7 +25,14 @@ class CombinedSerializer(Serializer):
     ):
         super().__init__(classes)
         self.key_codec = key_codec if key_codec else BaseLineKeyCodec
-        self.object_serializer = object_serializer if object_serializer else PipelineSerializer(object_serializer=CloudPickleSerializer(), codecs=[Lz4Codec()])
+        if object_serializer is None:
+            backend = os.getenv("BADGER_SERIALIZER", "cloudpickle").lower()
+            if backend == "msgspec":
+                base_serializer: ObjectSerializer = MsgspecSerializer()
+            else:
+                base_serializer = CloudPickleSerializer()
+            object_serializer = PipelineSerializer(object_serializer=base_serializer, codecs=[Lz4Codec()])
+        self.object_serializer = object_serializer
 
     def encode_key_idx(self, id: str, version: str | None, clazz_idx: bytes) -> bytes:
         return self.key_codec.encode_key_idx(id, version, clazz_idx)
@@ -38,4 +47,8 @@ class CombinedSerializer(Serializer):
         return self.object_serializer.dumps(obj)
 
     def unmarshall(self, obj: bytes, clazz: type[Tid]) -> Tid:
-        return cast(Tid, self.object_serializer.loads(obj))
+        try:
+            return cast(Tid, self.object_serializer.loads(obj, clazz=clazz))
+        except TypeError:
+            return cast(Tid, self.object_serializer.loads(obj))
+
