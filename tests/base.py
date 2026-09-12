@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 from typing import TypeVar
 
-from xsdata.models.datatype import XmlDateTime
+from pyxsdata.models.datatype import XmlDateTime
 
 from domain.netex.model import Line, LineRef, MultilingualString, Route, RouteRef, ServiceJourneyPattern, TextType
 from domain.netex.services.model_typing import Tid

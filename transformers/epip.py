@@ -22,7 +22,7 @@ from utils.aux_logging import log_print, log_all, log_once
 from transformers.routesprofile import RoutesProfile
 from utils.utils import project, chain, GeneratorTester
 
-from xsdata.models.datatype import XmlDateTime, XmlDate
+from pyxsdata.models.datatype import XmlDateTime, XmlDate
 
 from transformers.callsprofile import CallsProfile
 

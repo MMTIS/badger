@@ -2,7 +2,7 @@ from dataclasses import is_dataclass, fields
 from typing import Any, get_origin, Union, get_args
 from zoneinfo import ZoneInfo
 
-from xsdata.models.datatype import XmlTime, XmlDateTime
+from pyxsdata.models.datatype import XmlTime, XmlDateTime
 
 
 class XmlTimeZoned(XmlTime):

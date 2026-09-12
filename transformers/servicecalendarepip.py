@@ -2,7 +2,7 @@ import warnings
 from typing import List, Set, Dict
 
 import dateutil.rrule
-from xsdata.models.datatype import XmlDateTime, XmlDate
+from pyxsdata.models.datatype import XmlDateTime, XmlDate
 
 from domain.netex.model import (
     AvailabilityCondition,

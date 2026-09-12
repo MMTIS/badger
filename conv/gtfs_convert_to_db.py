@@ -7,8 +7,8 @@
 # import numpy
 # from pandas._libs.missing import NAType
 # import pandas as pd
-# from xsdata.formats.dataclass.serializers import XmlSerializer
-# from xsdata.models.datatype import XmlDateTime, XmlTime, XmlDate, XmlDuration
+# from pyxsdata.formats.dataclass.serializers import XmlSerializer
+# from pyxsdata.models.datatype import XmlDateTime, XmlTime, XmlDate, XmlDuration
 #
 # from domain.gtfs.services.duckdb_to_storage import to_storage
 # from domain.gtfs.transform.transporttype import gtfsRouteTypeToNeTEx
