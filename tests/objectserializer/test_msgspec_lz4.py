@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from enum import Enum
+import pathlib
 from typing import Any
 import unittest
+from xml.etree.ElementTree import QName
+
+from xsdata.models.datatype import XmlDate, XmlDateTime, XmlDuration, XmlTime
 
 from storage.objectserializer.msgspec.serializer import MsgspecSerializer
 from storage.objectserializer.codecs.lz4 import Lz4Codec
@@ -15,6 +20,12 @@ from tests.objectserializer.contracts.serializer_contract import (
 )
 
 
+class TransportMode(Enum):
+    BUS = "bus"
+    TRAM = "tram"
+    RAIL = "rail"
+
+
 @dataclass
 class SampleEntity:
     id: str
@@ -22,6 +33,19 @@ class SampleEntity:
     latitude: Decimal
     longitude: Decimal
     tags: list[str]
+
+
+@dataclass
+class XmlSampleEntity:
+    id: str
+    mode: TransportMode
+    date: XmlDate
+    time: XmlTime
+    datetime: XmlDateTime
+    duration: XmlDuration
+    price: Decimal
+    tag: QName
+    path: pathlib.Path
 
 
 SAMPLE_ENTITY = SampleEntity(
@@ -83,6 +107,22 @@ class MsgspecLz4SerializerTestCase(unittest.TestCase):
         # Verify valid roundtrip on both
         self.assertEqual(MsgspecSerializer().loads(raw), SAMPLE_ENTITY)
         self.assertEqual(self.object_serializer.loads(compressed), SAMPLE_ENTITY)
+
+    def test_xml_sample_entity_roundtrip(self) -> None:
+        """Verify roundtrip of complete XML datatype entity."""
+        xml_entity = XmlSampleEntity(
+            id="NL:NETEX:ScheduledStopPoint:100",
+            mode=TransportMode.TRAM,
+            date=XmlDate(2026, 9, 12),
+            time=XmlTime(14, 30, 0),
+            datetime=XmlDateTime(2026, 9, 12, 14, 30, 0),
+            duration=XmlDuration("PT1H30M"),
+            price=Decimal("3.85"),
+            tag=QName("http://netex.org.uk/netex", "ScheduledStopPoint"),
+            path=pathlib.Path("/tmp/netex_feed.xml"),
+        )
+        assert_serializer_roundtrip(self.object_serializer, xml_entity)
+        assert_serializer_roundtrip(MsgspecSerializer(), xml_entity)
 
 
 if __name__ == "__main__":

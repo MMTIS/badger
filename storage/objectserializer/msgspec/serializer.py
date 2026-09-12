@@ -1,9 +1,11 @@
-from __future__ import annotations
-
+from collections import UserString
 from decimal import Decimal
+from enum import Enum
 import importlib
+import pathlib
 from typing import Any, cast
 from dataclasses import is_dataclass
+from xml.etree.ElementTree import QName
 
 import msgspec
 
@@ -13,20 +15,41 @@ from storage.objectserializer.interface import ObjectSerializer
 class MsgspecSerializer(ObjectSerializer):
     """
     High-performance MessagePack serializer based on msgspec.
+    Supports Python builtins, dataclasses, and XML schema datatypes.
     """
 
     _class_cache: dict[str, type[Any]] = {}
 
     @staticmethod
     def _enc_hook(obj: Any) -> Any:
-        if isinstance(obj, Decimal):
+        if isinstance(obj, (Decimal, pathlib.Path)):
+            return str(obj)
+        if isinstance(obj, Enum):
+            return obj.value
+        if isinstance(obj, QName):
+            return str(obj)
+        if isinstance(obj, UserString):
+            return str(obj)
+        if hasattr(obj, "from_string"):
             return str(obj)
         raise NotImplementedError(f"Cannot serialize object of type {type(obj)}")
 
     @staticmethod
     def _dec_hook(target_type: type[Any], obj: Any) -> Any:
         if target_type is Decimal:
-            return Decimal(obj)
+            return Decimal(str(obj))
+        if target_type is pathlib.Path:
+            return pathlib.Path(str(obj))
+        if isinstance(target_type, type) and issubclass(target_type, Enum):
+            return target_type(obj)
+        if target_type is QName or (
+            isinstance(target_type, type) and issubclass(target_type, QName)
+        ):
+            return QName(str(obj))
+        if hasattr(target_type, "from_string"):
+            return target_type.from_string(str(obj))
+        if isinstance(target_type, type) and issubclass(target_type, UserString):
+            return target_type(str(obj))
         raise NotImplementedError(f"Cannot deserialize object of type {target_type}")
 
     def __init__(self, target_type: type[Any] | None = None):
