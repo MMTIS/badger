@@ -2,7 +2,7 @@ import datetime
 from datetime import timedelta
 from typing import List, Dict
 
-from xsdata.models.datatype import XmlDateTime, XmlDate
+from pyxsdata.models.datatype import XmlDateTime, XmlDate
 
 import utils
 from domain.netex.indexes.byid import getIndex

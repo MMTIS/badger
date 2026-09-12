@@ -1,6 +1,6 @@
 import math
 import datetime
-from xsdata.models.datatype import XmlTime, XmlDateTime, XmlDate
+from pyxsdata.models.datatype import XmlTime, XmlDateTime, XmlDate
 
 
 def gtfs_date(d: str) -> datetime.datetime:
