@@ -86,19 +86,31 @@ class MsgspecSerializer(ObjectSerializer):
     def loads(self, data: bytes, clazz: type[Any] | None = None) -> Any:
         target_cls = clazz or self._target_type
         if target_cls is not None:
-            return msgspec.msgpack.decode(
-                data,
-                type=target_cls,
-                dec_hook=self._dec_hook,
-            )
+            try:
+                return msgspec.msgpack.decode(
+                    data,
+                    type=target_cls,
+                    dec_hook=self._dec_hook,
+                )
+            except TypeError:
+                raw_dict = msgspec.msgpack.decode(data, dec_hook=self._dec_hook)
+                if isinstance(raw_dict, dict) and hasattr(target_cls, "__dataclass_fields__"):
+                    return target_cls(**{k: v for k, v in raw_dict.items() if k in target_cls.__dataclass_fields__})
+                return raw_dict
 
         tag, payload = msgspec.msgpack.decode(data)
         if tag:
             resolved_cls = self._resolve_class(tag)
             if resolved_cls is not None:
-                return msgspec.msgpack.decode(
-                    payload,
-                    type=resolved_cls,
-                    dec_hook=self._dec_hook,
-                )
+                try:
+                    return msgspec.msgpack.decode(
+                        payload,
+                        type=resolved_cls,
+                        dec_hook=self._dec_hook,
+                    )
+                except TypeError:
+                    raw_dict = msgspec.msgpack.decode(payload, dec_hook=self._dec_hook)
+                    if isinstance(raw_dict, dict) and hasattr(resolved_cls, "__dataclass_fields__"):
+                        return resolved_cls(**{k: v for k, v in raw_dict.items() if k in resolved_cls.__dataclass_fields__})
+                    return raw_dict
         return msgspec.msgpack.decode(payload, dec_hook=self._dec_hook)
