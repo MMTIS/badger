@@ -37,7 +37,7 @@ class MdbxStorageQueue(MdbxStorage):
 
             # TODO: If we want to do the references minus own embeddding, would be good to start here
             unresolved = tuple(
-                {self.serializer.encode_key(ref, version, referenced_clazz) for referenced_clazz, ref, version in only_references(obj, self.serializer)}
+                {self.serializer.encode_ref_path(ref, version, referenced_clazz, path) for referenced_clazz, ref, version, path in only_references(obj, self.serializer)}
             )
 
             batch.append((my_id, value, self.clazz_idx[obj.__class__], unresolved))

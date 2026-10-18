@@ -261,13 +261,14 @@ class MdbxStorage:
                 idx = db_id_idx.get_sequence(txn, 1).to_bytes(4, 'little')
                 full_key = RelationKeyCodec.get_fullkey_by_clazz_idx(idx, this_clazz_idx)
 
-            for referenced_clazz, ref, version in only_references(obj, self.serializer):
+            for referenced_clazz, ref, version, path in only_references(obj, self.serializer):
                 unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
                 resolved_idx = db_id_idx.get(txn, unresolved_value)
                 if resolved_idx:
                     db_reference_outward.put(txn, full_key, resolved_idx)
                 else:
-                    db_unresolved.put(txn, full_key, unresolved_value)
+                    unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path)
+                    db_unresolved.put(txn, full_key, unresolved_obj)
 
             value = self.serializer.marshall(obj, obj.__class__)
             db.put(txn, idx, value)
@@ -301,13 +302,14 @@ class MdbxStorage:
                     idx = db_id_idx.get_sequence(txn, 1).to_bytes(4, 'little')
                     full_key = RelationKeyCodec.get_fullkey_by_clazz_idx(idx, this_clazz_idx)
 
-                for referenced_clazz, ref, version in only_references(obj, self.serializer):
+                for referenced_clazz, ref, version, path in only_references(obj, self.serializer):
                     unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
                     resolved_idx = db_id_idx.get(txn, unresolved_value)
                     if resolved_idx:
                         db_reference_outward.put(txn, full_key, resolved_idx)
                     else:
-                        db_unresolved.put(txn, full_key, unresolved_value)
+                        unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path)
+                        db_unresolved.put(txn, full_key, unresolved_obj)
 
                 value = self.serializer.marshall(obj, clazz)
                 db.put(txn, idx, value)
