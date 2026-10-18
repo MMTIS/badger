@@ -9,6 +9,10 @@ from domain.netex.model import (
     TextType,
 )
 
+from domain.netex.services.recursive_attributes import (
+    recursive_attributes,
+    resolve_path,
+)
 from storage.mdbx.core.references import resolve
 
 from tests.base import MdbxStorageTestCase
@@ -65,3 +69,16 @@ class TestRecursiveReferences(MdbxStorageTestCase):
         # Terminates despite the cycle, and `visited` yields each object exactly once.
         self.assertEqual(set(visited_ids), {(Line, "l1"), (Route, "r1")})
         self.assertEqual(len(visited_ids), 2)
+
+    def test_path(self) -> None:
+        line = Line(
+            id="l1",
+            version="1",
+            name=MultilingualString(content=[TextType(value="Line l1")]),
+            routes=RouteRefsRelStructure(route_ref=[RouteRef(ref="r1", version="1")]),
+        )
+
+        depth: list[int] = []
+        all_attributes = list(recursive_attributes(line, depth, True))
+        for attribute, path in all_attributes:
+            self.assertEqual(attribute, resolve_path(line, path))

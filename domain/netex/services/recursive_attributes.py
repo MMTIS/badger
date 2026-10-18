@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Any, Hashable, Optional
-from collections.abc import Collection, Generator
+from collections.abc import Collection, Generator, Sequence
 
 from domain.netex import model as netex
 from domain.netex.model import (
@@ -118,6 +118,23 @@ def recursive_attributes(obj: Tid, depth: list[int], embeddings: bool = False) -
                     mydepth.pop()
     mydepth.pop()
 
+def resolve_path(obj: Any, path: Sequence[int]) -> Any:
+    """Resolve a numeric path to an object or attribute."""
+    current = obj
+
+    for index in path:
+        if hasattr(current, "__dataclass_fields__"):
+            field_names = _dc_field_names(current.__class__)
+            current = getattr(current, field_names[index])
+        elif isinstance(current, (list, tuple)):
+            current = current[index]
+        else:
+            raise TypeError(
+                f"Cannot resolve index {index} on "
+                f"{type(current).__name__}"
+            )
+
+    return current
 
 def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type[EntityStructure], str, str], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
