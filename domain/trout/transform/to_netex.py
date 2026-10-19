@@ -3,7 +3,7 @@ from collections.abc import Generator
 from typing import Union
 import datetime
 
-from xsdata.models.datatype import XmlTime, XmlDuration, XmlDateTime
+from pyxsdata.models.datatype import XmlTime, XmlDuration, XmlDateTime
 
 from domain.netex.model import (
     Line,

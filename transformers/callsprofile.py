@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from xsdata.models.datatype import XmlDuration, XmlTime
+from pyxsdata.models.datatype import XmlDuration, XmlTime
 
 from domain.netex.indexes.byid import getIndex
 from domain.netex.model import (

@@ -6,7 +6,7 @@ from enum import Enum
 from collections.abc import Iterable
 from typing import Any
 
-from xsdata.models.datatype import XmlDateTime, XmlDuration, XmlTime, XmlDate, XmlPeriod
+from pyxsdata.models.datatype import XmlDateTime, XmlDuration, XmlTime, XmlDate, XmlPeriod
 
 import domain.netex.model as netex
 import inspect

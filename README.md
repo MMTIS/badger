@@ -48,8 +48,8 @@ When the data is extracted (and potentially transformed) into NeTEx it will reta
 All information is kept as-is, there is no proprietary intermediate representation, NeTEx *is* the intermediate presentation.
 As such, the processing has an audit trail.
 
-Our (de)serialisation takes place using [xsData](https://xsdata.readthedocs.io/en/latest/), via Python Data Classes.
-This guarantees us XML Schema compliance.
+Our data-binding and code generation is powered by [pyxsdata](https://github.com/nth-bailey/pyxsdata), with high-performance native XML (de)serialization accelerated by [PolyXML](https://github.com/nth-bailey/PolyXML).
+This guarantees us XML Schema compliance at native Rust speeds.
 Our intermediate presentation is serialised using [cloudpickle](https://github.com/cloudpipe/cloudpickle) and is stored in compressed [lz4](https://lz4.github.io/lz4/) form.
 During the development of this software we have evaluated various database technologies, for our intermediate computing requirements [mdbx](https://github.com/erthink/libmdbx) is used.
 The processing of other CSV-based formats such as GTFS is mediated via  [DuckDB](https://duckdb.org/docs/stable/clients/python/overview.html).

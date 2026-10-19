@@ -2,13 +2,13 @@ import dataclasses
 from pathlib import Path
 from typing import List, Dict, Tuple
 
-from xsdata.formats.dataclass.context import XmlContext
-from xsdata.formats.dataclass.parsers import XmlParser
-from xsdata.formats.dataclass.parsers.config import ParserConfig
-from xsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
-from xsdata.formats.dataclass.serializers import XmlSerializer
-from xsdata.formats.dataclass.serializers.config import SerializerConfig
-from xsdata.models.datatype import XmlDuration
+from pyxsdata.formats.dataclass.context import XmlContext
+from pyxsdata.formats.dataclass.parsers import XmlParser
+from pyxsdata.formats.dataclass.parsers.config import ParserConfig
+from pyxsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
+from pyxsdata.formats.dataclass.serializers import XmlSerializer
+from pyxsdata.formats.dataclass.serializers.config import SerializerConfig
+from pyxsdata.models.datatype import XmlDuration
 
 from netex import (
     ServiceJourney,

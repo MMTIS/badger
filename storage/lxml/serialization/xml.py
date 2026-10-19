@@ -1,9 +1,9 @@
 from pathlib import Path
 
 from isal import igzip_threaded
-from xsdata.formats.dataclass.serializers import XmlSerializer
-from xsdata.formats.dataclass.serializers.config import SerializerConfig
-from xsdata.formats.dataclass.serializers.writers import XmlEventWriter
+from pyxsdata.formats.dataclass.serializers import XmlSerializer
+from pyxsdata.formats.dataclass.serializers.config import SerializerConfig
+from pyxsdata.formats.dataclass.serializers.writers import XmlEventWriter
 import zipfile
 import io
 from domain.netex.model import PublicationDelivery

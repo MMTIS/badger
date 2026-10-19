@@ -1,7 +1,7 @@
 # This code is written to export all data into a NeTEx GeneralFrame this should be our complete database state
 
 from mdbx.mdbx import TXN
-from xsdata.models.datatype import XmlDateTime
+from pyxsdata.models.datatype import XmlDateTime
 
 from domain.netex.model import (
     PublicationDelivery,

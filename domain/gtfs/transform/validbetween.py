@@ -1,7 +1,7 @@
 from datetime import datetime
 
 import duckdb
-from xsdata.models.datatype import XmlDateTime
+from pyxsdata.models.datatype import XmlDateTime
 
 from domain.gtfs.transform.datetime import gtfs_date
 from domain.netex.model import ValidBetween

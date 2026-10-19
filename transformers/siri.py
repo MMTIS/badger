@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from collections.abc import Generator
 
-from xsdata.models.datatype import XmlDateTime
+from pyxsdata.models.datatype import XmlDateTime
 
 from callsprofile import CallsProfile
 from netex import (

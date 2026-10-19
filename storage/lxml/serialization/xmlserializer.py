@@ -1,11 +1,11 @@
 from typing import Any, cast
 
-from xsdata.formats.dataclass.context import XmlContext
-from xsdata.formats.dataclass.parsers import XmlParser
-from xsdata.formats.dataclass.parsers.config import ParserConfig
-from xsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
-from xsdata.formats.dataclass.serializers import XmlSerializer
-from xsdata.formats.dataclass.serializers.config import SerializerConfig
+from pyxsdata.formats.dataclass.context import XmlContext
+from pyxsdata.formats.dataclass.parsers import XmlParser
+from pyxsdata.formats.dataclass.parsers.config import ParserConfig
+from pyxsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
+from pyxsdata.formats.dataclass.serializers import XmlSerializer
+from pyxsdata.formats.dataclass.serializers.config import SerializerConfig
 
 from lxml import etree
 
@@ -14,6 +14,8 @@ from domain.netex.services.model_typing import Tid
 from domain.utils import get_object_name
 from storage.interface import Serializer
 
+
+import polyxml
 
 class MyXmlSerializer(Serializer):
     serializer: XmlSerializer
@@ -62,10 +64,19 @@ class MyXmlSerializer(Serializer):
 
     def unmarshall(self, obj: Any, clazz: type[Tid]) -> Tid:
         if isinstance(obj, etree._Element):
-            return self.parser.parse(obj, clazz)
+            try:
+                xml_bytes = etree.tostring(obj, encoding="utf-8")
+                return polyxml.deserialize(xml_bytes, clazz)
+            except Exception:
+                return self.parser.parse(obj, clazz)
 
-        if isinstance(obj, str):
-            return self.parser.from_string(obj, clazz)
+        if isinstance(obj, (str, bytes)):
+            try:
+                return polyxml.deserialize(obj, clazz)
+            except Exception:
+                if isinstance(obj, str):
+                    return self.parser.from_string(obj, clazz)
+                return self.parser.from_bytes(obj, clazz)
 
-        else:
-            return self.parser.from_bytes(obj, clazz)
+        return self.parser.from_bytes(obj, clazz)
+

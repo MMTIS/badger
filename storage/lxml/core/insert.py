@@ -5,10 +5,10 @@ from zoneinfo import ZoneInfo
 
 from utils.aux_logging import log_once, log_all
 
-from xsdata.formats.dataclass.context import XmlContext
-from xsdata.formats.dataclass.parsers import XmlParser
-from xsdata.formats.dataclass.parsers.config import ParserConfig
-from xsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
+from pyxsdata.formats.dataclass.context import XmlContext
+from pyxsdata.formats.dataclass.parsers import XmlParser
+from pyxsdata.formats.dataclass.parsers.config import ParserConfig
+from pyxsdata.formats.dataclass.parsers.handlers import LxmlEventHandler
 
 from domain.netex import model as netex
 from domain.netex.model import VersionFrameDefaultsStructure, EntityStructure

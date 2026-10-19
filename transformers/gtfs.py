@@ -9,7 +9,7 @@ import itertools
 import copy
 
 from mdbx.mdbx import TXN
-from xsdata.models.datatype import XmlDate, XmlDateTime
+from pyxsdata.models.datatype import XmlDate, XmlDateTime
 
 from domain.netex.indexes.byid import getIndex
 from domain.netex.model import (

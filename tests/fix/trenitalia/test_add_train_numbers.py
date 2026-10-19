@@ -1,4 +1,4 @@
-from xsdata.models.datatype import XmlDateTime
+from pyxsdata.models.datatype import XmlDateTime
 
 from domain.netex.model import MultilingualString, ServiceJourney, TextType, TrainNumber
 
