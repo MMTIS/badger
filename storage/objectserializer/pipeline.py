@@ -36,8 +36,15 @@ class PipelineSerializer(ObjectSerializer):
 
         return data
 
-    def loads(self, data: bytes) -> Any:
+    def loads(self, data: bytes, clazz: type[Any] | None = None) -> Any:
         for codec in reversed(self._codecs):
             data = codec.decode(data)
 
+        if clazz is not None and hasattr(self._object_serializer, "loads"):
+            try:
+                return self._object_serializer.loads(data, clazz=clazz)
+            except TypeError:
+                pass
+
         return self._object_serializer.loads(data)
+
