@@ -13,3 +13,7 @@ class KeyCodec(ABC):
     @staticmethod
     @abstractmethod
     def split_key(key: bytes) -> tuple[bytes, bytes, bytes]: ...
+
+    @staticmethod
+    @abstractmethod
+    def split_key_str(key: bytes) -> tuple[str, str, bytes]: ...

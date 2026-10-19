@@ -1,6 +1,6 @@
 from functools import lru_cache
 from typing import Any, Hashable, Optional
-from collections.abc import Collection, Generator
+from collections.abc import Collection, Generator, Sequence
 
 from domain.netex import model as netex
 from domain.netex.model import (
@@ -118,8 +118,25 @@ def recursive_attributes(obj: Tid, depth: list[int], embeddings: bool = False) -
                     mydepth.pop()
     mydepth.pop()
 
+def resolve_path(obj: Any, path: Sequence[int]) -> Any:
+    """Resolve a numeric path to an object or attribute."""
+    current = obj
 
-def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type[EntityStructure], str, str], None, None]:
+    for index in path:
+        if hasattr(current, "__dataclass_fields__"):
+            field_names = _dc_field_names(current.__class__)
+            current = getattr(current, field_names[index])
+        elif isinstance(current, (list, tuple)):
+            current = current[index]
+        else:
+            raise TypeError(
+                f"Cannot resolve index {index} on "
+                f"{type(current).__name__}"
+            )
+
+    return current
+
+def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tuple[type[EntityStructure], str, str, Sequence[int]], None, None]:
     assert deserialized.id is not None, "deserialised.id must not be none"
     already_done: set[tuple[type[EntityStructure], str, str | None]] = set()
     # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
@@ -127,16 +144,16 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     ids: dict[tuple[str, str], type[EntityInVersionStructure]] = dict()
     refs: list[Any] = []
 
-    for obj, _path in recursive_attributes(deserialized, [], embeddings=True):
+    for obj, path in recursive_attributes(deserialized, [], embeddings=True):
         if isinstance(obj, EntityInVersionStructure):
             if obj.id is not None and obj.version is not None:
                 ids[(obj.id, obj.version)] = obj.__class__
 
         elif hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
-            refs.append(obj)
+            refs.append((obj, path,))
 
-    for obj in refs:
+    for obj, path in refs:
         # if obj.version_ref is not None and obj.version is None:
         # Don't include external references
         #    continue
@@ -200,6 +217,7 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
                 ref_class,  # The object that the reference is towards
                 obj.ref,
                 getattr(obj, "version", getattr(obj, "versionRef", "any")),
+                path
             )
 
             if result not in already_done:
