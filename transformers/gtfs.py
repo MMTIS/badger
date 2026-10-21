@@ -249,7 +249,7 @@ def gtfs_day_type(
     if day_type.properties is not None and len(day_type.properties.property_of_day) > 0:
         # If the properties are set, this means we would be able to make a valid calendars.txt entry we are now going to search for either an OperatingPeriod or UicOperatingPeriod
         pod = day_type.properties.property_of_day[0].days_of_week
-        if DayOfWeekEnumeration.EVERYDAY not in pod:
+        if DayOfWeekEnumeration.EVERYDAY in pod:
             pod = [
                 DayOfWeekEnumeration.MONDAY,
                 DayOfWeekEnumeration.TUESDAY,
@@ -271,8 +271,10 @@ def gtfs_day_type(
                     my_operating_period = project(
                         uic_operating_periods[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref], OperatingPeriod
                     )
-                    dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(my_operating_period)
-                    my_day_type_assignments.append(dta)
+                    # Work on a copy, the ValidDayBits below are read through the original reference
+                    dta_period = copy.deepcopy(dta)
+                    dta_period.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = getRef(my_operating_period)
+                    my_day_type_assignments.append(dta_period)
                     break
 
                 elif isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingPeriodRef):
@@ -325,19 +327,19 @@ def gtfs_day_type(
                         if uic_operating_period.valid_day_bits[i] == '1':
                             if datetime_weekday_to_dow(dt.weekday()) not in pod:
                                 # Extra date
-                                dta = copy.deepcopy(dta)
-                                dta.id += '_' + str(dt.date()).replace('-', '')
-                                dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = XmlDate.from_date(dt.date())
-                                my_day_type_assignments.append(dta)
+                                extra = copy.deepcopy(dta)
+                                extra.id += '_' + str(dt).replace('-', '')
+                                extra.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = XmlDate.from_date(dt)
+                                my_day_type_assignments.append(extra)
 
                         elif pod is not None and uic_operating_period.valid_day_bits[i] == '0':
                             if datetime_weekday_to_dow(dt.weekday()) in pod:
                                 # Removed date
-                                dta = copy.deepcopy(dta)
-                                dta.id += '_' + str(dt.date()).replace('-', '')
-                                dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = XmlDate.from_date(dt.date())
-                                dta.is_available = False
-                                my_day_type_assignments.append(dta)
+                                removed = copy.deepcopy(dta)
+                                removed.id += '_' + str(dt).replace('-', '')
+                                removed.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date = XmlDate.from_date(dt)
+                                removed.is_available = False
+                                my_day_type_assignments.append(removed)
 
                 elif isinstance(dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date, OperatingDayRef):
                     operating_day: OperatingDay = operating_days[dta.uic_operating_period_ref_or_operating_period_ref_or_operating_day_ref_or_date.ref]
