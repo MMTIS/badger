@@ -25,6 +25,7 @@ from utils.mro_attributes import resolve_class, unembed
 from utils import netex_monkeypatching  # noqa: F401
 
 from dataclasses import fields, MISSING
+from collections import defaultdict
 
 
 def _all_subclasses(cls: type[Any]) -> set[type[Any]]:
@@ -141,88 +142,60 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
     already_done: set[tuple[type[EntityStructure], str, str | None]] = set()
     # TODO: Hier deduplicatie implementeren, dat zou veel dubbele objecten schelen
 
-    ids: dict[tuple[str, str], type[EntityInVersionStructure]] = dict()
+    ids: dict[tuple[str, str], type[EntityInVersionStructure]] = defaultdict(set)
     refs: list[Any] = []
 
     for obj, path in recursive_attributes(deserialized, [], embeddings=True):
         if isinstance(obj, EntityInVersionStructure):
             if obj.id is not None and obj.version is not None:
-                ids[(obj.id, obj.version)] = obj.__class__
+                ids[(obj.id, obj.version)].add(obj.__class__)
 
         elif hasattr(obj, "ref"):
             assert obj.ref is not None, "Object ref must not be none"
             refs.append((obj, path,))
 
     for obj, path in refs:
-        # if obj.version_ref is not None and obj.version is None:
-        # Don't include external references
-        #    continue
+        classes = ids.get((obj.ref, obj.version,))
+        if classes is not None and len(classes) > 0:
+            # Heeft de huidige referentie wellicht een name_of_ref_class? En komt deze voor in classes?
+            if obj.name_of_ref_class and serializer.name_object[obj.name_of_ref_class.value] in classes:
+                # Top! Hij is dus resolved binnen de embedded daar hoeven we verder niets mee.
+                # We gaan verder met de volgende referentie
+                continue
+            else:
+                f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
+                if f.default is not MISSING and f.default is not None:
+                    if serializer.name_object[f.default.value] in classes:
+                        # Iets meer moeite, maar de default kan ook worden gevonden
+                        continue
 
-        # if obj.name_of_ref_class is None:
-        #    # Hack, because NeTEx does not define the default name of ref class yet
-        #    if obj.__class__.__name__.endswith("RefStructure"):
-        #        obj.name_of_ref_class = obj.__class__.__name__[0:-12]
-        #    elif obj.__class__.__name__.endswith("Ref"):
-        #        obj.name_of_ref_class = obj.__class__.__name__[0:-3]
+        # Er is geen lokale id dat bekend is, of de nameOfRefClass komt niet voor in combinatie met de ids
+        # We zijn nu op zoek naar de potentiele set van mogelijke nameOfRefClasses die gebruikt kunnen worden in de referentie
+        # In het beste geval zijn die direct beschikbaar (default) in het slechtste geval moeten we hacken.
+        # Het is belangrijk om te realiseren dat we van de oorsprong van deze referentie na dit punt niets weten.
+        # In theorie kunnen we dus in plaats van een lijst met klassen, die probleem ook kunnen verschuiven naar het moment
+        # wanneer we het willen opzoeken.
 
-        clazz = ids.get((obj.ref, obj.version), None)
-        if clazz:
-            # This is be a shortcut, it is possible that there are more objects with same id-pairs
+        name_of_ref_class: type | None = None
+        # The object explicitly mentioned a specific class, there should not be guessing
+        if obj.name_of_ref_class:
+            name_of_ref_class = serializer.name_object[obj.name_of_ref_class.value]
+        else:
             f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
             if f.default is not MISSING and f.default is not None:
-                try:
-                    obj.name_of_ref_class = type(f.default)(get_object_name(clazz))
-                except:
-                    obj.name_of_ref_class = f.default
-                    pass
-            continue
+                name_of_ref_class = serializer.name_object[obj.name_of_ref_class.value]
 
-        ref_class = None
-        if hasattr(obj.name_of_ref_class, 'value'):
-            if obj.name_of_ref_class.value not in serializer.name_object.keys():
-                # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
-                # o_bj.name_of_ref_class = obj.__class__(ref=None).name_of_ref_class
-                # TODO: Maybe precompute this?
-                f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
-                if f.default is not MISSING and f.default is not None:
-                    obj.name_of_ref_class = f.default
-                    ref_class = serializer.name_object[obj.name_of_ref_class.value]
-                else:
-                    # TODO: We should handle the case were we really have no clue, no default, not set
-                    obj.name_of_ref_class = 'DataManagedObject'
-                    ref_class = DataManagedObject
-            else:
-                ref_class = serializer.name_object[obj.name_of_ref_class.value]
+        result = (
+            name_of_ref_class,  # The object that the reference is towards
+            obj.ref,
+            getattr(obj, "version", getattr(obj, "versionRef", "any")),
+            path,
+            obj.__class__  # The referencing class
+        )
 
-        else:
-            if obj.name_of_ref_class not in serializer.name_object.keys():
-                # log_once(logging.WARN, "unknown name_of_ref_class", "Reference Class cannot be found in serializer")
-                # obj.name_of_ref_class = obj.__class__(ref=None).name_of_ref_class
-                # TODO: Maybe precompute this?
-                f = next(f for f in fields(obj.__class__) if f.name == 'name_of_ref_class')
-                if f.default is not MISSING and f.default is not None:
-                    obj.name_of_ref_class = f.default
-                    ref_class = serializer.name_object[obj.name_of_ref_class.value]  # because this one has a value
-
-                else:
-                    # TODO: We should handle the case were we really have no clue, no default, not set
-                    obj.name_of_ref_class = 'DataManagedObject'
-                    ref_class = DataManagedObject
-
-            else:
-                ref_class = serializer.name_object[obj.name_of_ref_class]
-
-        if ref_class:
-            result = (
-                ref_class,  # The object that the reference is towards
-                obj.ref,
-                getattr(obj, "version", getattr(obj, "versionRef", "any")),
-                path
-            )
-
-            if result not in already_done:
-                already_done.add(result)
-                yield result
+        if result not in already_done:
+            already_done.add(result)
+            yield result
 
 
 def only_reference_objects(deserialized: EntityStructure) -> Generator[VersionOfObjectRefStructure, None, None]:

@@ -261,14 +261,17 @@ class MdbxStorage:
                 idx = db_id_idx.get_sequence(txn, 1).to_bytes(4, 'little')
                 full_key = RelationKeyCodec.get_fullkey_by_clazz_idx(idx, this_clazz_idx)
 
-            for referenced_clazz, ref, version, path in only_references(obj, self.serializer):
-                unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
-                resolved_idx = db_id_idx.get(txn, unresolved_value)
-                if resolved_idx:
-                    db_reference_outward.put(txn, full_key, resolved_idx)
+            for referenced_clazz, ref, version, path, referencing_clazz in only_references(obj, self.serializer):
+                if referenced_clazz is not None:
+                    unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
+                    resolved_idx = db_id_idx.get(txn, unresolved_value)
+                    if resolved_idx:
+                        db_reference_outward.put(txn, full_key, resolved_idx)
+                    else:
+                        unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path, referencing_clazz)
+                        db_unresolved.put(txn, full_key, unresolved_obj)
                 else:
-                    unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path)
-                    db_unresolved.put(txn, full_key, unresolved_obj)
+                    print(ref, version, path)
 
             value = self.serializer.marshall(obj, obj.__class__)
             db.put(txn, idx, value)
