@@ -123,7 +123,6 @@ def resolve(storage: MdbxStorage) -> None:
 
     # TODO: get exclusively from KeyCodec
     separator = bytes([10])
-    separator2 = bytes([13])
 
     seen_count = 0
 
@@ -149,7 +148,11 @@ def resolve(storage: MdbxStorage) -> None:
                     log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
                 parts: list[bytes]
                 prefix: bytes
-                key, path_encoded = key_path.split(separator2, 1)
+
+                # TODO: this is a temporary implementation to show existing code still works
+                out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
+                key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
+
                 resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
                 class_change = False
                 version_change = False
@@ -194,7 +197,7 @@ def resolve(storage: MdbxStorage) -> None:
 
                 if resolved_idx:
                     if version_change or class_change:
-                        references_to_fix.append((resolved_idx, key, decode_path(path_encoded), version_change, class_change))
+                        references_to_fix.append((resolved_idx, key, out_path, version_change, class_change))
 
                     # f = storage.load_object_by_full_key(txn, idx)
                     # t = storage.load_object_by_full_key(txn, resolved_idx)
@@ -232,9 +235,8 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
     unresolved_pairs: dict[bytes, set[bytes]] = {}
     parts: list[bytes]
 
-    # TODO: fix with keycodec
+    # TODO: get exclusively from KeyCodec
     separator = bytes([10])
-    separator2 = bytes([13])
 
     if storage.readonly:
         raise
@@ -253,7 +255,11 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
         for full_key, key_path in unresolved_cursor.iter():
             assert full_key is not None
             assert key_path is not None
-            key, _path_encoded = key_path.split(separator2, 1)
+
+            # TODO: this is a temporary implementation to show existing code still works
+            out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
+            key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
+
             parts = storage.serializer.split_key(key)
             unresolved_pairs.setdefault(key, set()).add(full_key)
             missing_classes.add(storage.idx_clazz[parts[-1]])
@@ -284,7 +290,9 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
             for idx, key_path in it:
                 assert idx is not None
                 assert key_path is not None
-                key, path_encoded = key_path.split(separator2, 1)
+                # TODO: this is a temporary implementation to show existing code still works
+                out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
+                key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
 
                 prefix: bytes
                 resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
@@ -334,7 +342,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
 
                 if resolved_idx:
                     if version_change or class_change:
-                        references_to_fix.append((resolved_idx, key, decode_path(path_encoded), version_change, class_change))
+                        references_to_fix.append((resolved_idx, key, out_path, version_change, class_change))
 
                     # f = storage.load_object_by_full_key(txn, idx)
                     # t = storage.load_object_by_full_key(txn, resolved_idx)
