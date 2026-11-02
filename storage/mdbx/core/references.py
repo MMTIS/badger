@@ -151,7 +151,10 @@ def resolve(storage: MdbxStorage) -> None:
 
                 # TODO: this is a temporary implementation to show existing code still works
                 out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
-                key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
+                key = storage.serializer.encode_key_clazz(out_id, out_version, out_clazz)
+
+                if out_clazz is None:
+                    print("So we don't know what to search for, but it is a ", out_ref_clazz)
 
                 resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
                 class_change = False
