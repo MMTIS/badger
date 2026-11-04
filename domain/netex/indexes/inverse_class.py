@@ -3,13 +3,61 @@ from __future__ import annotations
 import inspect
 from dataclasses import fields, is_dataclass
 from collections.abc import Iterable
+from functools import lru_cache
 from typing import Any, Dict, List, Set, Type, Union, get_args, get_origin, get_type_hints
 from types import NoneType
+import sys
 
-from domain.netex.model import GeneralFrameMembersRelStructure
+from domain.netex.model import GeneralFrameMembersRelStructure, EntityStructure
 
 
-def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type[Any]] | None = None, scope_classes: set[Type[Any]] | None = None) -> Dict[Type[Any], Set[Type[Any]]]:
+@lru_cache(maxsize=None)
+def classes_and_subclasses(
+        classes: tuple[type[EntityStructure]],
+) -> tuple[type[EntityStructure]]:
+    result: set[type[EntityStructure]] = set()
+    visited: set[type] = set()
+
+    def walk(cls: type) -> None:
+        if cls in visited:
+            return
+
+        visited.add(cls)
+
+        # TODO: it seems that we cannot yet distinguish between a regular class and an abstract class
+        # Only include classes that are still the canonical class
+        # registered in their defining module.
+        module = sys.modules.get(cls.__module__)
+        if (
+                module is not None
+                and getattr(module, cls.__name__, None) is cls
+                and hasattr(cls, "Meta")
+                and hasattr(cls.Meta, "namespace")
+        ):
+            result.add(cls)
+
+        for sub in cls.__subclasses__():
+            walk(sub)
+
+    for cls in classes:
+        walk(cls.__mro__[1])
+
+    return tuple(result)
+
+def create_variant_classes_idx(clazz_idx: dict[type, bytes]):
+    @lru_cache(maxsize=None)
+    def get_variant_classes_idx(
+        variant_classes: tuple[type, ...],
+    ) -> tuple[bytes, ...]:
+        return tuple(
+            clazz_idx[variant_clazz]
+            for variant_clazz in variant_classes
+        )
+
+    return get_variant_classes_idx
+
+def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type[Any]] | None = None,
+                          scope_classes: set[Type[Any]] | None = None) -> Dict[Type[Any], Set[Type[Any]]]:
     """
     Bouw een inverse index: voor ieder type T (binnen scope_classes), in welke dataclasses (ook beperkt tot scope_classes) komt T (direct of indirect) voor als attribuut?
     :param classes: de dataclasses die onderzocht worden
@@ -29,10 +77,11 @@ def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type
         contained = _collect_contained_types(clazz, ignore_classes)
 
         # Filter de contained types op scope_classes
-        contained_in_scope = {c for c in contained if c in scope_classes}
+        all_scope_classes = classes_and_subclasses(tuple(scope_classes))
+        contained_in_scope = {c for c in contained if c in all_scope_classes}
 
         for candidate in contained_in_scope:
-            if candidate in scope_classes:
+            if candidate in all_scope_classes:
                 index.setdefault(candidate, set()).add(clazz)
 
     # Verwijder eventueel None uit values
@@ -45,15 +94,16 @@ def collect_classes_index(classes: Iterable[Type[Any]], ignore_classes: set[Type
 def _is_valid_dataclass(tp: Any, ignore_classes: Set[Type[Any]]) -> bool:
     """Check of dit een bruikbare dataclass is."""
     return (
-        isinstance(tp, type)
-        # and tp in classes
-        and tp not in ignore_classes
-        and is_dataclass(tp)
-        and not inspect.isabstract(tp)
+            isinstance(tp, type)
+            # and tp in classes
+            and tp not in ignore_classes
+            and is_dataclass(tp)
+            and not inspect.isabstract(tp)
     )
 
 
-def _collect_contained_types(clazz: Type[Any], ignore_classes: Set[Type[Any]], seen: Set[Type[Any]] | None = None) -> Set[Type[Any]]:
+def _collect_contained_types(clazz: Type[Any], ignore_classes: Set[Type[Any]], seen: Set[Type[Any]] | None = None) -> \
+Set[Type[Any]]:
     """
     Verzamelt transitief alle dataclass-types die in clazz voorkomen.
     """
@@ -124,7 +174,8 @@ def extract_concrete_types(tp: Any) -> Set[Type[Any]]:
 
 if __name__ == "__main__":
     choice_field = next(f for f in fields(GeneralFrameMembersRelStructure) if f.name == "choice")
-    all_types = {x for x in extract_concrete_types(choice_field.type) if not x.__name__.endswith("Frame") and x.__name__ != "EntityEntity"}
+    all_types = {x for x in extract_concrete_types(choice_field.type) if
+                 not x.__name__.endswith("Frame") and x.__name__ != "EntityEntity"}
     index = collect_classes_index(all_types, scope_classes=set(all_types))
     for k, v in index.items():
         print(k.__name__, "→", {c.__name__ for c in v})

@@ -13,7 +13,7 @@ def export_publication_delivery_xml(
     publication_delivery: PublicationDelivery, output_filename: Path
 ) -> None:
     serializer_config = SerializerConfig(
-        ignore_default_attributes=True, xml_declaration=True, pretty_print=True
+        ignore_default_attributes=True, xml_declaration=True, indent="    "
     )
     serializer_config.ignore_default_attributes = True
     serializer = XmlSerializer(config=serializer_config, writer=XmlEventWriter)

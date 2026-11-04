@@ -2,7 +2,8 @@ import logging
 
 from mdbx import MDBXDBFlags
 
-from domain.netex.indexes.inverse_class import collect_classes_index
+from domain.netex.indexes.inverse_class import collect_classes_index, classes_and_subclasses, create_variant_classes_idx
+from storage.objectserializer.cloudpickle import serializer
 from storage.objectserializer.codecs.path import decode_path
 from utils.aux_logging import log_all
 from domain.netex.services.model_typing import Tid
@@ -26,6 +27,9 @@ from storage.mdbx.core.const import (
 from mdbx.mdbx import TXN
 from collections.abc import Generator, Sequence
 from typing import Optional, Any, cast
+import re
+
+REF_SUFFIX = re.compile(r"(?:RefStructure|Ref)$")
 
 def references_fix_by_path(storage: MdbxStorage, txn: TXN, referencing_obj: EntityStructure, references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bool, bool]]) -> None:
     for resolved_idx, key, path, version_change, class_change in references_to_fix:
@@ -121,6 +125,10 @@ def resolve(storage: MdbxStorage) -> None:
     if storage.readonly:
         raise
 
+    get_variant_classes_idx = create_variant_classes_idx(
+        storage.serializer.clazz_idx
+    )
+
     # TODO: get exclusively from KeyCodec
     separator = bytes([10])
 
@@ -148,55 +156,55 @@ def resolve(storage: MdbxStorage) -> None:
                     log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
                 parts: list[bytes]
                 prefix: bytes
+                resolved_idx: bytes | None = None
+                class_change: bool = False
+                version_change: bool = False
 
-                # TODO: this is a temporary implementation to show existing code still works
                 out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
                 key = storage.serializer.encode_key_clazz(out_id, out_version, out_clazz)
 
-                if out_clazz is None:
-                    print("So we don't know what to search for, but it is a ", out_ref_clazz)
-
+                # Let us first know, do we already have candidate
                 resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
-                class_change = False
-                version_change = False
                 if not resolved_idx:
+                    # 1. Good: The version is incorrect or not specified, but original class matches (highest rank)
+                    # 2. Good: The version is correct, the original class does not match, but its variants do
+                    # 3. Wrong: The class is functionally incorrect, for example a QuayRef references a ScheduledStopPoint
+                    # 4. Wrong: Nothing is found
+
+                    clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__)
+                    abstract_clazz = storage.serializer.class_by_name(clazz_name)
+                    assert abstract_clazz is not None
+
+                    variant_classes = classes_and_subclasses((abstract_clazz,))
+                    variant_classes_idx = get_variant_classes_idx(variant_classes)
+
+                    out_clazz_idx = storage.serializer.clazz_idx.get(out_clazz, None)
+
+                    prefix = storage.serializer.encode_key_clazz(out_id, None, None)
                     cursor = txn.cursor(db=db_id_idx)
-
-                    # TODO: it is obvious we must refactor this
-                    parts = list(storage.serializer.split_key(key))
-                    class_part = separator + parts[-1]
-
-                    # Alternative 1, id + version exists, class does not match
-                    parts.pop()
-                    prefix = separator.join(parts) + separator
+                    wrong_classes: set[bytes] = set()
                     for check_key, check_idx in cursor.iter(prefix):
-                        if check_key.startswith(prefix):
+                        if not check_key.startswith(prefix):
+                            break
+
+                        # The best situation would be the match prefix \0 any \0 any of the right classes in variant_classes
+                        # We report an error if nothing would match, but we did find a prefix for the wrong class
+                        this_id, this_version, this_clazz_idx = storage.serializer.split_key(check_key)
+
+                        if out_clazz and this_clazz_idx == out_clazz:
+                            # Best case, thus break
                             class_change = check_idx
+                            version_change = check_idx
+                            resolved_idx = check_idx
+                            break
+
+                        elif this_clazz_idx in variant_classes_idx:
+                            class_change = check_idx
+                            version_change = check_idx
                             resolved_idx = check_idx
 
-                        # In all cases, found or not equal to prefix
-                        break
-
-                    if not resolved_idx:
-                        # Alternative 2, id exists
-                        parts.pop()
-
-                        prefix = separator.join(parts) + separator
-                        for check_key, check_idx in cursor.iter(prefix):
-                            if check_key.startswith(prefix) and check_key.endswith(class_part):
-                                class_change = False
-                                version_change = check_idx
-                                resolved_idx = check_idx
-                                break
-
-                            elif check_key.startswith(prefix):
-                                class_change = check_idx
-                                version_change = check_idx
-                                resolved_idx = check_idx
-                                # Continue to find a better match
-
-                            else:
-                                break
+                        else:
+                            wrong_classes.add(this_clazz_idx)
 
                 if resolved_idx:
                     if version_change or class_change:

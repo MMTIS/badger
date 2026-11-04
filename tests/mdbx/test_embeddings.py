@@ -94,7 +94,7 @@ class TestEmbeddings(MdbxStorageTestCase):
             references = list(self.storage.load_references_by_clazz_full_key(txn_read, full_key, False))
             self.assertEqual(1, len(references))
 
-            full_key_, authority_loaded = self.storage.load_object_by_full_key(txn_read, full_key)
+            authority_loaded = self.storage.load_object_by_full_key(txn_read, full_key)
             self.assertEqual("IT:ITH1:Authority:apb2:", authority_loaded.id)
 
     def test_embedded_object_can_be_resolved_and_promoted(self) -> None:

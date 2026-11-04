@@ -50,7 +50,7 @@ class MyXmlSerializer(Serializer):
         return get_object_name(clazz).encode('utf-8') + b'-' + key
 
     def marshall(self, obj: Any, clazz: type[EntityStructure], pretty_print: bool = False) -> str:
-        self.serializer.config.pretty_print = pretty_print
+        self.serializer.config.ident = "    " if pretty_print else None
         if isinstance(obj, str):
             return obj
         elif isinstance(obj, etree._Element):

@@ -21,7 +21,7 @@ from domain.netex.model import (
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
-from domain.utils import get_object_name
+from domain.utils import get_object_name, get_not_netex
 from storage.mdbx.serialization.combinedserializer import CombinedSerializer
 from utils.aux_logging import log_all
 from ctypes import c_uint64
@@ -66,7 +66,12 @@ class MdbxStorage:
         with self.env.rw_transaction() as txn:
             with txn.create_map(name=DB_CLAZZ_IDX, flags=DB_CLAZZ_IDX_FLAGS) as db_clazz_idx:
                 for idx, clazz in enumerate(self.serializer.name_object.values()):
+                    not_netex = get_not_netex(clazz)
+                    if not_netex:
+                        continue
+
                     clazz_name = get_object_name(clazz)
+
                     try:
                         # TODO: we have now all classes, not only the referencable classes
                         # _name_of_class = NameOfClass(clazz_name)
