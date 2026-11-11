@@ -24,14 +24,14 @@ from storage.mdbx.core.const import (
     DB_ID_IDX_FLAGS,
     DB_EMBEDDED_ID_IDX_FLAGS,
 )
-from mdbx.mdbx import TXN
+from mdbx.mdbx import TXN, DBI
 from collections.abc import Generator, Sequence
 from typing import Optional, Any, cast
 import re
 
 REF_SUFFIX = re.compile(r"(?:RefStructure|Ref)$")
 
-def references_fix_by_path(storage: MdbxStorage, txn: TXN, referencing_obj: EntityStructure, references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bool, bool]]) -> None:
+def references_fix_by_path(storage: MdbxStorage, txn: TXN, referencing_obj: EntityStructure, references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bytes | None, bytes | None]]) -> None:
     for resolved_idx, key, path, version_change, class_change in references_to_fix:
         referenced_clazz_idx, referenced_key = RelationKeyCodec.full_key_to_clazz_idx(resolved_idx)
         reference = resolve_path(referencing_obj, path)
@@ -129,9 +129,6 @@ def resolve(storage: MdbxStorage) -> None:
         storage.serializer.clazz_idx
     )
 
-    # TODO: get exclusively from KeyCodec
-    separator = bytes([10])
-
     seen_count = 0
 
     with storage.env.rw_transaction() as txn:
@@ -146,7 +143,7 @@ def resolve(storage: MdbxStorage) -> None:
 
         unresolved_cursor = txn.cursor(db=db_unresolved)
         for it in unresolved_cursor.iter_dupsort_rows():
-            references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bool, bool]] = []
+            references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bytes | None, bytes | None]] = []
 
             for idx, key_path in it:
                 assert idx is not None
@@ -157,8 +154,8 @@ def resolve(storage: MdbxStorage) -> None:
                 parts: list[bytes]
                 prefix: bytes
                 resolved_idx: bytes | None = None
-                class_change: bool = False
-                version_change: bool = False
+                class_change: bytes | None = None
+                version_change: bytes | None = None
 
                 out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
                 key = storage.serializer.encode_key_clazz(out_id, out_version, out_clazz)
@@ -184,6 +181,9 @@ def resolve(storage: MdbxStorage) -> None:
                     cursor = txn.cursor(db=db_id_idx)
                     wrong_classes: set[bytes] = set()
                     for check_key, check_idx in cursor.iter(prefix):
+                        assert check_key is not None
+                        assert check_idx is not None
+
                         if not check_key.startswith(prefix):
                             break
 
@@ -239,11 +239,48 @@ def resolve(storage: MdbxStorage) -> None:
         txn.commit()
 
 
+"""
+For readibility we split the creation of the embedded index
+"""
+def create_embedded_id_index(storage: MdbxStorage, db_unresolved: DBI, db_id_idx: DBI, txn: TXN):
+    missing_classes = set([])
+    unresolved_pairs: dict[bytes, set[bytes]] = {}
+
+    unresolved_cursor = txn.cursor(db=db_unresolved)
+    for full_key, key_path in unresolved_cursor.iter():
+        assert full_key is not None
+        assert key_path is not None
+
+        # TODO: this is a temporary implementation to show existing code still works
+        out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
+        key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
+
+        parts = storage.serializer.split_key(key)
+        unresolved_pairs.setdefault(key, set()).add(full_key)
+        missing_classes.add(storage.idx_clazz[parts[-1]])
+
+    used_classes_in_database = set(storage.db_names(txn).values())
+    index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
+    clazzes: set[type] = set().union(*index.values())
+
+    for clazz in clazzes:
+        this_clazz_idx = storage.clazz_idx[clazz]
+        db = txn.open_map(this_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+        with txn.cursor(db) as cur:
+            for idx, value in cur.iter():
+                assert idx is not None
+                assert value is not None
+                full_key = idx + this_clazz_idx.ljust(4, b'\x00')
+                obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
+
+                # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes
+                for candidate, _obj in only_embedding(storage.serializer,
+                                                      obj):  # we zouden hier direct het path binnen het object ook kunnen opslaan
+                    db_id_idx.put(txn, candidate, full_key)
+
 def resolve_embeddings_index(storage: MdbxStorage) -> None:
     log_all(logging.INFO, "[resolve] resolving embeddings")
 
-    missing_classes = set([])
-    unresolved_pairs: dict[bytes, set[bytes]] = {}
     parts: list[bytes]
 
     # TODO: get exclusively from KeyCodec
@@ -262,36 +299,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
         db_id_idx = txn.create_map(DB_EMBEDDED_ID_IDX, flags=DB_EMBEDDED_ID_IDX_FLAGS)
         db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
-        unresolved_cursor = txn.cursor(db=db_unresolved)
-        for full_key, key_path in unresolved_cursor.iter():
-            assert full_key is not None
-            assert key_path is not None
-
-            # TODO: this is a temporary implementation to show existing code still works
-            out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
-            key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
-
-            parts = storage.serializer.split_key(key)
-            unresolved_pairs.setdefault(key, set()).add(full_key)
-            missing_classes.add(storage.idx_clazz[parts[-1]])
-
-        used_classes_in_database = set(storage.db_names(txn).values())
-        index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)
-        clazzes: set[type] = set().union(*index.values())
-
-        for clazz in clazzes:
-            this_clazz_idx = storage.clazz_idx[clazz]
-            db = txn.open_map(this_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
-            with txn.cursor(db) as cur:
-                for idx, value in cur.iter():
-                    assert idx is not None
-                    assert value is not None
-                    full_key = idx + this_clazz_idx.ljust(4, b'\x00')
-                    obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
-
-                    # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes
-                    for candidate, _obj in only_embedding(storage.serializer, obj):  # we zouden hier direct het path binnen het object ook kunnen opslaan
-                        db_id_idx.put(txn, candidate, full_key)
+        create_embedded_id_index(storage, db_unresolved, db_id_idx, txn)
 
         # TODO: If this works, deduplicate the code with the regular one
         unresolved_cursor = txn.cursor(db=db_unresolved)
