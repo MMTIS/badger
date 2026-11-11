@@ -10,4 +10,5 @@ def get_not_netex(clazz: type[EntityStructure]) -> bool:
     return False
 
 def get_object_name(clazz: type[EntityStructure]) -> str:
-    return getattr(getattr(clazz, "Meta", None), "name", str(clazz.__name__))
+    meta = vars(clazz).get("Meta")
+    return getattr(meta, "name", clazz.__name__)
