@@ -119,17 +119,114 @@ def resolve_embeddings_iterable(
         for candidate in embedding_obj_iter(storage.serializer, obj, interesting_classes, ignore):
             yield key, obj, candidate
 
-
-def resolve(storage: MdbxStorage) -> None:
-    log_all(logging.INFO, "[resolve] resolving references")
-    if storage.readonly:
-        raise
-
+def resolve_ids(storage: MdbxStorage, db_unresolved: DBI, db_id_idx: DBI, txn: TXN):
     get_variant_classes_idx = create_variant_classes_idx(
         storage.serializer.clazz_idx
     )
 
     seen_count = 0
+
+    db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
+
+    unresolved_cursor = txn.cursor(db=db_unresolved)
+    for it in unresolved_cursor.iter_dupsort_rows():
+        references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bytes | None, bytes | None]] = []
+
+        for idx, key_path in it:
+            assert idx is not None
+            assert key_path is not None
+            seen_count += 1
+            if seen_count % 1_000_000 == 0:
+                log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
+            parts: list[bytes]
+            prefix: bytes
+            resolved_idx: bytes | None = None
+            class_change: bytes | None = None
+            version_change: bytes | None = None
+
+            out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
+            key = storage.serializer.encode_key_clazz(out_id, out_version, out_clazz)
+
+            # Let us first know, do we already have candidate
+            resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
+            if not resolved_idx:
+                # 1. Good: The version is incorrect or not specified, but original class matches (highest rank)
+                # 2. Good: The version is correct, the original class does not match, but its variants do
+                # 3. Wrong: The class is functionally incorrect, for example a QuayRef references a ScheduledStopPoint
+                # 4. Wrong: Nothing is found
+
+                clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__)
+                abstract_clazz = storage.serializer.class_by_name(clazz_name)
+                assert abstract_clazz is not None
+
+                variant_classes = classes_and_subclasses((abstract_clazz,))
+                variant_classes_idx = get_variant_classes_idx(variant_classes)
+
+                out_clazz_idx = storage.serializer.clazz_idx.get(out_clazz, None)
+
+                prefix = storage.serializer.encode_key_clazz(out_id, None, None)
+                cursor = txn.cursor(db=db_id_idx)
+                wrong_classes: set[bytes] = set()
+                for check_key, check_idx in cursor.iter(prefix):
+                    assert check_key is not None
+                    assert check_idx is not None
+
+                    if not check_key.startswith(prefix):
+                        break
+
+                    # The best situation would be the match prefix \0 any \0 any of the right classes in variant_classes
+                    # We report an error if nothing would match, but we did find a prefix for the wrong class
+                    this_id, this_version, this_clazz_idx = storage.serializer.split_key(check_key)
+
+                    if out_clazz and this_clazz_idx == out_clazz:
+                        # Best case, thus break
+                        class_change = check_idx
+                        version_change = check_idx
+                        resolved_idx = check_idx
+                        break
+
+                    elif this_clazz_idx in variant_classes_idx:
+                        class_change = check_idx
+                        version_change = check_idx
+                        resolved_idx = check_idx
+
+                    else:
+                        wrong_classes.add(this_clazz_idx)
+
+            if resolved_idx:
+                if version_change or class_change:
+                    references_to_fix.append((resolved_idx, key, out_path, version_change, class_change))
+
+                # f = storage.load_object_by_full_key(txn, idx)
+                # t = storage.load_object_by_full_key(txn, resolved_idx)
+
+                # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
+
+                db_reference_forward.put(txn, idx, resolved_idx)
+                # db_unresolved.delete(txn, idx, key) OR:
+                it.cur.delete()  # The reason here, the it, has a duplicated cursor
+
+            # else:
+            #    print("unresolved", key, idx)
+
+        # In this situation the original reference was incomplete
+        if len(references_to_fix) > 0:
+            referencing_clazz_idx, referencing_idx = RelationKeyCodec.full_key_to_clazz_idx(idx)
+            referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
+            referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
+
+            references_fix_by_path(storage, txn, referencing_obj, references_to_fix)
+            # references_fix_by_original_iteration(storage, txn, referencing_obj, references_to_fix)
+
+            # TODO: buffer this write to ~10000 objects of the same type?
+            db = txn.open_map(referencing_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
+            db.put(txn, referencing_idx, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+
+
+def resolve(storage: MdbxStorage) -> None:
+    log_all(logging.INFO, "[resolve] resolving references")
+    if storage.readonly:
+        raise
 
     with storage.env.rw_transaction() as txn:
         db_unresolved = txn.open_map(DB_UNRESOLVED, flags=DB_UNRESOLVED_FLAGS)
@@ -139,101 +236,7 @@ def resolve(storage: MdbxStorage) -> None:
             return
 
         db_id_idx = txn.open_map(DB_ID_IDX, flags=DB_ID_IDX_FLAGS)
-        db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
-
-        unresolved_cursor = txn.cursor(db=db_unresolved)
-        for it in unresolved_cursor.iter_dupsort_rows():
-            references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bytes | None, bytes | None]] = []
-
-            for idx, key_path in it:
-                assert idx is not None
-                assert key_path is not None
-                seen_count += 1
-                if seen_count % 1_000_000 == 0:
-                    log_all(logging.INFO, f"[resolve] {seen_count} references processed...")
-                parts: list[bytes]
-                prefix: bytes
-                resolved_idx: bytes | None = None
-                class_change: bytes | None = None
-                version_change: bytes | None = None
-
-                out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
-                key = storage.serializer.encode_key_clazz(out_id, out_version, out_clazz)
-
-                # Let us first know, do we already have candidate
-                resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
-                if not resolved_idx:
-                    # 1. Good: The version is incorrect or not specified, but original class matches (highest rank)
-                    # 2. Good: The version is correct, the original class does not match, but its variants do
-                    # 3. Wrong: The class is functionally incorrect, for example a QuayRef references a ScheduledStopPoint
-                    # 4. Wrong: Nothing is found
-
-                    clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__)
-                    abstract_clazz = storage.serializer.class_by_name(clazz_name)
-                    assert abstract_clazz is not None
-
-                    variant_classes = classes_and_subclasses((abstract_clazz,))
-                    variant_classes_idx = get_variant_classes_idx(variant_classes)
-
-                    out_clazz_idx = storage.serializer.clazz_idx.get(out_clazz, None)
-
-                    prefix = storage.serializer.encode_key_clazz(out_id, None, None)
-                    cursor = txn.cursor(db=db_id_idx)
-                    wrong_classes: set[bytes] = set()
-                    for check_key, check_idx in cursor.iter(prefix):
-                        assert check_key is not None
-                        assert check_idx is not None
-
-                        if not check_key.startswith(prefix):
-                            break
-
-                        # The best situation would be the match prefix \0 any \0 any of the right classes in variant_classes
-                        # We report an error if nothing would match, but we did find a prefix for the wrong class
-                        this_id, this_version, this_clazz_idx = storage.serializer.split_key(check_key)
-
-                        if out_clazz and this_clazz_idx == out_clazz:
-                            # Best case, thus break
-                            class_change = check_idx
-                            version_change = check_idx
-                            resolved_idx = check_idx
-                            break
-
-                        elif this_clazz_idx in variant_classes_idx:
-                            class_change = check_idx
-                            version_change = check_idx
-                            resolved_idx = check_idx
-
-                        else:
-                            wrong_classes.add(this_clazz_idx)
-
-                if resolved_idx:
-                    if version_change or class_change:
-                        references_to_fix.append((resolved_idx, key, out_path, version_change, class_change))
-
-                    # f = storage.load_object_by_full_key(txn, idx)
-                    # t = storage.load_object_by_full_key(txn, resolved_idx)
-
-                    # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
-
-                    db_reference_forward.put(txn, idx, resolved_idx)
-                    # db_unresolved.delete(txn, idx, key) OR:
-                    it.cur.delete()  # The reason here, the it, has a duplicated cursor
-
-                # else:
-                #    print("unresolved", key, idx)
-
-            # In this situation the original reference was incomplete
-            if len(references_to_fix) > 0:
-                referencing_clazz_idx, referencing_idx = RelationKeyCodec.full_key_to_clazz_idx(idx)
-                referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
-                referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
-
-                references_fix_by_path(storage, txn, referencing_obj, references_to_fix)
-                # references_fix_by_original_iteration(storage, txn, referencing_obj, references_to_fix)
-
-                # TODO: buffer this write to ~10000 objects of the same type?
-                db = txn.open_map(referencing_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
-                db.put(txn, referencing_idx, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+        resolve_ids(storage, db_unresolved, db_id_idx, txn)
 
         log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
         txn.commit()
@@ -281,11 +284,6 @@ def create_embedded_id_index(storage: MdbxStorage, db_unresolved: DBI, db_id_idx
 def resolve_embeddings_index(storage: MdbxStorage) -> None:
     log_all(logging.INFO, "[resolve] resolving embeddings")
 
-    parts: list[bytes]
-
-    # TODO: get exclusively from KeyCodec
-    separator = bytes([10])
-
     if storage.readonly:
         raise
 
@@ -297,95 +295,9 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
             return
 
         db_id_idx = txn.create_map(DB_EMBEDDED_ID_IDX, flags=DB_EMBEDDED_ID_IDX_FLAGS)
-        db_reference_forward = txn.open_map(DB_REFERENCE_OUTWARD, flags=DB_REFERENCE_OUTWARD_FLAGS)
 
         create_embedded_id_index(storage, db_unresolved, db_id_idx, txn)
-
-        # TODO: If this works, deduplicate the code with the regular one
-        unresolved_cursor = txn.cursor(db=db_unresolved)
-        for it in unresolved_cursor.iter_dupsort_rows():
-            references_to_fix: list[tuple[bytes, bytes, Sequence[int], bool, bool]] = []
-
-            for idx, key_path in it:
-                assert idx is not None
-                assert key_path is not None
-                # TODO: this is a temporary implementation to show existing code still works
-                out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
-                key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
-
-                prefix: bytes
-                resolved_idx = db_id_idx.get(txn, key)  # This will be the id + version + class check
-                class_change = False
-                version_change = False
-                if not resolved_idx:
-                    cursor = txn.cursor(db=db_id_idx)
-
-                    parts = list(storage.serializer.split_key(key))
-                    class_part = separator + parts[-1]
-
-                    # Alternative 1, id + version exists, class does not match
-                    parts.pop()
-                    prefix = separator.join(parts) + separator
-                    for check_key, check_idx in cursor.iter(prefix):
-                        assert check_key is not None
-                        assert check_idx is not None
-                        if check_key.startswith(prefix):
-                            class_change = check_idx
-                            resolved_idx = check_idx
-
-                        # In all cases, found or not equal to prefix
-                        break
-
-                    if not resolved_idx:
-                        # Alternative 2, id exists
-                        parts.pop()
-
-                        prefix = separator.join(parts) + separator
-                        for check_key, check_idx in cursor.iter(prefix):
-                            assert check_key is not None
-                            assert check_idx is not None
-                            if check_key.startswith(prefix) and check_key.endswith(class_part):
-                                class_change = False
-                                version_change = check_idx
-                                resolved_idx = check_idx
-                                break
-
-                            elif check_key.startswith(prefix):
-                                class_change = check_idx
-                                version_change = check_idx
-                                resolved_idx = check_idx
-                                # Continue to find a better match
-
-                            else:
-                                break
-
-                if resolved_idx:
-                    if version_change or class_change:
-                        references_to_fix.append((resolved_idx, key, out_path, version_change, class_change))
-
-                    # f = storage.load_object_by_full_key(txn, idx)
-                    # t = storage.load_object_by_full_key(txn, resolved_idx)
-
-                    # print(f"{f.id} {f.__class__} -> {t.id} {t.__class__}")
-
-                    db_reference_forward.put(txn, idx, resolved_idx)
-                    it.cur.delete()
-
-                # else:
-                #    print("unresolved", value, idx)
-
-            # In this situation the original reference was incomplete
-            if len(references_to_fix) > 0:
-                referencing_clazz_idx, referencing_idx = RelationKeyCodec.full_key_to_clazz_idx(idx)
-                referencing_clazz = storage.idx_clazz[referencing_clazz_idx]
-                referencing_obj: EntityStructure = storage.load_object(txn, referencing_clazz, referencing_idx)
-
-                references_fix_by_path(storage, txn, referencing_obj, references_to_fix)
-                # references_fix_by_original_iteration(storage, txn, referencing_obj, references_to_fix)
-
-                # TODO: buffer this write to ~10000 objects of the same type?
-                db = txn.open_map(referencing_clazz_idx, flags=MDBXDBFlags.MDBX_DB_DEFAULTS)
-                db.put(txn, referencing_idx, storage.serializer.marshall(referencing_obj, referencing_obj.__class__))
+        resolve_ids(storage, db_unresolved, db_id_idx, txn)
 
         log_all(logging.INFO, f"[unresolved references] {db_unresolved.get_stat(txn).ms_entries}")
 
