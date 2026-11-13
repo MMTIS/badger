@@ -158,7 +158,7 @@ def resolve_ids(storage: MdbxStorage, db_unresolved: DBI, db_id_idx: DBI, txn: T
                 clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__) # Wat werkt hier niet: FromJourney, ToJourney, terwijl daar wel een JourneyRefStructure achter zit
                 abstract_clazz = storage.serializer.class_by_name(clazz_name)
                 if abstract_clazz is None:
-                    print(clazz_name)
+                    print(clazz_name, out_id, out_version, out_clazz, out_path, out_ref_clazz)
                 assert abstract_clazz is not None
 
                 variant_classes = classes_and_subclasses((abstract_clazz,))
@@ -260,9 +260,17 @@ def create_embedded_id_index(storage: MdbxStorage, db_unresolved: DBI, db_id_idx
         out_id, out_version, out_clazz, out_path, out_ref_clazz = storage.serializer.decode_ref_path(key_path)
         key = storage.serializer.encode_key_clazz(out_id, out_version, out_ref_clazz)
 
-        parts = storage.serializer.split_key(key)
+        clazz_name = REF_SUFFIX.sub("",
+                                    out_ref_clazz.__name__)  # Wat werkt hier niet: FromJourney, ToJourney, terwijl daar wel een JourneyRefStructure achter zit
+        abstract_clazz = storage.serializer.class_by_name(clazz_name)
+        if abstract_clazz is None:
+            print(clazz_name, out_id, out_version, out_clazz, out_path, out_ref_clazz)
+        assert abstract_clazz is not None
+
+        variant_classes = classes_and_subclasses((abstract_clazz,))
+
         unresolved_pairs.setdefault(key, set()).add(full_key)
-        missing_classes.add(storage.idx_clazz[parts[-1]])
+        missing_classes.update(variant_classes)
 
     used_classes_in_database = set(storage.db_names(txn).values())
     index = collect_classes_index(used_classes_in_database, scope_classes=missing_classes)

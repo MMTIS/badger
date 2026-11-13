@@ -27,6 +27,9 @@ from utils import netex_monkeypatching  # noqa: F401
 from dataclasses import fields, MISSING
 from collections import defaultdict
 
+import re
+
+REF_SUFFIX = re.compile(r"(?:RefStructure|Ref)$")
 
 def _all_subclasses(cls: type[Any]) -> set[type[Any]]:
     seen = set()
@@ -185,12 +188,18 @@ def only_references(deserialized: Tid, serializer: Serializer) -> Generator[tupl
             if f.default is not MISSING and f.default is not None:
                 name_of_ref_class = serializer.name_object[obj.name_of_ref_class.value]
 
+        ref_clazz =  obj.__class__
+        clazz_name = REF_SUFFIX.sub("", ref_clazz.__name__)  # Wat werkt hier niet: FromJourney, ToJourney, terwijl daar wel een JourneyRefStructure achter zit
+        abstract_clazz = serializer.class_by_name(clazz_name)
+        if abstract_clazz is None:
+            ref_clazz = ref_clazz.__mro__[1]
+
         result = (
             name_of_ref_class,  # The object that the reference is towards
             obj.ref,
             getattr(obj, "version", getattr(obj, "versionRef", "any")),
             path,
-            obj.__class__  # The referencing class
+            ref_clazz
         )
 
         if result not in already_done:
