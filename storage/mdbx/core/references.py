@@ -155,8 +155,10 @@ def resolve_ids(storage: MdbxStorage, db_unresolved: DBI, db_id_idx: DBI, txn: T
                 # 3. Wrong: The class is functionally incorrect, for example a QuayRef references a ScheduledStopPoint
                 # 4. Wrong: Nothing is found
 
-                clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__)
+                clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__) # Wat werkt hier niet: FromJourney, ToJourney, terwijl daar wel een JourneyRefStructure achter zit
                 abstract_clazz = storage.serializer.class_by_name(clazz_name)
+                if abstract_clazz is None:
+                    print(clazz_name)
                 assert abstract_clazz is not None
 
                 variant_classes = classes_and_subclasses((abstract_clazz,))

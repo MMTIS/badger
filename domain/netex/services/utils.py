@@ -6,13 +6,30 @@ import domain.netex.model as netex
 from domain.utils import get_not_netex
 
 
-def get_boring_classes() -> set[Any]:
+def get_boring_classes() -> set[type]:
     # Get all classes from the generated NeTEx Python Dataclasses
     clsmembers = inspect.getmembers(netex, inspect.isclass)
 
-    # The interesting class members certainly will have a "Meta class" with a namespace
-    # interesting_members = [x[1] for x in clsmembers if hasattr(x[1], "Meta") and hasattr(x[1].Meta, "namespace")] + [netex.VersionFrameDefaultsStructure]
+    netex_classes = {
+        clazz
+        for _, clazz in clsmembers
+        if dataclasses.is_dataclass(clazz) and not get_not_netex(clazz)
+    }
 
-    interesting_members = [x[1] for x in clsmembers if dataclasses.is_dataclass(x[1]) and not get_not_netex(x[1])]
+    result = set(netex_classes)
 
-    return set(interesting_members)
+    def collect_subclasses(clazz: type) -> None:
+        for member in vars(clazz).values():
+            if (
+                inspect.isclass(member)
+                and dataclasses.is_dataclass(member)
+                # and issubclass(member, tuple(netex_classes))
+                and member not in result
+            ):
+                result.add(member)
+                collect_subclasses(member)
+
+    for clazz in netex_classes:
+        collect_subclasses(clazz)
+
+    return result
