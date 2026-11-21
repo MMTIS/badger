@@ -11,6 +11,7 @@ from storage.mdbx.core.implementation import MdbxStorage
 from utils.aux_logging import log_all, prepare_logger
 from storage.mdbx.core.references import resolve, resolve_embeddings_index
 
+# TODO: If we could do the reversion order in order of referencing, we might end up without any unresolved referencing issues.
 
 def reversion_object(deserialized: EntityStructure, version: str | None) -> EntityStructure:
     if version is None:
@@ -25,6 +26,11 @@ def reversion_object(deserialized: EntityStructure, version: str | None) -> Enti
             obj.responsibility_set_ref_attribute = None
         if hasattr(obj, "derived_from_version_ref_attribute"):
             obj.derived_from_version_ref_attribute = None
+        if hasattr(obj, "private_codes") and obj.private_codes is not None:
+            # TODO push into dedicated NeTEx 1.0
+            if hasattr(obj, "private_code"):
+                obj.private_code = obj.private_codes.private_code[0]
+            obj.private_codes = None
 
     if hasattr(deserialized, "version"):
         deserialized.version = version
@@ -34,6 +40,11 @@ def reversion_object(deserialized: EntityStructure, version: str | None) -> Enti
         deserialized.responsibility_set_ref_attribute = None
     if hasattr(deserialized, "derived_from_version_ref_attribute"):
         deserialized.derived_from_version_ref_attribute = None
+    if hasattr(deserialized, "private_codes") and deserialized.private_codes is not None:
+        # TODO push into dedicated NeTEx 1.0
+        if hasattr(deserialized, "private_code"):
+            deserialized.private_code = deserialized.private_codes.private_code[0]
+        deserialized.private_codes = None
 
     return deserialized
 

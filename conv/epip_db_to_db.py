@@ -3,6 +3,7 @@ from collections.abc import Generator
 
 from domain.netex.model import (
     Codespace,
+    Block,
     ScheduledStopPoint,
     Operator,
     ResponsibilitySet,
@@ -39,6 +40,9 @@ from domain.netex.model import (
 )
 from domain.netex.services.refs import getRef
 from transformers.multilingualstring import TransformMultilingualString
+from transformers.block import add_vehicletype_from_blocks_and_apply
+from transformers.noticeassignment import add_noticeassignment_to_elements_and_apply
+from conv.reversion_db_to_db import reversion_update
 from storage.mdbx.core.implementation import MdbxStorage
 
 import logging
@@ -169,12 +173,10 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                         # VehicleType,
                         ResponsibilitySet,
                         Notice,
-                        NoticeAssignment,
                         # TopographicPlace,
                         # Network,
                         DestinationDisplay,
                         PassengerStopAssignment,
-                        VehicleType,
                     ]:
                         # We need to have something like a backwards compatible copy,
                         # that takes the MultilingualString and only uses the features of NeTEx 1.3
@@ -188,6 +190,9 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
 
                     target_db.insert_any_object_on_queue(txn_write, epip_service_journey_generator(source_db, txn_read, generator_defaults))
 
+                    # VehicleType
+                    target_db.insert_any_object_on_queue(txn_write, add_vehicletype_from_blocks_and_apply(source_db, txn_read, target_db, txn_write, generator_defaults))
+
                     target_db.insert_any_object_on_queue(txn_write, epip_service_calendar(source_db, txn_read, generator_defaults))
 
                     target_db.insert_any_object_on_queue(txn_write, epip_service_journey_interchange(source_db, txn_read, generator_defaults))
@@ -195,8 +200,6 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                     # target_db.insert_any_object_on_queue(txn_write, epip_interchange_rule(source_db, txn_read, generator_defaults))
 
                     target_db.insert_any_object_on_queue(txn_write, infer_directions_from_sjps_and_apply(target_db, txn_write, generator_defaults))
-
-                    # TODO: apply NoticeAssignment directly on ServiceJourney (per EPIP)
 
                     # Reprojection update would copy the entire database, instead we would actually want to filter what we introduce,
                     # If we take a national stop registry it will have all the points, but we would want to limit this to the objects that
@@ -212,7 +215,12 @@ def epip_db_to_db(source_database_file: Path, target_database_file: Path) -> Non
                     # Force MultilingualString v1
                     target_db.insert_any_object_on_queue(txn_write, TransformMultilingualString.iter_to_v1(target_db, txn_write))
 
-                    # TODO: overwrite with a single version
+                    # Overwrite with a single version, does not work because it duplicates everything in this database
+                    # target_db.insert_any_object_on_queue(txn_write, reversion_update(target_db, txn_write, "20261109"))
+
+                    target_db.insert_any_object_on_queue(txn_write, TransformMultilingualString.iter_to_v1(target_db, txn_write))
+
+                    target_db.insert_any_object_on_queue(txn_write, add_noticeassignment_to_elements_and_apply(source_db, txn_read, target_db, txn_write, generator_defaults))
 
             txn_write.commit()
 

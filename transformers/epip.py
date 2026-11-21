@@ -1124,7 +1124,8 @@ def export_epip_network_offer(
         version="ntx:1.1",
         publication_timestamp=XmlDateTime.now(),
         participant_ref=ParticipantRef(value=defaults["particpant_ref"]),
-        description=MultilingualString(content=[TextType(value=defaults["xml_description"])]),
+        # description=MultilingualString(content=[TextType(value=defaults["xml_description"])]), # This is NeTEx 2.0, hence never EPIP 1 compliant
+        description=MultilingualString(content=[defaults["xml_description"]]),
         data_objects=DataObjectsRelStructure(
             choice=[
                 CompositeFrame(

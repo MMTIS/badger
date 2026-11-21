@@ -8,6 +8,7 @@ from storage.objectserializer.codecs.path import decode_path
 from utils.aux_logging import log_all
 from domain.netex.services.model_typing import Tid
 from domain.netex.model import EntityStructure, EntityInVersionStructure, NameOfClass
+from domain.netex.services.utils import get_enum
 from domain.netex.services.recursive_attributes import only_reference_objects, only_embedding, embedding_obj_iter
 from domain.utils import get_object_name
 from storage.keycodec.relation import RelationKeyCodec
@@ -33,22 +34,29 @@ REF_SUFFIX = re.compile(r"(?:RefStructure|Ref)$")
 
 def references_fix_by_path(storage: MdbxStorage, txn: TXN, referencing_obj: EntityStructure, references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bytes | None, bytes | None]]) -> None:
     for resolved_idx, key, path, version_change, class_change in references_to_fix:
-        referenced_clazz_idx, referenced_key = RelationKeyCodec.full_key_to_clazz_idx(resolved_idx)
+        # referenced_clazz_idx, referenced_key = RelationKeyCodec.full_key_to_clazz_idx(resolved_idx)
         reference = resolve_path(referencing_obj, path)
         if class_change:
-            referenced_class = storage.idx_clazz[referenced_clazz_idx]
-            reference.name_of_ref_class = NameOfClass(
-                get_object_name(referenced_class)
-            )  # I am very afraid how this might be handled in terms of comparisons later.
-        if version_change:
-            referenced_clazz = storage.idx_clazz[referenced_clazz_idx]
-            referenced_obj: EntityInVersionStructure = cast(
-                EntityInVersionStructure,
-                storage.load_object(
-                    txn, referenced_clazz, referenced_key
-                ),
+            # referenced_class = storage.idx_clazz[referenced_clazz_idx]
+            # TODO: This will create a 'some sort correct' name, but we want to have the type of name_of_ref_class
+            # reference.name_of_ref_class = NameOfClass(
+            #     get_object_name(referenced_class)
+            # )  # I am very afraid how this might be handled in terms of comparisons later.
+            field_type = get_enum(reference.__class__, "name_of_ref_class")
+            # field_type = NameOfClass if not field_type else
+            reference.name_of_ref_class = field_type(
+                get_object_name(storage.serializer.idx_clazz[class_change])
             )
-            reference.version = referenced_obj.version
+        if version_change:
+            # referenced_clazz = storage.idx_clazz[referenced_clazz_idx]
+            # referenced_obj: EntityInVersionStructure = cast(
+            #    EntityInVersionStructure,
+            #    storage.load_object(
+            #        txn, referenced_clazz, referenced_key
+            #    ),
+            #)
+            # reference.version = referenced_obj.version
+            reference.version = version_change.decode()
 
 def references_fix_by_original_iteration(storage: MdbxStorage, txn: TXN, referencing_obj: EntityStructure, references_to_fix: list[tuple[bytes, bytes | None, Sequence[int], bool, bool]]):
     for resolved_idx, value, path, version_change, class_change in references_to_fix:
@@ -74,9 +82,14 @@ def references_fix_by_original_iteration(storage: MdbxStorage, txn: TXN, referen
             if value == cmp_value:
                 if class_change:
                     referenced_class = storage.idx_clazz[referenced_clazz_idx]
-                    reference.name_of_ref_class = NameOfClass(
+                    # reference.name_of_ref_class = NameOfClass(
+                    #     get_object_name(referenced_class)
+                    # )  # I am very afraid how this might be handled in terms of comparisons later.
+                    field_type = get_enum(reference.__class__, "name_of_ref_class")
+                    # field_type = NameOfClass if field_type is None
+                    reference.name_of_ref_class = field_type(
                         get_object_name(referenced_class)
-                    )  # I am very afraid how this might be handled in terms of comparisons later.
+                    )
                 if version_change:
                     referenced_clazz = storage.idx_clazz[referenced_clazz_idx]
                     referenced_obj: EntityInVersionStructure = cast(
@@ -157,12 +170,11 @@ def resolve_ids(storage: MdbxStorage, db_unresolved: DBI, db_id_idx: DBI, txn: T
 
                 clazz_name = REF_SUFFIX.sub("", out_ref_clazz.__name__) # Wat werkt hier niet: FromJourney, ToJourney, terwijl daar wel een JourneyRefStructure achter zit
                 abstract_clazz = storage.serializer.class_by_name(clazz_name)
-                if abstract_clazz is None:
-                    print(clazz_name, out_id, out_version, out_clazz, out_path, out_ref_clazz)
-                assert abstract_clazz is not None
-
-                variant_classes = classes_and_subclasses((abstract_clazz,))
-                variant_classes_idx = get_variant_classes_idx(variant_classes)
+                if abstract_clazz is not None:
+                    variant_classes = classes_and_subclasses((abstract_clazz,))
+                    variant_classes_idx = get_variant_classes_idx(variant_classes)
+                else:
+                    variant_classes_idx = None
 
                 out_clazz_idx = storage.serializer.clazz_idx.get(out_clazz, None)
 
@@ -180,16 +192,17 @@ def resolve_ids(storage: MdbxStorage, db_unresolved: DBI, db_id_idx: DBI, txn: T
                     # We report an error if nothing would match, but we did find a prefix for the wrong class
                     this_id, this_version, this_clazz_idx = storage.serializer.split_key(check_key)
 
-                    if out_clazz and this_clazz_idx == out_clazz:
+                    if out_clazz and this_clazz_idx == out_clazz_idx:
                         # Best case, thus break
-                        class_change = check_idx
-                        version_change = check_idx
+                        class_change = None
+                        version_change = this_version
                         resolved_idx = check_idx
                         break
 
-                    elif this_clazz_idx in variant_classes_idx:
-                        class_change = check_idx
-                        version_change = check_idx
+                    elif variant_classes_idx is None or this_clazz_idx in variant_classes_idx:
+                        # TODO: I notice this is beng set, while only the version is changed
+                        class_change = this_clazz_idx
+                        version_change = this_version
                         resolved_idx = check_idx
 
                     else:
@@ -264,8 +277,9 @@ def create_embedded_id_index(storage: MdbxStorage, db_unresolved: DBI, db_id_idx
                                     out_ref_clazz.__name__)  # Wat werkt hier niet: FromJourney, ToJourney, terwijl daar wel een JourneyRefStructure achter zit
         abstract_clazz = storage.serializer.class_by_name(clazz_name)
         if abstract_clazz is None:
-            print(clazz_name, out_id, out_version, out_clazz, out_path, out_ref_clazz)
-        assert abstract_clazz is not None
+            print("Missing?", clazz_name, out_id, out_version, out_clazz, out_path, out_ref_clazz)
+            print("This would mean: search EVERYWHERE")
+            continue
 
         variant_classes = classes_and_subclasses((abstract_clazz,))
 
@@ -287,9 +301,18 @@ def create_embedded_id_index(storage: MdbxStorage, db_unresolved: DBI, db_id_idx
                 obj: EntityStructure = storage.serializer.unmarshall(value, clazz)
 
                 # TODO: None should be replaced with the set of potential sub classes, hence the superset of missing_classes
-                for candidate, _obj in only_embedding(storage.serializer,
+                for candidate, obj, path in only_embedding(storage.serializer,
                                                       obj):  # we zouden hier direct het path binnen het object ook kunnen opslaan
                     db_id_idx.put(txn, candidate, full_key)
+
+                    # unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path, referencing_clazz)
+                    # TODO:
+                    # Je hebt hier dus nodig:
+                    # De id van het embedded object (daar zoek je op)
+                    # De fullkey van het parent object
+                    # Het pad binnen het parent object (dan kun je het embedded object snel vinden)
+                    # (full_key, version, storage.clazz_idx[obj.__class__])
+                    # db_id_clazz_idx.put(txn, candidate, storage.clazz_idx[obj.__class__])
 
 def resolve_embeddings_index(storage: MdbxStorage) -> None:
     log_all(logging.INFO, "[resolve] resolving embeddings")
@@ -305,6 +328,7 @@ def resolve_embeddings_index(storage: MdbxStorage) -> None:
             return
 
         db_id_idx = txn.create_map(DB_EMBEDDED_ID_IDX, flags=DB_EMBEDDED_ID_IDX_FLAGS)
+        # db_id_clazz_idx = txn.create_map(DB_EMBEDDED_ID_CLAZZ_IDX, flags=DB_EMBEDDED_ID_CLAZZ_IDX_FLAGS)
 
         create_embedded_id_index(storage, db_unresolved, db_id_idx, txn)
         resolve_ids(storage, db_unresolved, db_id_idx, txn)

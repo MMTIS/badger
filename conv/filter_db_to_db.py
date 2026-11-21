@@ -8,6 +8,8 @@ from domain.utils import get_object_name
 
 
 from domain.netex.model import (
+    Authority,
+    Block,
     Route,
     ServiceJourneyPattern,
     ServiceJourneyInterchange,
@@ -157,11 +159,12 @@ def filter_db_to_db(
 ) -> None:
     with MdbxStorage(source_database_file, readonly=False) as db_write:
         # Assure we have a inward index.
-        resolve(db_write)
-        resolve_embeddings_index(db_write)
-        with db_write.env.rw_transaction() as txn:
-            db_write._index_references_inwards(txn, force=True)
-            txn.commit()
+        # resolve(db_write)
+        # resolve_embeddings_index(db_write)
+        # with db_write.env.rw_transaction() as txn:
+        #    db_write._index_references_inwards(txn, force=True)
+        #    txn.commit()
+        pass
 
     with MdbxStorage(source_database_file) as db_read:
         # Assure we have a inward index.
@@ -236,13 +239,46 @@ filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntitySt
         ],
         "inward_classes": [DayTypeAssignment, NoticeAssignment],
     },
-    Line: {
+    Block: {
         "conditional_inward_classes": [
+            # (Route, Line),
+            # (Line, Route),
+            # (Route, ServiceJourneyPattern),
+            # (ServiceJourneyPattern, ServiceJourney),
+            # (PassengerStopAssignment, ScheduledStopPoint),
+
             (Route, Line),
-            (Line, Route),
             (Route, ServiceJourneyPattern),
             (ServiceJourneyPattern, ServiceJourney),
             (PassengerStopAssignment, ScheduledStopPoint),
+            (ScheduledStopPoint, PassengerStopAssignment),
+
+        ],
+        "inward_classes": [DayTypeAssignment, NoticeAssignment],
+    },
+    Line: {
+        "conditional_inward_classes": [
+            # (Route, Line),
+            # (Line, Route),
+            # (Route, ServiceJourneyPattern),
+            # (ServiceJourneyPattern, ServiceJourney),
+            # (PassengerStopAssignment, ScheduledStopPoint),
+
+            (Route, Line),
+            (Line, Route),
+            (Authority, Line),
+            (Line, Authority),
+            (Route, ServiceJourneyPattern),
+            (Line, ServiceJourneyPattern),
+            (ServiceJourneyPattern, Line),
+            (ServiceJourneyPattern, Route),
+            (ServiceJourneyPattern, ServiceJourney),
+            (ServiceJourney, ServiceJourneyPattern),
+            (PassengerStopAssignment, ScheduledStopPoint),
+            (ScheduledStopPoint, PassengerStopAssignment),
+            (Block, ServiceJourney),
+            (ServiceJourney, Block),
+
         ],
         "inward_classes": [DayTypeAssignment, NoticeAssignment],
     },
@@ -255,6 +291,21 @@ filter_templates: dict[type[EntityStructure], dict[str, list[tuple[type[EntitySt
             (Route, ServiceJourneyPattern),
             (ServiceJourneyPattern, ServiceJourney),
             (PassengerStopAssignment, ScheduledStopPoint),
+        ],
+        "inward_classes": [DayTypeAssignment, NoticeAssignment],
+    },
+    Authority: {
+        "conditional_inward_classes": [
+            (Route, Line),
+            (Line, Route),
+            (Authority, Line),
+            (Line, Authority),
+            (Route, ServiceJourneyPattern),
+            (ServiceJourneyPattern, ServiceJourney),
+            (PassengerStopAssignment, ScheduledStopPoint),
+            (ScheduledStopPoint, PassengerStopAssignment),
+            (Block, ServiceJourney),
+            (ServiceJourney, Block),
         ],
         "inward_classes": [DayTypeAssignment, NoticeAssignment],
     },

@@ -33,3 +33,22 @@ def get_boring_classes() -> set[type]:
         collect_subclasses(clazz)
 
     return result
+
+
+from typing import get_type_hints, get_args, get_origin, Union
+import types
+
+
+def get_enum(clazz: type, attribute: str):
+    hints = get_type_hints(clazz)
+
+    field_type = hints[attribute]
+
+    # Unwrap Optional / Union
+    if get_origin(field_type) in (Union, types.UnionType):
+        field_type = next(
+            arg for arg in get_args(field_type)
+            if arg is not type(None)
+        )
+
+    return field_type

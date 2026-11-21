@@ -270,10 +270,10 @@ def only_embedding(
     if not interesting_classes:
         interesting_classes = serializer.clazz_idx.keys()
 
-    for obj, _path in recursive_attributes(deserialized, [], embeddings=True):
+    for obj, path in recursive_attributes(deserialized, [], embeddings=True):
         if hasattr(obj, "id") and obj.id is not None:
             if (ignore is None or obj.__class__ not in ignore) and obj.__class__ in interesting_classes:
-                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj
+                yield serializer.encode_key(obj.id, obj.version if hasattr(obj, "version") else None, obj.__class__), obj, path
 
 
 def recursive_attributes_all(

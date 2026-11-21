@@ -51,7 +51,7 @@ def create_variant_classes_idx(clazz_idx: dict[type, bytes]):
     ) -> tuple[bytes, ...]:
         return tuple(
             clazz_idx[variant_clazz]
-            for variant_clazz in variant_classes
+            for variant_clazz in variant_classes if variant_clazz in clazz_idx
         )
 
     return get_variant_classes_idx

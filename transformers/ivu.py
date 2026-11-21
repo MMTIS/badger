@@ -32,7 +32,15 @@ def avv_sjp_order(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourneyPat
         yield sjp
 
 def avv_service_journey_operator(db_read: MdbxStorage, txn: TXN) -> Generator[ServiceJourney, None, None]:
-    line_operator_ref = {line.id: line.operator_ref for line in db_read.iter_only_objects(txn, Line)}
+    line_operator_ref: dict[str, OperatorRef] = {}
+    for line in db_read.iter_only_objects(txn, Line):
+        if line.additional_operators is not None:
+            for operator_ref in line.additional_operators.transport_organisation_ref:
+                if isinstance(operator_ref, OperatorRef):
+                    line_operator_ref[line.id] = operator_ref
+        if line.operator_ref is not None:
+            line_operator_ref[line.id] = operator_ref
+
     route_operator_ref = {route.id: line_operator_ref[route.line_ref.ref] for route in db_read.iter_only_objects(txn, Route) if route.line_ref}
 
     sjp_operator_ref = {}
