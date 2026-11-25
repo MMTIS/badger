@@ -39,7 +39,7 @@ def avv_service_journey_operator(db_read: MdbxStorage, txn: TXN) -> Generator[Se
                 if isinstance(operator_ref, OperatorRef):
                     line_operator_ref[line.id] = operator_ref
         if line.operator_ref is not None:
-            line_operator_ref[line.id] = operator_ref
+            line_operator_ref[line.id] = line.operator_ref
 
     route_operator_ref = {route.id: line_operator_ref[route.line_ref.ref] for route in db_read.iter_only_objects(txn, Route) if route.line_ref}
 

@@ -23,6 +23,7 @@ from domain.netex.model import (
     EscalatorEquipment,
     TravelatorEquipment,
     SiteFacilitySet,
+    PrivateCodes
 )
 from domain.utils import get_object_name
 from storage.lxml.serialization.xmlserializer import MyXmlSerializer
@@ -31,6 +32,14 @@ from storage.mdbx.core.implementation import MdbxStorage
 mapping = {SimplePointVersionStructure: ogr.wkbPoint, Polygon: ogr.wkbPolygon, MultiSurface: ogr.wkbMultiPolygon, NoneType: ogr.wkbPoint}
 mapping_name = {SimplePointVersionStructure: '_POINT', Polygon: '_POLYGON', MultiSurface: '_MULTIPOLYGON', NoneType: '_POINT'}
 
+def get_first_privatecode(privatecodes: PrivateCodes):
+    if privatecodes is None:
+        return None
+
+    if len(privatecodes.private_code) == 0:
+        return None
+
+    return privatecodes.private_code[0].value
 
 def force_3d(geom: ogr.Geometry, z_value: int) -> ogr.Geometry:
     """
@@ -85,7 +94,7 @@ def createLayers(storage: MdbxStorage, ds: Dataset):
     # First pass, see what types are around
     grouped_geo = defaultdict(set)
 
-    with storage.env.ro_transaction():
+    with storage.env.ro_transaction() as txn:
         for k, stopPlace in storage.iter_objects(txn, StopPlace):
             collected_equipments: dict[str, Any] = {}
 
@@ -164,6 +173,9 @@ def createLayers(storage: MdbxStorage, ds: Dataset):
                             if equipment_place.place_equipments:
                                 for place_equipment in equipment_place.place_equipments.choice:
                                     if hasattr(place_equipment, "ref"):
+                                        # This mitigates poor input, unacceptable.
+                                        if place_equipment.ref not in collected_equipments:
+                                            continue
                                         actual_equipment = collected_equipments[place_equipment.ref]
                                     else:
                                         collected_equipments[place_equipment.id] = place_equipment
@@ -247,6 +259,7 @@ field_maps[StopPlace] = stopplace_field_map
 
 quay_field_map = {
     "name": ("name.content[0]", ogr.OFTString),
+    "private_code": ("private_code.value", ogr.OFTString),
     "public_code": ("public_code.value", ogr.OFTString),
     "quay_type": ("quay_type", ogr.OFTString),
     "parent_quay_ref": ("parent_quay_ref", ogr.OFTString),
@@ -316,7 +329,7 @@ def add_feature(obj: Any, layers: dict[str, ogr.Layer]):
         feature = ogr.Feature(layer.GetLayerDefn())
 
         feature.SetField("name", sp.name.content[0])
-        feature.SetField("private_code", sp.private_code.value)
+        feature.SetField("private_code", get_first_privatecode(sp.private_codes))
         feature.SetField("accessibility_assessment", get_boolean(sp.accessibility_assessment.mobility_impaired_access))
 
         if sp.accessibility_assessment.limitations:
@@ -347,8 +360,9 @@ def add_feature(obj: Any, layers: dict[str, ogr.Layer]):
         layer = layers[key]
         feature = ogr.Feature(layer.GetLayerDefn())
 
-        feature.SetField("name", q.name.content[0])
+        feature.SetField("name", q.name.content[0] if q.name else None)
         feature.SetField("public_code", q.public_code.value if q.public_code else None)
+        feature.SetField("private_code", get_first_privatecode(q.private_codes))
         feature.SetField("quay_type", q.quay_type.name)
         feature.SetField("parent_quay_ref", q.parent_quay_ref.ref if q.parent_quay_ref else None)
         feature.SetField("accessibility_assessment", get_boolean(q.accessibility_assessment.mobility_impaired_access) if q.accessibility_assessment else None)
@@ -385,7 +399,7 @@ def add_feature(obj: Any, layers: dict[str, ogr.Layer]):
         layer = layers[key]
         feature = ogr.Feature(layer.GetLayerDefn())
 
-        feature.SetField("private_code", access_space.private_code.value if obj.private_code else None)
+        feature.SetField("private_code", get_first_privatecode(access_space.private_codes))
         feature.SetField("access_space_type", access_space.access_space_type.name)
         feature.SetField("passage_type", access_space.passage_type.name)
         feature.SetField("level", level)
@@ -416,7 +430,7 @@ def add_feature(obj: Any, layers: dict[str, ogr.Layer]):
         feature = ogr.Feature(layer.GetLayerDefn())
 
         if isinstance(obj, LiftEquipment):
-            feature.SetField("private_code", obj.private_code.value if obj.private_code else None)
+            feature.SetField("private_code", get_first_privatecode(obj.private_codes))
             feature.SetField("public_code", obj.public_code.value if obj.public_code else None)
             feature.SetField("description", obj.description.content[0] if obj.description else None)
             feature.SetField("width", float(obj.width) if obj.width else None)
@@ -428,7 +442,7 @@ def add_feature(obj: Any, layers: dict[str, ogr.Layer]):
             feature.SetField("accoustic_announcements", 1 if obj.accoustic_announcements is True else 0 if obj.accoustic_announcements is False else None)
 
         elif isinstance(obj, EscalatorEquipment) or isinstance(obj, RampEquipment) or isinstance(obj, TravelatorEquipment):
-            feature.SetField("private_code", obj.private_code.value if obj.private_code else None)
+            feature.SetField("private_code", get_first_privatecode(obj.private_codes))
             feature.SetField("public_code", obj.public_code.value if obj.public_code else None)
             feature.SetField("description", obj.description.content[0] if obj.description else None)
 
@@ -539,6 +553,8 @@ def stopPlaceToLayers(stopPlace: StopPlace, layers: dict[str, ogr.Layer]):
                     if equipment_place.place_equipments:
                         for place_equipment in equipment_place.place_equipments.choice:
                             if hasattr(place_equipment, "ref"):
+                                if place_equipment.ref not in collected_equipments:
+                                    continue
                                 actual_equipment = collected_equipments[place_equipment.ref]
                             else:
                                 collected_equipments[place_equipment.id] = place_equipment
