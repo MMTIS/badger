@@ -1,7 +1,7 @@
 from typing import cast
 
-from domain.netex import ScheduledStopPointRef, FareScheduledStopPoint, NameOfClass
-from domain.netex.model import PassengerStopAssignment, StopPlace, StopPlaceRef, QuaysRelStructure, Quay, QuayRef
+from domain.netex.model import PassengerStopAssignment, StopPlace, StopPlaceRef, QuaysRelStructure, Quay, QuayRef, Block, ScheduledStopPointRef, FareScheduledStopPoint, NameOfClass, PointRefStructure, ScheduledStopPoint, NameOfClassQuayRefStructureType, NameOfClassScheduledStopPointRefStructureType, NameOfClassPointRefStructureType
+from domain.netex.services.utils import get_enum
 from storage.mdbx.core.references import resolve, resolve_embeddings_index
 from tests.base import MdbxStorageTestCase
 
@@ -29,7 +29,37 @@ class TestResolve(MdbxStorageTestCase):
         with self.storage.env.ro_transaction() as txn_read:
             psa_loaded: PassengerStopAssignment
             _key, psa_loaded = self.storage.load_object_by_id_version(txn_read, "psa1", PassengerStopAssignment, "1")
-            self.assertEqual(psa_loaded.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.name_of_ref_class, NameOfClass.FARE_SCHEDULED_STOP_POINT)
+            self.assertEqual(psa_loaded.fare_scheduled_stop_point_ref_or_scheduled_stop_point_ref_or_scheduled_stop_point.name_of_ref_class, NameOfClassScheduledStopPointRefStructureType.FARE_SCHEDULED_STOP_POINT)
+
+
+    def test_abstract_no_class_found(self) -> None:
+        """
+        In case a reference happens to be a non-abstract supertype, but references a subtype.
+        In case a reference from an ambstract is truly invalid: no prefix exists
+        """
+
+        block = Block(id="b1", version="1",
+                      start_point_ref=PointRefStructure(ref="p1", version="1"),
+                      end_point_ref=PointRefStructure(ref="p2", version="1"),
+                      )
+
+        p1 = ScheduledStopPoint(id="p1", version="1")
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage.insert_any_object_on_queue(txn_write, [block, p1])
+            txn_write.commit()
+
+        resolve(self.storage)
+
+        with self.storage.env.ro_transaction() as txn_read:
+            block_loaded: Block
+            _key, block_loaded = self.storage.load_object_by_id_version(txn_read, "b1", Block, "1")
+
+            # This one can be overridden, since it exists
+            self.assertEqual(block_loaded.start_point_ref.name_of_ref_class, NameOfClassPointRefStructureType.SCHEDULED_STOP_POINT)
+
+            # This one must stay the same as input
+            self.assertEqual(block_loaded.end_point_ref.name_of_ref_class, block.end_point_ref.name_of_ref_class)
 
 
     def test_version_is_updated(self) -> None:
@@ -58,3 +88,60 @@ class TestResolve(MdbxStorageTestCase):
             _key, psa_loaded = self.storage.load_object_by_id_version(txn_read, "psa1", PassengerStopAssignment, "1")
             self.assertEqual(psa_loaded.taxi_rank_ref_or_stop_place_ref_or_stop_place.version, "2")
             self.assertEqual(psa_loaded.taxi_stand_ref_or_quay_ref_or_quay.version, "2")
+            self.assertEqual(psa_loaded.taxi_stand_ref_or_quay_ref_or_quay.name_of_ref_class, NameOfClassQuayRefStructureType.QUAY)
+
+    def test_name_of_ref_class(self) -> None:
+        """
+        In case of a version which does not exist, check if we correctly resolved the situation.
+        """
+
+        psa = PassengerStopAssignment(
+            id="psa1",
+            version="1",
+            taxi_stand_ref_or_quay_ref_or_quay=QuayRef(ref="q1", version="2"), # Deliberately wrong version to trigger other code path
+        )
+
+        sp = StopPlace(id="sp1", version="1", quays=QuaysRelStructure(taxi_stand_ref_or_quay_ref_or_quay=[Quay(id="q1", version="1")]))
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage.insert_any_object_on_queue(txn_write, [psa, sp])
+            txn_write.commit()
+
+        # resolve(self.storage)
+        resolve_embeddings_index(self.storage)
+
+        with self.storage.env.ro_transaction() as txn_read:
+            psa_loaded: PassengerStopAssignment
+            _key, psa_loaded = self.storage.load_object_by_id_version(txn_read, "psa1", PassengerStopAssignment, "1")
+            self.assertEqual(psa_loaded.taxi_stand_ref_or_quay_ref_or_quay.name_of_ref_class, NameOfClassQuayRefStructureType.QUAY)
+
+    def test_name_of_ref_class2(self) -> None:
+        """
+        In case of a version which does not exist, check if we correctly resolved the situation.
+        """
+
+        psa = PassengerStopAssignment(
+            id="psa1",
+            version="1",
+            taxi_stand_ref_or_quay_ref_or_quay=QuayRef(ref="q1", version="1", name_of_ref_class=NameOfClass.STOP_PLACE), # Deliberately very invalid
+        )
+
+        sp = StopPlace(id="sp1", version="1", quays=QuaysRelStructure(taxi_stand_ref_or_quay_ref_or_quay=[Quay(id="q1", version="1")]))
+
+        with self.storage.env.rw_transaction() as txn_write:
+            self.storage.insert_any_object_on_queue(txn_write, [psa, sp])
+            txn_write.commit()
+
+        # resolve(self.storage)
+        resolve_embeddings_index(self.storage)
+
+        with self.storage.env.ro_transaction() as txn_read:
+            psa_loaded: PassengerStopAssignment
+            _key, psa_loaded = self.storage.load_object_by_id_version(txn_read, "psa1", PassengerStopAssignment, "1")
+            self.assertEqual(psa_loaded.taxi_stand_ref_or_quay_ref_or_quay.name_of_ref_class, NameOfClassQuayRefStructureType.QUAY)
+
+
+    def test_name_of_ref_class_dynamic(self) -> None:
+        field_type = get_enum(QuayRef, "name_of_ref_class")
+        self.assertEqual(field_type, NameOfClassQuayRefStructureType)
+

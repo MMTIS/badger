@@ -1,6 +1,6 @@
 import unittest
 
-from domain.netex.model import ScheduledStopPoint
+from domain.netex.model import ScheduledStopPoint, ScheduledStopPointRef
 from domain.netex.services.utils import get_boring_classes
 from storage.mdbx.serialization.combinedserializer import CombinedSerializer
 from storage.objectserializer.codecs.path import encode_path, decode_path
@@ -52,19 +52,22 @@ class TestPathCodec(unittest.TestCase):
 
     def test_combined_ref_path(self) -> None:
         serializer = CombinedSerializer(get_boring_classes())
-        serializer.set_clazz_idx({ScheduledStopPoint: b'0'}, {b'0': ScheduledStopPoint})
+        serializer.set_clazz_idx({ScheduledStopPoint: b'0', ScheduledStopPointRef: b'1'}, {b'0': ScheduledStopPoint, b'1': ScheduledStopPointRef})
         in_id = "test"
         in_version = "1"
         in_clazz = ScheduledStopPoint
         in_path = (10,1,33)
+        in_ref_clazz = ScheduledStopPointRef
 
-        ref_path_bytes = serializer.encode_ref_path(in_id, in_version, in_clazz, encode_path(in_path))
-        key, path = serializer.split_key_path(ref_path_bytes)
+        ref_path_bytes = serializer.encode_ref_path(in_id, in_version, in_clazz, encode_path(in_path), in_ref_clazz)
+        out_id, out_version, out_clazz, out_path, out_ref_clazz = serializer.decode_ref_path(ref_path_bytes)
 
-        self.assertEqual(in_id, key[0])
-        self.assertEqual(in_version, key[1])
-        self.assertEqual(in_clazz, serializer.idx_clazz[key[2]])
-        self.assertEqual(in_path, path)
+        self.assertEqual(in_id, out_id)
+        self.assertEqual(in_version, out_version)
+        self.assertEqual(in_clazz, out_clazz)
+        self.assertEqual(in_path, out_path)
+        self.assertEqual(in_ref_clazz, out_ref_clazz)
+
 
 if __name__ == "__main__":
     unittest.main()

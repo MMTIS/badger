@@ -21,7 +21,7 @@ from domain.netex.model import (
 from domain.netex.services.model_typing import Tid
 from domain.netex.services.recursive_attributes import only_references
 from domain.netex.services.utils import get_boring_classes
-from domain.utils import get_object_name
+from domain.utils import get_object_name, get_not_netex
 from storage.mdbx.serialization.combinedserializer import CombinedSerializer
 from utils.aux_logging import log_all
 from ctypes import c_uint64
@@ -66,9 +66,15 @@ class MdbxStorage:
         with self.env.rw_transaction() as txn:
             with txn.create_map(name=DB_CLAZZ_IDX, flags=DB_CLAZZ_IDX_FLAGS) as db_clazz_idx:
                 for idx, clazz in enumerate(self.serializer.name_object.values()):
+                    not_netex = get_not_netex(clazz)
+                    if not_netex:
+                        continue
+
                     clazz_name = get_object_name(clazz)
+
                     try:
-                        _name_of_class = NameOfClass(clazz_name)
+                        # TODO: we have now all classes, not only the referencable classes
+                        # _name_of_class = NameOfClass(clazz_name)
                         db_clazz_idx.put(txn, idx.to_bytes(2, 'little'), clazz_name.encode('utf-8'))
                     except ValueError:
                         pass
@@ -261,13 +267,18 @@ class MdbxStorage:
                 idx = db_id_idx.get_sequence(txn, 1).to_bytes(4, 'little')
                 full_key = RelationKeyCodec.get_fullkey_by_clazz_idx(idx, this_clazz_idx)
 
-            for referenced_clazz, ref, version, path in only_references(obj, self.serializer):
-                unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
-                resolved_idx = db_id_idx.get(txn, unresolved_value)
-                if resolved_idx:
-                    db_reference_outward.put(txn, full_key, resolved_idx)
+            for referenced_clazz, ref, version, path, referencing_clazz in only_references(obj, self.serializer):
+                if referenced_clazz is not None:
+                    unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
+                    resolved_idx = db_id_idx.get(txn, unresolved_value)
+                    if resolved_idx:
+                        db_reference_outward.put(txn, full_key, resolved_idx)
+
+                    else:
+                        unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path, referencing_clazz)
+                        db_unresolved.put(txn, full_key, unresolved_obj)
                 else:
-                    unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path)
+                    unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path, referencing_clazz)
                     db_unresolved.put(txn, full_key, unresolved_obj)
 
             value = self.serializer.marshall(obj, obj.__class__)
@@ -302,13 +313,17 @@ class MdbxStorage:
                     idx = db_id_idx.get_sequence(txn, 1).to_bytes(4, 'little')
                     full_key = RelationKeyCodec.get_fullkey_by_clazz_idx(idx, this_clazz_idx)
 
-                for referenced_clazz, ref, version, path in only_references(obj, self.serializer):
-                    unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
-                    resolved_idx = db_id_idx.get(txn, unresolved_value)
-                    if resolved_idx:
-                        db_reference_outward.put(txn, full_key, resolved_idx)
+                for referenced_clazz, ref, version, path, referencing_clazz in only_references(obj, self.serializer):
+                    if referenced_clazz is not None:
+                        unresolved_value = self.serializer.encode_key(ref, version, referenced_clazz)
+                        resolved_idx = db_id_idx.get(txn, unresolved_value)
+                        if resolved_idx:
+                            db_reference_outward.put(txn, full_key, resolved_idx)
+                        else:
+                            unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path, referencing_clazz)
+                            db_unresolved.put(txn, full_key, unresolved_obj)
                     else:
-                        unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path)
+                        unresolved_obj = self.serializer.encode_ref_path(ref, version, referenced_clazz, path, referencing_clazz)
                         db_unresolved.put(txn, full_key, unresolved_obj)
 
                 value = self.serializer.marshall(obj, clazz)

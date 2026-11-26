@@ -39,10 +39,10 @@ def simple_recursive_attributes(obj):
 def reversion_object(deserialized, updated_version, any_too=False) -> Generator[EntityStructure, None, None]:
     for obj in simple_recursive_attributes(deserialized):
         if hasattr(obj, 'version') and (any_too or obj.version != 'any'):
-            obj.version = updated_version
+            obj.version = str(updated_version)
 
     if hasattr(deserialized, 'version') and (any_too or deserialized.version != 'any'):
-        deserialized.version = updated_version
+        deserialized.version = str(updated_version)
 
     yield deserialized
 
@@ -92,4 +92,4 @@ def reversion_update(db: MdbxStorage, txn: TXN, version: int) -> Generator[Tid, 
     for clazz in db.db_names(txn).values():
         obj: Tid
         for _key, obj in db.iter_objects(txn, clazz):
-            yield reversion_object(obj, version, True)
+            yield from reversion_object(obj, version, True)

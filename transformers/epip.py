@@ -572,7 +572,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
     # uic_operating_periods: list[UicOperatingPeriod] = []
     # day_type_assignments: list[DayTypeAssignment] = []
 
-    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: MdbxStorage, txn: TXN) -> None:
+    def recover_line_ref(service_journey: ServiceJourney, service_journey_pattern: ServiceJourneyPattern, db_read: MdbxStorage, txn: TXN) -> Generator[EntityStructure, None, None]:
         sj_line_ref = None
         if service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view is not None and (
             isinstance(service_journey.flexible_line_ref_or_line_ref_or_line_view_or_flexible_line_view, FlexibleLineRef)
@@ -601,10 +601,13 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
                     service_journey_pattern.direction_type = route.direction_type.value
 
                 if service_journey_pattern.direction_ref_or_direction_view is None:
-                    service_journey_pattern.direction_ref_or_direction_view = route.direction_ref
+                    # Since Route is not something we would pull in EPIP, the reference is also not pulled in
+                    if route.direction_ref:
+                        yield db_read.load_object_by_reference(txn, route.direction_ref)
+                        service_journey_pattern.direction_ref_or_direction_view = route.direction_ref
 
                 if service_journey_pattern.distance is None:
-                    route.distance = service_journey_pattern.distance
+                    service_journey_pattern.distance = route.distance
 
         else:
             service_journey_pattern.route_ref_or_route_view = RouteView(flexible_line_ref_or_line_ref_or_line_view=sj_line_ref)
@@ -677,7 +680,7 @@ def epip_service_journey_generator(db_read: MdbxStorage, txn: TXN, generator_def
             ]
 
             # After the Routes to ServiceLinks!
-            recover_line_ref(sj, service_journey_pattern, db_read, txn)
+            yield from recover_line_ref(sj, service_journey_pattern, db_read, txn)
 
             # TODO Issue #242: handle LinkSequenceProjectionRef / LinkSequenceProjection
 
@@ -1124,7 +1127,8 @@ def export_epip_network_offer(
         version="ntx:1.1",
         publication_timestamp=XmlDateTime.now(),
         participant_ref=ParticipantRef(value=defaults["particpant_ref"]),
-        description=MultilingualString(content=[TextType(value=defaults["xml_description"])]),
+        # description=MultilingualString(content=[TextType(value=defaults["xml_description"])]), # This is NeTEx 2.0, hence never EPIP 1 compliant
+        description=MultilingualString(content=[defaults["xml_description"]]),
         data_objects=DataObjectsRelStructure(
             choice=[
                 CompositeFrame(

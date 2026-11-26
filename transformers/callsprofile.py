@@ -349,7 +349,7 @@ class CallsProfile:
             departure += CallsProfile.getDuration(wait_time)
             if spijp is not None:
                 arrival_time, arrival_day_offset = CallsProfile.getArrivalTime(arrival, offset)
-                departure_time, departure_day_offset = CallsProfile.getDepartureTimeOffset(arrival, offset)
+                departure_time, departure_day_offset = CallsProfile.getDepartureTimeOffset(departure, offset)
                 timetabled_passing_time = TimetabledPassingTime(
                     id=service_journey.id.replace(":ServiceJourney:", ":TimetabledPassingTime:") + '-' + str(order),
                     version=service_journey.version,
